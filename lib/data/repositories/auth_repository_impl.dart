@@ -79,4 +79,3 @@ class AuthRepositoryImpl implements AuthRepository {
     return _supabase.auth.currentSession != null;
   }
 }
-
