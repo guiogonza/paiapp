@@ -31,7 +31,7 @@ class VehicleModel extends VehicleEntity {
       'brand': marca, // Mapeo: marca → brand
       'model': modelo, // Mapeo: modelo → model
       'year': ano, // Mapeo: ano → year
-      if (conductor != null && conductor!.isNotEmpty) 'driver_name': conductor, // Mapeo: conductor → driver_name
+      'driver_name': conductor,// Mapeo: conductor → driver_name
     };
   }
 

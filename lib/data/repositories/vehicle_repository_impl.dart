@@ -14,6 +14,11 @@ class VehicleRepositoryImpl implements VehicleRepository {
   @override
   Future<Either<VehicleFailure, List<VehicleEntity>>> getVehicles() async {
     try {
+      // Verificar que el usuario esté autenticado
+      if (_supabase.auth.currentUser == null) {
+        return const Left(ValidationFailure('Debes iniciar sesión para ver vehículos'));
+      }
+
       final response = await _supabase
           .from(_tableName)
           .select()
@@ -66,6 +71,11 @@ class VehicleRepositoryImpl implements VehicleRepository {
   Future<Either<VehicleFailure, VehicleEntity>> createVehicle(
       VehicleEntity vehicle) async {
     try {
+      // Verificar que el usuario esté autenticado
+      if (_supabase.auth.currentUser == null) {
+        return const Left(ValidationFailure('Debes iniciar sesión para crear vehículos'));
+      }
+
       final model = VehicleModel.fromEntity(vehicle);
       final json = model.toJson();
       json.remove('id'); // No incluir id en la creación
