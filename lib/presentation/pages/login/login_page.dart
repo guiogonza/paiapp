@@ -79,18 +79,43 @@ class _LoginPageState extends State<LoginPage> {
         _passwordController.text,
       );
 
-      if (mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const DashboardPage()),
+      // Después del registro, intentar hacer login automáticamente
+      try {
+        await _authRepository.login(
+          _emailController.text.trim(),
+          _passwordController.text,
         );
+
+        if (mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const DashboardPage()),
+          );
+        }
+      } catch (loginError) {
+        // Si el login falla (por ejemplo, si requiere confirmación de email),
+        // mostrar mensaje pero permitir que el usuario intente iniciar sesión manualmente
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text(
+                'Registro exitoso. Por favor, inicia sesión con tus credenciales.',
+              ),
+              backgroundColor: Colors.orange,
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 5),
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
+        final errorMessage = e.toString().replaceFirst('Exception: ', '');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(e.toString().replaceFirst('Exception: ', '')),
+            content: Text(errorMessage),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 5),
           ),
         );
       }

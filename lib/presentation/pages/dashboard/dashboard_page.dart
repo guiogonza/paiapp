@@ -11,6 +11,9 @@ class DashboardPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final authRepository = AuthRepositoryImpl();
     final currentUser = authRepository.getCurrentUser();
+    
+    // Verificar autenticación
+    final isAuthenticated = authRepository.isAuthenticated();
 
     return Scaffold(
       appBar: AppBar(
@@ -52,6 +55,15 @@ class DashboardPage extends StatelessWidget {
                       color: AppColors.textSecondary,
                     ),
               ),
+            const SizedBox(height: 8),
+            Text(
+              isAuthenticated 
+                ? '✓ Autenticado' 
+                : '⚠ No autenticado',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: isAuthenticated ? Colors.green : Colors.orange,
+                  ),
+            ),
             const SizedBox(height: 48),
             ElevatedButton.icon(
               onPressed: () {
