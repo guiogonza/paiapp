@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:pai_app/core/constants/app_constants.dart';
 import 'package:pai_app/core/theme/app_colors.dart';
+import 'package:pai_app/presentation/pages/login/login_page.dart';
+import 'package:pai_app/presentation/pages/dashboard/dashboard_page.dart';
 
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key});
@@ -45,16 +48,31 @@ class _SplashPageState extends State<SplashPage>
 
     _controller.forward();
 
-    // Navegar a la siguiente pantalla después del splash
+    // Verificar sesión y navegar después del splash
     Future.delayed(
       const Duration(milliseconds: AppConstants.splashDuration),
       () {
         if (mounted) {
-          // TODO: Navegar a la pantalla principal o de autenticación
-          // Navigator.of(context).pushReplacementNamed('/home');
+          _navigateToNextScreen();
         }
       },
     );
+  }
+
+  void _navigateToNextScreen() {
+    final session = Supabase.instance.client.auth.currentSession;
+    
+    if (session != null) {
+      // Hay sesión activa, ir al Dashboard
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const DashboardPage()),
+      );
+    } else {
+      // No hay sesión, ir al Login
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const LoginPage()),
+      );
+    }
   }
 
   @override
@@ -130,17 +148,5 @@ class _SplashPageState extends State<SplashPage>
     );
   }
 
-  Widget _buildLetter(String letter, Color color) {
-    return Text(
-      letter,
-      style: TextStyle(
-        fontSize: 64,
-        fontWeight: FontWeight.bold,
-        color: color,
-        letterSpacing: 0,
-        height: 1.0,
-      ),
-    );
-  }
 }
 
