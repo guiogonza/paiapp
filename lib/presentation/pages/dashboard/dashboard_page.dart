@@ -3,6 +3,8 @@ import 'package:pai_app/core/theme/app_colors.dart';
 import 'package:pai_app/data/repositories/auth_repository_impl.dart';
 import 'package:pai_app/presentation/pages/login/login_page.dart';
 import 'package:pai_app/presentation/pages/vehicles/vehicles_list_page.dart';
+import 'package:pai_app/presentation/pages/trips/trips_list_page.dart';
+import 'package:pai_app/presentation/pages/expenses/expenses_list_page.dart';
 
 class DashboardPage extends StatelessWidget {
   const DashboardPage({super.key});
@@ -75,6 +77,42 @@ class DashboardPage extends StatelessWidget {
               },
               icon: const Icon(Icons.directions_car),
               label: const Text('Gestionar Vehículos'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 16,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const TripsListPage(),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.route),
+              label: const Text('Gestionar Viajes'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 16,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const ExpensesListPage(),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.receipt_long),
+              label: const Text('Gestionar Gastos'),
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 24,
