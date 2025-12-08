@@ -51,5 +51,11 @@
 	<string>Necesitamos acceso a la galería para seleccionar fotos de los recibos de gastos.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Necesitamos acceso para guardar fotos de recibos en la galería.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Necesitamos acceso a tu ubicación para mostrarte en el mapa y rastrear vehículos.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>Necesitamos acceso a tu ubicación para mostrarte en el mapa y rastrear vehículos.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Necesitamos acceso a tu ubicación para mostrarte en el mapa y rastrear vehículos en tiempo real.</string>
 </dict>
 </plist>

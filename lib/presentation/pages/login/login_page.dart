@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:pai_app/core/theme/app_colors.dart';
 import 'package:pai_app/data/repositories/auth_repository_impl.dart';
-import 'package:pai_app/presentation/pages/dashboard/dashboard_page.dart';
+import 'package:pai_app/data/repositories/profile_repository_impl.dart';
+import 'package:pai_app/presentation/pages/owner/owner_dashboard_page.dart';
+import 'package:pai_app/presentation/pages/driver/driver_dashboard_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -41,9 +43,7 @@ class _LoginPageState extends State<LoginPage> {
       );
 
       if (mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const DashboardPage()),
-        );
+        _navigateToDashboard();
       }
     } catch (e) {
       if (mounted) {
@@ -60,6 +60,47 @@ class _LoginPageState extends State<LoginPage> {
         setState(() {
           _isLoading = false;
         });
+      }
+    }
+  }
+
+  Future<void> _navigateToDashboard() async {
+    try {
+      final profileRepository = ProfileRepositoryImpl();
+      final profileResult = await profileRepository.getCurrentUserProfile();
+      
+      if (mounted) {
+        profileResult.fold(
+          (failure) {
+            // Si no se puede obtener el perfil, mostrar OwnerDashboardPage por defecto
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (_) => const OwnerDashboardPage()),
+            );
+          },
+          (profile) {
+            // Redirigir según el role
+            Widget targetPage;
+            if (profile.role == 'owner') {
+              targetPage = const OwnerDashboardPage();
+            } else if (profile.role == 'driver') {
+              targetPage = const DriverDashboardPage();
+            } else {
+              // Role desconocido, mostrar OwnerDashboardPage por defecto
+              targetPage = const OwnerDashboardPage();
+            }
+            
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (_) => targetPage),
+            );
+          },
+        );
+      }
+    } catch (e) {
+      // Error al obtener perfil, mostrar OwnerDashboardPage por defecto
+      if (mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const OwnerDashboardPage()),
+        );
       }
     }
   }
@@ -87,9 +128,7 @@ class _LoginPageState extends State<LoginPage> {
         );
 
         if (mounted) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const DashboardPage()),
-          );
+          _navigateToDashboard();
         }
       } catch (loginError) {
         // Si el login falla (por ejemplo, si requiere confirmación de email),
@@ -216,9 +255,6 @@ class _LoginPageState extends State<LoginPage> {
                     validator: (value) {
                       if (value == null || value.isEmpty) {
                         return 'Por favor ingresa tu contraseña';
-                      }
-                      if (value.length < 6) {
-                        return 'La contraseña debe tener al menos 6 caracteres';
                       }
                       return null;
                     },

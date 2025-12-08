@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:pai_app/core/constants/app_constants.dart';
 import 'package:pai_app/core/theme/app_colors.dart';
+import 'package:pai_app/data/repositories/profile_repository_impl.dart';
 import 'package:pai_app/presentation/pages/login/login_page.dart';
-import 'package:pai_app/presentation/pages/dashboard/dashboard_page.dart';
+import 'package:pai_app/presentation/pages/owner/owner_dashboard_page.dart';
+import 'package:pai_app/presentation/pages/driver/driver_dashboard_page.dart';
 
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key});
@@ -59,19 +61,73 @@ class _SplashPageState extends State<SplashPage>
     );
   }
 
-  void _navigateToNextScreen() {
+  Future<void> _navigateToNextScreen() async {
     final session = Supabase.instance.client.auth.currentSession;
     
     if (session != null) {
-      // Hay sesión activa, ir al Dashboard
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const DashboardPage()),
-      );
+      // Hay sesión activa, obtener el perfil y redirigir según el role
+      try {
+        final profileRepository = ProfileRepositoryImpl();
+        final profileResult = await profileRepository.getCurrentUserProfile();
+        
+        if (mounted) {
+          profileResult.fold(
+            (failure) {
+              // Si no se puede obtener el perfil, mostrar OwnerDashboardPage por defecto
+              // (asumiendo que el usuario es owner si no tiene perfil)
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('No se encontró perfil. Mostrando dashboard de dueño por defecto.'),
+                    backgroundColor: Colors.orange,
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(builder: (_) => const OwnerDashboardPage()),
+                );
+              }
+            },
+            (profile) {
+              // Redirigir según el role
+              Widget targetPage;
+              if (profile.role == 'owner') {
+                targetPage = const OwnerDashboardPage();
+              } else if (profile.role == 'driver') {
+                targetPage = const DriverDashboardPage();
+              } else {
+                // Role desconocido, mostrar OwnerDashboardPage por defecto
+                targetPage = const OwnerDashboardPage();
+              }
+              
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(builder: (_) => targetPage),
+              );
+            },
+          );
+        }
+      } catch (e) {
+        // Error al obtener perfil, mostrar OwnerDashboardPage por defecto
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error al cargar perfil: ${e.toString()}. Mostrando dashboard por defecto.'),
+              backgroundColor: Colors.orange,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const OwnerDashboardPage()),
+          );
+        }
+      }
     } else {
       // No hay sesión, ir al Login
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const LoginPage()),
-      );
+      if (mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const LoginPage()),
+        );
+      }
     }
   }
 
