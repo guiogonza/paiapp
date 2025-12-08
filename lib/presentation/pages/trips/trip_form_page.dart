@@ -20,6 +20,7 @@ class TripFormPage extends StatefulWidget {
 class _TripFormPageState extends State<TripFormPage> {
   final _formKey = GlobalKey<FormState>();
   final _driverNameController = TextEditingController();
+  final _clientNameController = TextEditingController();
   final _originController = TextEditingController();
   final _destinationController = TextEditingController();
   final _revenueAmountController = TextEditingController();
@@ -42,6 +43,7 @@ class _TripFormPageState extends State<TripFormPage> {
     if (widget.trip != null) {
       _selectedVehicleId = widget.trip!.vehicleId;
       _driverNameController.text = widget.trip!.driverName;
+      _clientNameController.text = widget.trip!.clientName;
       _originController.text = widget.trip!.origin;
       _destinationController.text = widget.trip!.destination;
       _revenueAmountController.text = widget.trip!.revenueAmount.toStringAsFixed(0);
@@ -55,6 +57,7 @@ class _TripFormPageState extends State<TripFormPage> {
 
     // Agregar listeners para validación en tiempo real
     _driverNameController.addListener(_validateForm);
+    _clientNameController.addListener(_validateForm);
     _originController.addListener(_validateForm);
     _destinationController.addListener(_validateForm);
     _revenueAmountController.addListener(_validateForm);
@@ -64,6 +67,7 @@ class _TripFormPageState extends State<TripFormPage> {
   @override
   void dispose() {
     _driverNameController.dispose();
+    _clientNameController.dispose();
     _originController.dispose();
     _destinationController.dispose();
     _revenueAmountController.dispose();
@@ -235,6 +239,7 @@ class _TripFormPageState extends State<TripFormPage> {
         id: widget.trip?.id,
         vehicleId: _selectedVehicleId!,
         driverName: _driverNameController.text.trim(),
+        clientName: _clientNameController.text.trim(),
         origin: _originController.text.trim(),
         destination: _destinationController.text.trim(),
         revenueAmount: revenueAmount,
@@ -366,6 +371,23 @@ class _TripFormPageState extends State<TripFormPage> {
                 ),
                 validator: (value) =>
                     Validators.validateRequired(value, 'Conductor'),
+                textInputAction: TextInputAction.next,
+              ),
+              const SizedBox(height: 20),
+
+              // Client Name (Cliente) - Obligatorio
+              TextFormField(
+                controller: _clientNameController,
+                decoration: InputDecoration(
+                  labelText: 'Nombre del Cliente *',
+                  hintText: 'Nombre del cliente',
+                  prefixIcon: const Icon(Icons.business),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                validator: (value) =>
+                    Validators.validateRequired(value, 'Nombre del Cliente'),
                 textInputAction: TextInputAction.next,
               ),
               const SizedBox(height: 20),

@@ -13,6 +13,7 @@ import 'package:pai_app/data/services/vehicle_history_service.dart';
 import 'package:pai_app/domain/entities/vehicle_location_entity.dart';
 import 'package:pai_app/presentation/pages/login/login_page.dart';
 import 'package:pai_app/presentation/pages/vehicle_history/vehicle_history_page.dart';
+import 'package:pai_app/presentation/pages/billing/billing_dashboard_page.dart';
 
 class OwnerDashboardPage extends StatefulWidget {
   const OwnerDashboardPage({super.key});
@@ -503,6 +504,27 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
                                 label: const Text('Ver historiales'),
                               ),
                             ],
+                          ),
+                          const SizedBox(height: 12),
+                          // Botón para Cobranza y Facturación
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => const BillingDashboardPage(),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.payment),
+                              label: const Text('Cobranza y Facturación'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                              ),
+                            ),
                           ),
                           if (!_hasLocationPermission && !kIsWeb) ...[
                             const SizedBox(height: 8),

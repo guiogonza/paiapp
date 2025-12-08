@@ -32,19 +32,34 @@
 
 ### Situación actual
 
-El endpoint `https://plataforma.sistemagps.online/api/get_history` está devolviendo error 500 cuando se envían los parámetros de fecha.
+El endpoint `https://plataforma.sistemagps.online/api/get_history` está devolviendo error 500 cuando se envían los parámetros.
 
-### Parámetros que se están enviando
+### Información del proveedor
+
+Según el proveedor del API:
+- El `get_devices` tiene que almacenar los IDs del GPS como una variable
+- Ese ID del GPS es el que se usa en `get_history`
+- En el history hay que mandar: **id del GPS**, fecha inicio, hora inicio, fecha fin, hora fin
+
+### Parámetros que se están enviando actualmente
 
 ```
 user_api_hash: [API_KEY]
 lang: es
-device_id: [ID_DEL_VEHICULO]
+id: [ID_DEL_GPS]  ← Cambiado de device_id a id según indicación del proveedor
 from_date: YYYY-MM-DD (ej: 2025-12-07)
 from_time: HH:MM:SS (ej: 16:09:23)
 to_date: YYYY-MM-DD (ej: 2025-12-08)
 to_time: HH:MM:SS (ej: 16:09:23)
 ```
+
+### Flujo actual
+
+1. ✅ `get_devices` obtiene el `id` del GPS (ej: `38724`)
+2. ✅ Ese `id` se guarda en `VehicleLocationEntity.id`
+3. ✅ Ese `id` se pasa a `VehicleHistoryPage` como `vehicleId`
+4. ✅ Ese `id` se envía al API como parámetro `id` (no `device_id`)
+5. ⚠️ El API aún devuelve error 500
 
 ### Errores encontrados
 
@@ -81,24 +96,28 @@ to_time: HH:MM:SS (ej: 16:09:23)
 
 ## 📋 Acciones pendientes con el proveedor del API
 
-### Preguntas para el proveedor
+### Información recibida del proveedor
+
+✅ **Confirmado:**
+- Usar `id` (no `device_id`) - El ID del GPS obtenido de `get_devices`
+- Parámetros requeridos: `id`, `from_date`, `from_time`, `to_date`, `to_time`
+
+### Preguntas pendientes para el proveedor
 
 1. **Formato de fechas:**
-   - ¿Qué formato espera el API para `from_date` y `to_date`? (YYYY-MM-DD, DD-MM-YYYY, etc.)
-   - ¿Qué formato espera para `from_time` y `to_time`? (HH:MM:SS, HH:MM, etc.)
+   - ¿Qué formato exacto espera el API para `from_date` y `to_date`? (YYYY-MM-DD, DD-MM-YYYY, etc.)
+   - ¿Qué formato exacto espera para `from_time` y `to_time`? (HH:MM:SS, HH:MM, etc.)
+   - ¿Hay alguna validación especial de fechas?
 
-2. **Parámetros requeridos:**
-   - ¿Todos los parámetros están correctos?
-   - ¿Falta algún parámetro obligatorio?
-   - ¿El parámetro `device_id` es correcto o debería ser `id`?
-
-3. **Ejemplo de petición exitosa:**
-   - ¿Pueden proporcionar un ejemplo de URL que funcione?
-   - ¿Hay documentación del API disponible?
-
-4. **Error 500:**
+2. **Error 500 persistente:**
+   - A pesar de usar `id` y todos los parámetros requeridos, el API sigue devolviendo error 500
    - ¿Es un problema conocido del servidor?
    - ¿Hay alguna configuración especial necesaria?
+   - ¿Pueden proporcionar un ejemplo de petición exitosa con los valores exactos?
+
+3. **Ejemplo de petición exitosa:**
+   - ¿Pueden proporcionar un ejemplo completo de URL que funcione?
+   - ¿Hay documentación del API disponible con ejemplos?
 
 ## 🔧 Código actual
 

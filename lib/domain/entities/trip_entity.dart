@@ -2,6 +2,7 @@ class TripEntity {
   final String? id;
   final String vehicleId; // FK a vehicles
   final String driverName; // Conductor - obligatorio
+  final String clientName; // Cliente - obligatorio
   final String origin; // Origen - obligatorio
   final String destination; // Destino - obligatorio
   final double revenueAmount; // Monto de ingreso - obligatorio
@@ -13,6 +14,7 @@ class TripEntity {
     this.id,
     required this.vehicleId,
     required this.driverName,
+    required this.clientName,
     required this.origin,
     required this.destination,
     required this.revenueAmount,
@@ -25,6 +27,7 @@ class TripEntity {
     String? id,
     String? vehicleId,
     String? driverName,
+    String? clientName,
     String? origin,
     String? destination,
     double? revenueAmount,
@@ -36,6 +39,7 @@ class TripEntity {
       id: id ?? this.id,
       vehicleId: vehicleId ?? this.vehicleId,
       driverName: driverName ?? this.driverName,
+      clientName: clientName ?? this.clientName,
       origin: origin ?? this.origin,
       destination: destination ?? this.destination,
       revenueAmount: revenueAmount ?? this.revenueAmount,
@@ -52,6 +56,7 @@ class TripEntity {
         other.id == id &&
         other.vehicleId == vehicleId &&
         other.driverName == driverName &&
+        other.clientName == clientName &&
         other.origin == origin &&
         other.destination == destination &&
         other.revenueAmount == revenueAmount &&
@@ -65,6 +70,7 @@ class TripEntity {
     return id.hashCode ^
         vehicleId.hashCode ^
         driverName.hashCode ^
+        clientName.hashCode ^
         origin.hashCode ^
         destination.hashCode ^
         revenueAmount.hashCode ^

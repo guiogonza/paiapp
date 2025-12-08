@@ -1,0 +1,349 @@
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:pai_app/core/theme/app_colors.dart';
+import 'package:pai_app/data/repositories/remittance_repository_impl.dart';
+import 'package:pai_app/domain/entities/remittance_with_route_entity.dart';
+
+class BillingDashboardPage extends StatefulWidget {
+  const BillingDashboardPage({super.key});
+
+  @override
+  State<BillingDashboardPage> createState() => _BillingDashboardPageState();
+}
+
+class _BillingDashboardPageState extends State<BillingDashboardPage> {
+  final _remittanceRepository = RemittanceRepositoryImpl();
+  List<RemittanceWithRouteEntity> _pendingRemittances = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPendingRemittances();
+  }
+
+  Future<void> _loadPendingRemittances() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    final result = await _remittanceRepository.getPendingRemittancesWithRoutes();
+
+    result.fold(
+      (failure) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error al cargar remisiones: ${failure.message}'),
+              backgroundColor: Colors.red,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+        setState(() {
+          _pendingRemittances = [];
+          _isLoading = false;
+        });
+      },
+      (remittances) {
+        setState(() {
+          _pendingRemittances = remittances;
+          _isLoading = false;
+        });
+      },
+    );
+  }
+
+  Future<void> _markAsCollected(RemittanceWithRouteEntity remittance) async {
+    if (remittance.id == null) return;
+
+    // Mostrar diálogo de confirmación
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirmar cobro'),
+        content: Text(
+          '¿Estás seguro de que deseas marcar esta remisión como cobrada?\n\n'
+          'Cliente: ${remittance.clientName?.isNotEmpty == true ? remittance.clientName! : remittance.receiverName}\n'
+          'Viaje: ${remittance.startLocation} → ${remittance.endLocation}',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+            ),
+            child: const Text('Confirmar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    // Mostrar loading
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+
+    final result = await _remittanceRepository.markAsCollected(remittance.id!);
+
+    if (!mounted) return;
+    Navigator.pop(context); // Cerrar loading
+
+    result.fold(
+      (failure) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al marcar como cobrado: ${failure.message}'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      },
+      (_) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Remisión marcada como cobrada exitosamente'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        // Recargar la lista
+        _loadPendingRemittances();
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Cobranza y Facturación'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadPendingRemittances,
+            tooltip: 'Actualizar',
+          ),
+        ],
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _pendingRemittances.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.check_circle_outline,
+                        size: 64,
+                        color: AppColors.textSecondary.withValues(alpha: 0.5),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'No hay remisiones pendientes',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Todas las remisiones han sido cobradas',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                )
+              : RefreshIndicator(
+                  onRefresh: _loadPendingRemittances,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _pendingRemittances.length,
+                    itemBuilder: (context, index) {
+                      final remittance = _pendingRemittances[index];
+                      return _buildRemittanceCard(remittance);
+                    },
+                  ),
+                ),
+    );
+  }
+
+  Widget _buildRemittanceCard(RemittanceWithRouteEntity remittance) {
+    final dateFormat = DateFormat('dd/MM/yyyy');
+    final timeFormat = DateFormat('HH:mm');
+    final createdAt = remittance.createdAt;
+    final dateStr = createdAt != null ? dateFormat.format(createdAt) : 'N/A';
+    final timeStr = createdAt != null ? timeFormat.format(createdAt) : '';
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header con indicador de documento
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Cliente',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        // Priorizar clientName del route (trip) para facturación
+                        remittance.clientName?.isNotEmpty == true
+                            ? remittance.clientName!
+                            : remittance.receiverName,
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Indicador de documento
+                if (remittance.hasDocument)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.green,
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.attach_file,
+                          size: 16,
+                          color: Colors.green,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Documento',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: Colors.green,
+                                fontWeight: FontWeight.bold,
+                              ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const Divider(),
+            const SizedBox(height: 16),
+            // Información del viaje
+            Row(
+              children: [
+                const Icon(
+                  Icons.route,
+                  size: 20,
+                  color: AppColors.primary,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Viaje',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${remittance.startLocation} → ${remittance.endLocation}',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w500,
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            // Fecha
+            Row(
+              children: [
+                const Icon(
+                  Icons.calendar_today,
+                  size: 20,
+                  color: AppColors.textSecondary,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Fecha: $dateStr${timeStr.isNotEmpty ? ' a las $timeStr' : ''}',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ],
+            ),
+            if (remittance.driverName != null && remittance.driverName!.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.person,
+                    size: 20,
+                    color: AppColors.textSecondary,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Conductor: ${remittance.driverName}',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 16),
+            const Divider(),
+            const SizedBox(height: 16),
+            // Botón de acción
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => _markAsCollected(remittance),
+                icon: const Icon(Icons.check_circle),
+                label: const Text('Marcar como Cobrado'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+

@@ -8,6 +8,7 @@ class TripModel extends TripEntity {
     super.id,
     required super.vehicleId,
     required super.driverName,
+    required super.clientName,
     required super.origin,
     required super.destination,
     required super.revenueAmount,
@@ -23,6 +24,7 @@ class TripModel extends TripEntity {
       id: json['id'] as String?,
       vehicleId: json['vehicle_id'] as String, // Mapeo estricto: vehicle_id
       driverName: json['driver_name'] as String, // Mapeo estricto: driver_name
+      clientName: (json['client_name'] as String?) ?? '', // Mapeo estricto: client_name
       origin: (json['start_location'] ?? json['origin']) as String? ?? '', // Mapeo estricto: start_location o origin
       destination: (json['end_location'] ?? json['destination']) as String? ?? '', // Mapeo estricto: end_location o destination
       revenueAmount: (json['revenue_amount'] as num).toDouble(), // Mapeo estricto: revenue_amount
@@ -43,6 +45,7 @@ class TripModel extends TripEntity {
       if (id != null) 'id': id,
       'vehicle_id': vehicleId, // Mapeo estricto: vehicle_id
       'driver_name': driverName, // Mapeo estricto: driver_name
+      'client_name': clientName, // Mapeo estricto: client_name
       'start_location': origin, // Mapeo estricto: start_location
       'end_location': destination, // Mapeo estricto: end_location
       'revenue_amount': revenueAmount, // Mapeo estricto: revenue_amount
@@ -58,6 +61,7 @@ class TripModel extends TripEntity {
       id: entity.id,
       vehicleId: entity.vehicleId,
       driverName: entity.driverName,
+      clientName: entity.clientName,
       origin: entity.origin,
       destination: entity.destination,
       revenueAmount: entity.revenueAmount,
@@ -73,6 +77,7 @@ class TripModel extends TripEntity {
       id: id,
       vehicleId: vehicleId,
       driverName: driverName,
+      clientName: clientName,
       origin: origin,
       destination: destination,
       revenueAmount: revenueAmount,

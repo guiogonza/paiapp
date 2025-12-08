@@ -29,12 +29,12 @@ class VehicleHistoryService {
       }
 
       // Construir los parámetros de la URL
-      // El API de GPS requiere parámetros separados: from_date, from_time, to_date, to_time
-      // El parámetro 'id' parece causar error 500, así que solo usamos 'device_id'
+      // El API de GPS requiere: id (del GPS obtenido de get_devices), fecha inicio, hora inicio, fecha fin, hora fin
+      // IMPORTANTE: Usar 'id' (no 'device_id') con el ID del GPS que viene de get_devices
       final params = <String, String>{
         'user_api_hash': apiKey,
         'lang': 'es',
-        'device_id': vehicleId,
+        'id': vehicleId, // ID del GPS obtenido de get_devices
       };
 
       // Agregar fechas y horas separadas - SON OBLIGATORIAS según el error 422
