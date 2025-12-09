@@ -6,7 +6,7 @@ import 'package:flutter/foundation.dart';
 
 /// Servicio que obtiene el historial de ubicaciones de vehículos desde la API de GPS
 class VehicleHistoryService {
-  static const String _historyUrl = 'https://plataforma.sistemagps.online/api/get_history';
+  static const String _historyUrl = 'http://178.63.27.106/api/get_history';
   final GPSAuthService _authService = GPSAuthService();
 
   /// Obtiene el historial de un vehículo específico
@@ -28,25 +28,22 @@ class VehicleHistoryService {
         throw Exception('No se pudo obtener el API key');
       }
 
-      // Construir los parámetros de la URL
-      // El API de GPS requiere: id (del GPS obtenido de get_devices), fecha inicio, hora inicio, fecha fin, hora fin
-      // IMPORTANTE: Usar 'id' (no 'device_id') con el ID del GPS que viene de get_devices
-      final params = <String, String>{
-        'user_api_hash': apiKey,
-        'lang': 'es',
-        'id': vehicleId, // ID del GPS obtenido de get_devices
-      };
-
-      // Agregar fechas y horas separadas - SON OBLIGATORIAS según el error 422
-      // El API espera: from_date, from_time, to_date, to_time (separados)
-      // Si no se proporcionan, usar valores por defecto (últimas 24 horas)
+      // Construir los parámetros de la URL en el orden correcto
+      // Orden correcto según el API: lang, user_api_hash, report_id, device_id, from_date, to_date, from_time, to_time
       final fromDate = from ?? DateTime.now().subtract(const Duration(days: 1));
       final toDate = to ?? DateTime.now();
       
-      params['from_date'] = _formatDateOnly(fromDate);
-      params['from_time'] = _formatTimeOnly(fromDate);
-      params['to_date'] = _formatDateOnly(toDate);
-      params['to_time'] = _formatTimeOnly(toDate);
+      // Construir parámetros en el orden exacto requerido por el API
+      final params = <String, String>{
+        'lang': 'es',
+        'user_api_hash': apiKey,
+        'report_id': '1',
+        'device_id': vehicleId, // ID del GPS obtenido de get_devices
+        'from_date': _formatDateOnly(fromDate),
+        'to_date': _formatDateOnly(toDate),
+        'from_time': _formatTimeOnly(fromDate),
+        'to_time': _formatTimeOnly(toDate),
+      };
       
       if (kDebugMode) {
         print('📅 Enviando fechas obligatorias:');
@@ -87,6 +84,26 @@ class VehicleHistoryService {
       }
 
       if (response.statusCode == 200) {
+        if (kDebugMode) {
+          print('✅ Respuesta exitosa (200)');
+          print('📦 JSON completo de la respuesta:');
+          print('   ${response.body}');
+          try {
+            final jsonData = json.decode(response.body);
+            print('📦 JSON parseado:');
+            print('   Tipo: ${jsonData.runtimeType}');
+            if (jsonData is Map) {
+              print('   Keys: ${jsonData.keys.toList()}');
+            } else if (jsonData is List) {
+              print('   Total de items: ${jsonData.length}');
+              if (jsonData.isNotEmpty) {
+                print('   Primer item: ${jsonData.first}');
+              }
+            }
+          } catch (e) {
+            print('⚠️ Error al parsear JSON: $e');
+          }
+        }
         return _parseHistoryResponse(response, vehicleId, plate);
       } else {
         if (kDebugMode) {
@@ -151,90 +168,122 @@ class VehicleHistoryService {
     String vehicleId,
     String plate,
   ) {
+    if (kDebugMode) {
+      print('📦 Parseando respuesta del historial...');
+      print('   Body length: ${response.body.length} caracteres');
+    }
+    
     final data = json.decode(response.body);
     
     if (kDebugMode) {
       print('📦 Respuesta de historial recibida');
+      print('   Tipo de dato: ${data.runtimeType}');
+      if (data is Map) {
+        print('   Estructura del Map:');
+        data.forEach((key, value) {
+          print('     $key: ${value.runtimeType}${value is List ? ' (${value.length} items)' : ''}');
+        });
+      } else if (data is List) {
+        print('   Es una Lista con ${data.length} items');
+        if (data.isNotEmpty) {
+          print('   Estructura del primer item:');
+          final firstItem = data.first;
+          if (firstItem is Map) {
+            firstItem.forEach((key, value) {
+              print('     $key: $value (${value.runtimeType})');
+            });
+          }
+        }
+      }
     }
 
-    // La respuesta puede tener diferentes estructuras
-    // Intentar extraer los items del historial
+    // La respuesta tiene estructura anidada: {"items": [{"items": [...]}]}
     List<dynamic> items = [];
     
-    if (data is List) {
+    if (data is Map) {
+      // Buscar items en el nivel superior
+      final topLevelItems = data['items'] as List?;
+      if (topLevelItems != null && topLevelItems.isNotEmpty) {
+        // La estructura es: items[0].items[] contiene los puntos reales
+        for (var topItem in topLevelItems) {
+          if (topItem is Map && topItem['items'] != null) {
+            final nestedItems = topItem['items'] as List;
+            items.addAll(nestedItems);
+          }
+        }
+      } else {
+        // Fallback: buscar en otras keys comunes
+        items = data['data'] ?? 
+                data['history'] ?? 
+                data['positions'] ?? 
+                [];
+      }
+    } else if (data is List) {
       items = data;
-    } else if (data is Map) {
-      // Puede venir como {"items": [...]} o {"data": [...]} o directamente los items
-      items = data['items'] ?? 
-              data['data'] ?? 
-              data['history'] ?? 
-              data['positions'] ?? 
-              [];
     }
 
     if (kDebugMode) {
       print('📦 Total de puntos de historial recibidos: ${items.length}');
+      if (items.isNotEmpty) {
+        print('   Estructura del primer punto:');
+        final firstPoint = items.first;
+        if (firstPoint is Map) {
+          firstPoint.forEach((key, value) {
+            print('     $key: $value');
+          });
+        }
+      }
     }
 
     final history = <VehicleHistoryEntity>[];
     
     for (var item in items) {
       try {
-        // Extraer coordenadas
-        final lat = (item['lat'] ?? item['latitude'] ?? 0.0).toDouble();
-        final lng = (item['lng'] ?? item['longitude'] ?? item['lon'] ?? 0.0).toDouble();
+        if (item is! Map) continue;
         
-        // Extraer timestamp
+        // Extraer coordenadas (priorizar latitude/longitude, luego lat/lng)
+        final lat = (item['latitude'] ?? item['lat'] ?? 0.0).toDouble();
+        final lng = (item['longitude'] ?? item['lng'] ?? item['lon'] ?? 0.0).toDouble();
+        
+        // Extraer timestamp - usar 'time' con formato DD-MM-YYYY HH:MM:SS
         DateTime? timestamp;
-        if (item['timestamp'] != null) {
-          // Puede venir como Unix timestamp (segundos o milisegundos)
-          final ts = item['timestamp'];
-          if (ts is int) {
-            // Si es muy grande, probablemente está en milisegundos
-            timestamp = ts > 1000000000000
-                ? DateTime.fromMillisecondsSinceEpoch(ts)
-                : DateTime.fromMillisecondsSinceEpoch(ts * 1000);
-          }
-        } else if (item['time'] != null) {
-          // Intentar parsear formato de fecha string
+        if (item['time'] != null) {
           try {
             final timeStr = item['time'] as String;
-            // Intentar diferentes formatos
+            // Formato esperado: "08-12-2025 09:20:39" (DD-MM-YYYY HH:MM:SS)
             if (timeStr.contains('-') && timeStr.contains(':')) {
-              // Formato: "05-12-2025 11:57:52" o "2025-12-05 11:57:52"
               final parts = timeStr.split(' ');
               if (parts.length == 2) {
                 final dateParts = parts[0].split('-');
                 final timeParts = parts[1].split(':');
                 if (dateParts.length == 3 && timeParts.length == 3) {
-                  // Determinar si el formato es DD-MM-YYYY o YYYY-MM-DD
-                  if (dateParts[0].length == 4) {
-                    // YYYY-MM-DD
-                    timestamp = DateTime(
-                      int.parse(dateParts[0]),
-                      int.parse(dateParts[1]),
-                      int.parse(dateParts[2]),
-                      int.parse(timeParts[0]),
-                      int.parse(timeParts[1]),
-                      int.parse(timeParts[2]),
-                    );
-                  } else {
-                    // DD-MM-YYYY
-                    timestamp = DateTime(
-                      int.parse(dateParts[2]),
-                      int.parse(dateParts[1]),
-                      int.parse(dateParts[0]),
-                      int.parse(timeParts[0]),
-                      int.parse(timeParts[1]),
-                      int.parse(timeParts[2]),
-                    );
-                  }
+                  // Formato DD-MM-YYYY
+                  timestamp = DateTime(
+                    int.parse(dateParts[2]), // año
+                    int.parse(dateParts[1]), // mes
+                    int.parse(dateParts[0]), // día
+                    int.parse(timeParts[0]), // hora
+                    int.parse(timeParts[1]), // minuto
+                    int.parse(timeParts[2]), // segundo
+                  );
                 }
               }
             }
           } catch (e) {
             if (kDebugMode) {
               print('⚠️ Error al parsear fecha: ${item['time']} - $e');
+            }
+          }
+        }
+        
+        // Si no se pudo parsear 'time', intentar con 'raw_time' (formato YYYY-MM-DD)
+        if (timestamp == null && item['raw_time'] != null) {
+          try {
+            final rawTimeStr = item['raw_time'] as String;
+            timestamp = DateTime.parse(rawTimeStr);
+          } catch (e) {
+            if (kDebugMode) {
+              print('⚠️ Error al parsear raw_time: ${item['raw_time']} - $e');
             }
           }
         }
@@ -250,7 +299,29 @@ class VehicleHistoryService {
             ? (item['course'] as num).toDouble() 
             : (item['heading'] != null ? (item['heading'] as num).toDouble() : null);
         final altitude = item['altitude'] != null ? (item['altitude'] as num).toDouble() : null;
-        final valid = item['valid'] as bool?;
+        
+        // Extraer 'valid' - puede venir como 1/0 o true/false
+        bool? valid;
+        if (item['valid'] != null) {
+          if (item['valid'] is bool) {
+            valid = item['valid'] as bool;
+          } else if (item['valid'] is int) {
+            valid = (item['valid'] as int) == 1;
+          }
+        }
+        
+        // Extraer 'ignition' de other_arr
+        bool? ignition;
+        if (item['other_arr'] != null && item['other_arr'] is List) {
+          final otherArr = item['other_arr'] as List;
+          for (var otherItem in otherArr) {
+            if (otherItem is String && otherItem.startsWith('ignition: ')) {
+              final ignitionStr = otherItem.replaceFirst('ignition: ', '');
+              ignition = ignitionStr.toLowerCase() == 'true';
+              break;
+            }
+          }
+        }
 
         history.add(
           VehicleHistoryEntity(
@@ -263,11 +334,13 @@ class VehicleHistoryService {
             heading: heading,
             altitude: altitude,
             valid: valid,
+            ignition: ignition, // Agregar ignition
           ),
         );
       } catch (e) {
         if (kDebugMode) {
           print('⚠️ Error al parsear punto de historial: $e');
+          print('   Item: $item');
         }
       }
     }

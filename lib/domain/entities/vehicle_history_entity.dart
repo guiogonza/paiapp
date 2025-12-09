@@ -9,6 +9,7 @@ class VehicleHistoryEntity {
   final double? heading; // Dirección en grados (course)
   final double? altitude; // Altitud en metros
   final bool? valid; // Si la ubicación es válida
+  final bool? ignition; // Si el vehículo está encendido
 
   const VehicleHistoryEntity({
     required this.vehicleId,
@@ -20,6 +21,7 @@ class VehicleHistoryEntity {
     this.heading,
     this.altitude,
     this.valid,
+    this.ignition,
   });
 
   VehicleHistoryEntity copyWith({
@@ -32,6 +34,7 @@ class VehicleHistoryEntity {
     double? heading,
     double? altitude,
     bool? valid,
+    bool? ignition,
   }) {
     return VehicleHistoryEntity(
       vehicleId: vehicleId ?? this.vehicleId,
@@ -43,6 +46,7 @@ class VehicleHistoryEntity {
       heading: heading ?? this.heading,
       altitude: altitude ?? this.altitude,
       valid: valid ?? this.valid,
+      ignition: ignition ?? this.ignition,
     );
   }
 

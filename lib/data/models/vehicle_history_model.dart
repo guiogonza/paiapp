@@ -12,6 +12,7 @@ class VehicleHistoryModel extends VehicleHistoryEntity {
     super.heading,
     super.altitude,
     super.valid,
+    super.ignition,
   });
 
   factory VehicleHistoryModel.fromJson(Map<String, dynamic> json) {
@@ -25,6 +26,7 @@ class VehicleHistoryModel extends VehicleHistoryEntity {
       heading: json['heading'] != null ? (json['heading'] as num).toDouble() : null,
       altitude: json['altitude'] != null ? (json['altitude'] as num).toDouble() : null,
       valid: json['valid'] as bool?,
+      ignition: json['ignition'] as bool?,
     );
   }
 
@@ -39,6 +41,7 @@ class VehicleHistoryModel extends VehicleHistoryEntity {
       'heading': heading,
       'altitude': altitude,
       'valid': valid,
+      'ignition': ignition,
     };
   }
 
@@ -53,6 +56,7 @@ class VehicleHistoryModel extends VehicleHistoryEntity {
       heading: entity.heading,
       altitude: entity.altitude,
       valid: entity.valid,
+      ignition: entity.ignition,
     );
   }
 
@@ -67,6 +71,7 @@ class VehicleHistoryModel extends VehicleHistoryEntity {
       heading: heading,
       altitude: altitude,
       valid: valid,
+      ignition: ignition,
     );
   }
 }

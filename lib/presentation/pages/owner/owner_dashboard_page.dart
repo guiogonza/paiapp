@@ -153,6 +153,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
         _isLoading = false;
       });
       _updateMarkers();
+      _centerMapOnVehicles();
       
       // Cargar y guardar el historial de cada vehículo en segundo plano
       _loadAndSaveVehicleHistory(locations);
@@ -352,6 +353,80 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
   void _onMapCreated(gmaps.GoogleMapController controller) {
     _mapController = controller;
     _updateMarkers();
+    _centerMapOnVehicles();
+  }
+
+  latlng.LatLng _calculateCenter() {
+    if (_vehicleLocations.isEmpty) return _defaultLocationFlutter;
+    
+    double avgLat = 0;
+    double avgLng = 0;
+    for (var vehicle in _vehicleLocations) {
+      avgLat += vehicle.lat;
+      avgLng += vehicle.lng;
+    }
+    avgLat /= _vehicleLocations.length;
+    avgLng /= _vehicleLocations.length;
+    
+    return latlng.LatLng(avgLat, avgLng);
+  }
+
+  gmaps.LatLng _calculateGoogleMapsCenter() {
+    if (_vehicleLocations.isEmpty) return _defaultLocation;
+    
+    double avgLat = 0;
+    double avgLng = 0;
+    for (var vehicle in _vehicleLocations) {
+      avgLat += vehicle.lat;
+      avgLng += vehicle.lng;
+    }
+    avgLat /= _vehicleLocations.length;
+    avgLng /= _vehicleLocations.length;
+    
+    return gmaps.LatLng(avgLat, avgLng);
+  }
+
+  void _centerMapOnVehicles() {
+    if (_vehicleLocations.isEmpty) return;
+
+    if (kIsWeb) {
+      final center = _calculateCenter();
+      Future.delayed(const Duration(milliseconds: 100), () {
+        if (mounted && _flutterMapController != null) {
+          try {
+            _flutterMapController!.move(
+              center,
+              8.0, // Zoom amplio
+            );
+          } catch (e) {
+            // Ignorar errores
+          }
+        }
+      });
+    } else {
+      // Calcular bounds para Google Maps
+      double minLat = _vehicleLocations.first.lat;
+      double maxLat = _vehicleLocations.first.lat;
+      double minLng = _vehicleLocations.first.lng;
+      double maxLng = _vehicleLocations.first.lng;
+
+      for (var vehicle in _vehicleLocations) {
+        if (vehicle.lat < minLat) minLat = vehicle.lat;
+        if (vehicle.lat > maxLat) maxLat = vehicle.lat;
+        if (vehicle.lng < minLng) minLng = vehicle.lng;
+        if (vehicle.lng > maxLng) maxLng = vehicle.lng;
+      }
+
+      _mapController?.animateCamera(
+        gmaps.CameraUpdate.newLatLngBounds(
+          gmaps.LatLngBounds(
+            southwest: gmaps.LatLng(minLat, minLng),
+            northeast: gmaps.LatLng(maxLat, maxLng),
+          ),
+          100, // padding
+        ),
+      );
+    }
   }
 
   @override
@@ -390,13 +465,10 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
                     ? FlutterMap(
                         mapController: _flutterMapController,
                         options: MapOptions(
-                          initialCenter: _currentLocation != null
-                              ? latlng.LatLng(
-                                  _currentLocation!.latitude!,
-                                  _currentLocation!.longitude!,
-                                )
+                          initialCenter: _vehicleLocations.isNotEmpty
+                              ? _calculateCenter()
                               : _defaultLocationFlutter,
-                          initialZoom: 14.0,
+                          initialZoom: 8.0, // Zoom más amplio para ver todos los vehículos
                         ),
                         children: [
                           TileLayer(
@@ -411,14 +483,11 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
                     : gmaps.GoogleMap(
                         onMapCreated: _onMapCreated,
                         initialCameraPosition: gmaps.CameraPosition(
-                          target: _currentLocation != null
-                              ? gmaps.LatLng(
-                                  _currentLocation!.latitude!,
-                                  _currentLocation!.longitude!,
-                                )
-                              : _defaultLocation,
-                          zoom: 14.0,
-                        ),
+                              target: _vehicleLocations.isNotEmpty
+                                  ? _calculateGoogleMapsCenter()
+                                  : _defaultLocation,
+                              zoom: 8.0, // Zoom más amplio para ver todos los vehículos
+                            ),
                         markers: _markers,
                         myLocationEnabled: _hasLocationPermission,
                         myLocationButtonEnabled: _hasLocationPermission,

@@ -4,6 +4,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart' as gmaps;
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' as latlng;
 import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:pai_app/core/theme/app_colors.dart';
 import 'package:pai_app/data/repositories/vehicle_history_repository_impl.dart';
 import 'package:pai_app/data/services/vehicle_history_service.dart';
@@ -33,6 +34,8 @@ class _VehicleHistoryPageState extends State<VehicleHistoryPage> {
   MapController? _flutterMapController;
   gmaps.GoogleMapController? _mapController;
   bool _loadingFromApi = false;
+  VehicleHistoryEntity? _selectedPoint;
+  OverlayEntry? _overlayEntry;
 
   // Ubicación por defecto: Bogotá, Colombia
   static const gmaps.LatLng _defaultLocation = gmaps.LatLng(4.7110, -74.0721);
@@ -207,7 +210,18 @@ class _VehicleHistoryPageState extends State<VehicleHistoryPage> {
   Future<void> _saveHistoryToSupabase(List<VehicleHistoryEntity> history) async {
     try {
       if (kDebugMode) {
-        print('💾 Guardando ${history.length} puntos en Supabase...');
+        print('💾 Intentando guardar ${history.length} puntos en Supabase...');
+      }
+      
+      // Verificar si hay sesión activa antes de intentar guardar
+      final supabase = Supabase.instance.client;
+      final session = supabase.auth.currentSession;
+      
+      if (session == null) {
+        if (kDebugMode) {
+          print('⚠️ No hay sesión activa. No se puede guardar en Supabase.');
+        }
+        return;
       }
       
       final result = await _historyRepository.saveVehicleHistory(history);
@@ -215,7 +229,9 @@ class _VehicleHistoryPageState extends State<VehicleHistoryPage> {
         (failure) {
           if (kDebugMode) {
             print('⚠️ No se pudo guardar en Supabase: ${failure.message}');
+            print('   Esto no afecta la visualización del historial desde el API.');
           }
+          // No mostrar error al usuario, es una operación en segundo plano
         },
         (_) {
           if (kDebugMode) {
@@ -226,7 +242,9 @@ class _VehicleHistoryPageState extends State<VehicleHistoryPage> {
     } catch (e) {
       if (kDebugMode) {
         print('⚠️ Error al guardar en Supabase: ${e.toString()}');
+        print('   Esto no afecta la visualización del historial desde el API.');
       }
+      // No mostrar error al usuario, es una operación en segundo plano
     }
   }
 
@@ -317,8 +335,123 @@ class _VehicleHistoryPageState extends State<VehicleHistoryPage> {
     return _history.map((point) => gmaps.LatLng(point.lat, point.lng)).toList();
   }
 
+  /// Construye polylines segmentadas por estado de ignition para Google Maps
+  Set<gmaps.Polyline> _buildGoogleMapsPolylinesWithIgnition() {
+    if (_history.isEmpty) return {};
+
+    final polylines = <gmaps.Polyline>{};
+    List<gmaps.LatLng> currentSegment = [];
+    bool? currentIgnition;
+    int segmentIndex = 0;
+
+    for (var point in _history) {
+      final ignition = point.ignition;
+      
+      // Si cambia el estado de ignition, crear un nuevo segmento
+      if (currentIgnition != null && currentIgnition != ignition) {
+        if (currentSegment.length > 1) {
+          polylines.add(
+            gmaps.Polyline(
+              polylineId: gmaps.PolylineId('route_segment_$segmentIndex'),
+              points: List.from(currentSegment),
+              color: currentIgnition == true ? Colors.green : Colors.red,
+              width: 4,
+            ),
+          );
+          segmentIndex++;
+        }
+        currentSegment = [];
+      }
+      
+      currentSegment.add(gmaps.LatLng(point.lat, point.lng));
+      currentIgnition = ignition;
+    }
+
+    // Agregar el último segmento
+    if (currentSegment.length > 1) {
+      polylines.add(
+        gmaps.Polyline(
+          polylineId: gmaps.PolylineId('route_segment_$segmentIndex'),
+          points: currentSegment,
+          color: currentIgnition == true ? Colors.green : Colors.red,
+          width: 4,
+        ),
+      );
+    }
+
+    // Si no hay información de ignition, usar color por defecto
+    if (polylines.isEmpty && _history.isNotEmpty) {
+      polylines.add(
+        gmaps.Polyline(
+          polylineId: const gmaps.PolylineId('route'),
+          points: _getGoogleMapsPolyline(),
+          color: AppColors.primary,
+          width: 4,
+        ),
+      );
+    }
+
+    return polylines;
+  }
+
   List<latlng.LatLng> _getFlutterMapPolyline() {
     return _history.map((point) => latlng.LatLng(point.lat, point.lng)).toList();
+  }
+
+  /// Construye polylines segmentadas por estado de ignition
+  /// Verde: vehículo encendido (ignition: true)
+  /// Rojo: vehículo apagado (ignition: false)
+  List<Polyline> _buildPolylinesWithIgnition() {
+    if (_history.isEmpty) return [];
+
+    final polylines = <Polyline>[];
+    List<latlng.LatLng> currentSegment = [];
+    bool? currentIgnition;
+
+    for (var point in _history) {
+      final ignition = point.ignition;
+      
+      // Si cambia el estado de ignition, crear un nuevo segmento
+      if (currentIgnition != null && currentIgnition != ignition) {
+        if (currentSegment.length > 1) {
+          polylines.add(
+            Polyline(
+              points: List.from(currentSegment),
+              strokeWidth: 4.0,
+              color: currentIgnition == true ? Colors.green : Colors.red,
+            ),
+          );
+        }
+        currentSegment = [];
+      }
+      
+      currentSegment.add(latlng.LatLng(point.lat, point.lng));
+      currentIgnition = ignition;
+    }
+
+    // Agregar el último segmento
+    if (currentSegment.length > 1) {
+      polylines.add(
+        Polyline(
+          points: currentSegment,
+          strokeWidth: 4.0,
+          color: currentIgnition == true ? Colors.green : Colors.red,
+        ),
+      );
+    }
+
+    // Si no hay información de ignition, usar color por defecto
+    if (polylines.isEmpty && _history.isNotEmpty) {
+      polylines.add(
+        Polyline(
+          points: _getFlutterMapPolyline(),
+          strokeWidth: 4.0,
+          color: AppColors.primary,
+        ),
+      );
+    }
+
+    return polylines;
   }
 
   @override
@@ -398,6 +531,9 @@ class _VehicleHistoryPageState extends State<VehicleHistoryPage> {
                                   ? latlng.LatLng(_history.first.lat, _history.first.lng)
                                   : _defaultLocationFlutter,
                               initialZoom: 13.0,
+                              onTap: (tapPosition, point) {
+                                _handleMapTap(point);
+                              },
                             ),
                             children: [
                               TileLayer(
@@ -405,13 +541,7 @@ class _VehicleHistoryPageState extends State<VehicleHistoryPage> {
                                 userAgentPackageName: 'com.example.pai_app',
                               ),
                               PolylineLayer(
-                                polylines: [
-                                  Polyline(
-                                    points: _getFlutterMapPolyline(),
-                                    strokeWidth: 4.0,
-                                    color: AppColors.primary,
-                                  ),
-                                ],
+                                polylines: _buildPolylinesWithIgnition(),
                               ),
                               MarkerLayer(
                                 markers: [
@@ -460,20 +590,16 @@ class _VehicleHistoryPageState extends State<VehicleHistoryPage> {
                               _mapController = controller;
                               _centerMapOnRoute();
                             },
+                            onTap: (position) {
+                              _handleGoogleMapTap(position);
+                            },
                             initialCameraPosition: gmaps.CameraPosition(
                               target: _history.isNotEmpty
                                   ? gmaps.LatLng(_history.first.lat, _history.first.lng)
                                   : _defaultLocation,
                               zoom: 13.0,
                             ),
-                            polylines: {
-                              gmaps.Polyline(
-                                polylineId: const gmaps.PolylineId('route'),
-                                points: _getGoogleMapsPolyline(),
-                                color: AppColors.primary,
-                                width: 4,
-                              ),
-                            },
+                            polylines: _buildGoogleMapsPolylinesWithIgnition(),
                             markers: {
                               // Marcador inicial
                               if (_history.isNotEmpty)
@@ -515,6 +641,66 @@ class _VehicleHistoryPageState extends State<VehicleHistoryPage> {
                             tiltGesturesEnabled: true,
                             rotateGesturesEnabled: true,
                           ),
+                    // Leyenda de colores (si hay información de ignition)
+                    if (_history.any((h) => h.ignition != null))
+                      Positioned(
+                        top: 16,
+                        right: 16,
+                        child: Card(
+                          elevation: 4,
+                          child: Padding(
+                            padding: const EdgeInsets.all(12.0),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Estado del vehículo',
+                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    Container(
+                                      width: 16,
+                                      height: 16,
+                                      decoration: BoxDecoration(
+                                        color: Colors.green,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Encendido',
+                                      style: Theme.of(context).textTheme.bodySmall,
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    Container(
+                                      width: 16,
+                                      height: 16,
+                                      decoration: BoxDecoration(
+                                        color: Colors.red,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Apagado',
+                                      style: Theme.of(context).textTheme.bodySmall,
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
                     // Panel de información
                     Positioned(
                       bottom: 16,
@@ -623,8 +809,173 @@ class _VehicleHistoryPageState extends State<VehicleHistoryPage> {
     );
   }
 
+  /// Encuentra el punto más cercano a la posición del tap
+  VehicleHistoryEntity? _findNearestPoint(double lat, double lng) {
+    if (_history.isEmpty) return null;
+
+    VehicleHistoryEntity? nearest;
+    double minDistance = double.infinity;
+
+    for (var point in _history) {
+      final distance = _calculateDistance(lat, lng, point.lat, point.lng);
+      if (distance < minDistance) {
+        minDistance = distance;
+        nearest = point;
+      }
+    }
+
+    // Solo retornar si está dentro de un radio razonable (50 metros)
+    return minDistance < 0.0005 ? nearest : null;
+  }
+
+  /// Calcula la distancia entre dos puntos en grados (aproximación)
+  double _calculateDistance(double lat1, double lng1, double lat2, double lng2) {
+    final dLat = lat2 - lat1;
+    final dLng = lng2 - lng1;
+    return (dLat * dLat) + (dLng * dLng);
+  }
+
+  /// Maneja el tap en FlutterMap (web)
+  void _handleMapTap(latlng.LatLng point) {
+    final nearest = _findNearestPoint(point.latitude, point.longitude);
+    if (nearest != null) {
+      setState(() {
+        _selectedPoint = nearest;
+      });
+      _showInfoPopup(point.latitude, point.longitude);
+    } else {
+      _hideInfoPopup();
+    }
+  }
+
+  /// Maneja el tap en Google Maps (móvil)
+  void _handleGoogleMapTap(gmaps.LatLng position) {
+    final nearest = _findNearestPoint(position.latitude, position.longitude);
+    if (nearest != null) {
+      setState(() {
+        _selectedPoint = nearest;
+      });
+      _showInfoPopup(position.latitude, position.longitude);
+    } else {
+      _hideInfoPopup();
+    }
+  }
+
+  /// Muestra el popup con información del punto
+  void _showInfoPopup(double lat, double lng) {
+    final point = _selectedPoint;
+    if (point == null) return;
+
+    _hideInfoPopup();
+
+    _overlayEntry = OverlayEntry(
+      builder: (context) => Positioned(
+        left: MediaQuery.of(context).size.width / 2 - 150,
+        top: 100,
+        child: Material(
+          elevation: 8,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            width: 300,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Información del Punto',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 20),
+                      onPressed: _hideInfoPopup,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                  ],
+                ),
+                const Divider(),
+                const SizedBox(height: 8),
+                _buildInfoRow(
+                  Icons.access_time,
+                  'Hora',
+                  DateFormat('dd/MM/yyyy HH:mm:ss').format(point.timestamp),
+                ),
+                const SizedBox(height: 8),
+                _buildInfoRow(
+                  Icons.speed,
+                  'Velocidad',
+                  point.speed != null
+                      ? '${point.speed!.toStringAsFixed(1)} km/h'
+                      : 'No disponible',
+                ),
+                if (point.ignition != null) ...[
+                  const SizedBox(height: 8),
+                  _buildInfoRow(
+                    point.ignition == true ? Icons.power : Icons.power_off,
+                    'Estado',
+                    point.ignition == true ? 'Encendido' : 'Apagado',
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    Overlay.of(context).insert(_overlayEntry!);
+  }
+
+  /// Oculta el popup
+  void _hideInfoPopup() {
+    _overlayEntry?.remove();
+    _overlayEntry = null;
+    setState(() {
+      _selectedPoint = null;
+    });
+  }
+
+  Widget _buildInfoRow(IconData icon, String label, String value) {
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: AppColors.primary),
+        const SizedBox(width: 8),
+        Text(
+          '$label: ',
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   void dispose() {
+    _hideInfoPopup();
     _mapController?.dispose();
     super.dispose();
   }
