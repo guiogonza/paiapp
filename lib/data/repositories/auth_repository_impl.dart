@@ -2,6 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:pai_app/domain/entities/user_entity.dart';
 import 'package:pai_app/domain/repositories/auth_repository.dart';
 import 'package:pai_app/data/services/gps_auth_service.dart';
+import 'package:pai_app/data/repositories/profile_repository_impl.dart';
 
 class AuthRepositoryImpl implements AuthRepository {
   final SupabaseClient _supabase = Supabase.instance.client;
@@ -10,97 +11,103 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<UserEntity> login(String email, String password) async {
     try {
-      // PASO 1: Validar primero contra el API de GPS
-      print('🔐 Validando credenciales contra API de GPS...');
-      final apiKey = await _gpsAuthService.login(email, password);
-      
-      if (apiKey == null || apiKey.isEmpty) {
-        throw Exception('Credenciales inválidas. Verifica tu email y contraseña.');
-      }
-      
-      print('✅ Credenciales válidas en API de GPS');
-      
-      // PASO 2: Si el API es correcto, verificar/crear usuario en Supabase
+      // PASO 1: Intentar primero hacer login en Supabase (prioridad)
+      // Esto permite que usuarios creados directamente en Supabase puedan entrar
       UserEntity? userEntity;
       
       try {
-        // Intentar hacer login en Supabase (si el usuario ya existe)
+        print('🔐 Intentando login en Supabase...');
         final supabaseResponse = await _supabase.auth.signInWithPassword(
           email: email,
           password: password,
         );
         
         if (supabaseResponse.user != null) {
-          print('✅ Usuario encontrado en Supabase');
+          print('✅ Usuario autenticado en Supabase');
           userEntity = UserEntity(
             id: supabaseResponse.user!.id,
             email: supabaseResponse.user!.email ?? email,
             name: supabaseResponse.user!.userMetadata?['name'] as String?,
           );
+          
+          // Validar GPS SOLO si el usuario es 'owner' (asíncrono, no bloquea el login)
+          // Esto se ejecuta en segundo plano después de retornar el userEntity
+          _validateGpsApiIfOwnerAsync(email, password);
+          
+          return userEntity;
         }
       } on AuthException catch (e) {
-        // Si el usuario no existe en Supabase, crearlo
+        // Si el usuario no existe en Supabase, intentar con API de GPS
         if (e.message.contains('Invalid login credentials') || 
             e.message.contains('User not found')) {
-          print('⚠️ Usuario no existe en Supabase, creándolo...');
+          print('⚠️ Usuario no encontrado en Supabase, intentando con API de GPS...');
           
+          // PASO 2: Validar contra el API de GPS
           try {
-            // Crear usuario en Supabase con la misma contraseña
-            final signUpResponse = await _supabase.auth.signUp(
-              email: email,
-              password: password,
-              emailRedirectTo: null, // No requerir confirmación de email por ahora
-            );
+            final apiKey = await _gpsAuthService.login(email, password);
             
-            if (signUpResponse.user != null) {
-              print('✅ Usuario creado en Supabase');
-              userEntity = UserEntity(
-                id: signUpResponse.user!.id,
-                email: signUpResponse.user!.email ?? email,
-                name: signUpResponse.user!.userMetadata?['name'] as String?,
-              );
-            } else {
-              throw Exception('No se pudo crear el usuario en Supabase');
+            if (apiKey == null || apiKey.isEmpty) {
+              throw Exception('Credenciales inválidas. Verifica tu email y contraseña.');
             }
-          } catch (signUpError) {
-            print('❌ Error al crear usuario en Supabase: $signUpError');
-            // Si falla la creación, intentar hacer login de nuevo (por si se creó en otro momento)
+            
+            print('✅ Credenciales válidas en API de GPS');
+            
+            // Si el API es correcto, crear usuario en Supabase
             try {
-              final retryResponse = await _supabase.auth.signInWithPassword(
+              final signUpResponse = await _supabase.auth.signUp(
                 email: email,
                 password: password,
+                emailRedirectTo: null,
               );
-              if (retryResponse.user != null) {
-                userEntity = UserEntity(
-                  id: retryResponse.user!.id,
-                  email: retryResponse.user!.email ?? email,
-                  name: retryResponse.user!.userMetadata?['name'] as String?,
+              
+              if (signUpResponse.user != null) {
+                print('✅ Usuario creado en Supabase');
+                return UserEntity(
+                  id: signUpResponse.user!.id,
+                  email: signUpResponse.user!.email ?? email,
+                  name: signUpResponse.user!.userMetadata?['name'] as String?,
+                );
+              } else {
+                throw Exception('No se pudo crear el usuario en Supabase');
+              }
+            } catch (signUpError) {
+              print('❌ Error al crear usuario en Supabase: $signUpError');
+              // Si falla la creación, intentar hacer login de nuevo
+              try {
+                final retryResponse = await _supabase.auth.signInWithPassword(
+                  email: email,
+                  password: password,
+                );
+                if (retryResponse.user != null) {
+                  return UserEntity(
+                    id: retryResponse.user!.id,
+                    email: retryResponse.user!.email ?? email,
+                    name: retryResponse.user!.userMetadata?['name'] as String?,
+                  );
+                }
+              } catch (_) {
+                // Si aún falla, usar email como ID temporal
+                print('⚠️ Usando autenticación solo del API de GPS');
+                return UserEntity(
+                  id: email,
+                  email: email,
+                  name: null,
                 );
               }
-            } catch (_) {
-              // Si aún falla, continuar con el usuario del API de GPS
-              print('⚠️ No se pudo crear/autenticar en Supabase, continuando con API de GPS');
             }
+          } catch (gpsError) {
+            // Si el API de GPS también falla, lanzar error
+            throw Exception('Credenciales inválidas. Verifica tu email y contraseña.');
           }
         } else {
           throw Exception('Error de autenticación en Supabase: ${e.message}');
         }
       }
       
-      // Si no se pudo obtener/crear usuario en Supabase, crear un UserEntity temporal
-      // usando el email como ID (esto es solo para mantener la compatibilidad)
-      if (userEntity == null) {
-        print('⚠️ Usando autenticación solo del API de GPS');
-        userEntity = UserEntity(
-          id: email, // Usar email como ID temporal
-          email: email,
-          name: null,
-        );
-      }
-      
-      return userEntity;
+      // Si llegamos aquí sin usuario, lanzar error
+      throw Exception('No se pudo autenticar el usuario');
     } catch (e) {
-      // Si el error es del API de GPS, lanzarlo directamente
+      // Si el error es de credenciales inválidas, lanzarlo directamente
       if (e.toString().contains('Credenciales inválidas')) {
         rethrow;
       }
@@ -191,5 +198,51 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   bool isAuthenticated() {
     return _supabase.auth.currentSession != null;
+  }
+
+  /// Valida el API de GPS de forma asíncrona sin bloquear el login
+  /// Solo se ejecuta si el usuario es 'owner'
+  void _validateGpsApiIfOwnerAsync(String email, String password) {
+    // Ejecutar en segundo plano sin bloquear el login
+    Future.microtask(() async {
+      try {
+        final profileRepository = ProfileRepositoryImpl();
+        final profileResult = await profileRepository.getCurrentUserProfile();
+        
+        profileResult.fold(
+          (_) {
+            // Si no se puede obtener el perfil, no validar GPS
+            print('⚠️ No se pudo obtener perfil, omitiendo validación GPS');
+          },
+          (profile) {
+            // Solo validar GPS si el rol es 'owner'
+            if (profile.role == 'owner') {
+              _validateGpsApiAsync(email, password);
+            } else {
+              print('ℹ️ Usuario con rol ${profile.role}, omitiendo validación GPS');
+            }
+          },
+        );
+      } catch (e) {
+        print('⚠️ Error al obtener perfil para validación GPS (no crítico): $e');
+        // No bloquear el login por esto
+      }
+    });
+  }
+
+  /// Valida el API de GPS de forma asíncrona (llamado solo para owners)
+  void _validateGpsApiAsync(String email, String password) async {
+    try {
+      print('🔐 Validando también contra API de GPS (solo para owners)...');
+      final apiKey = await _gpsAuthService.login(email, password);
+      if (apiKey != null && apiKey.isNotEmpty) {
+        print('✅ Credenciales también válidas en API de GPS');
+      } else {
+        print('⚠️ Credenciales no válidas en API de GPS, pero usuario puede entrar (solo Supabase)');
+      }
+    } catch (e) {
+      print('⚠️ Error al validar con API de GPS (no crítico, no bloquea login): $e');
+      // No lanzar error, el usuario puede entrar solo con Supabase
+    }
   }
 }

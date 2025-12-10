@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:pai_app/core/theme/app_colors.dart';
 import 'package:pai_app/data/repositories/profile_repository_impl.dart';
 import 'package:pai_app/data/repositories/remittance_repository_impl.dart';
@@ -49,13 +50,19 @@ class _DriverRemittanceListPageState extends State<DriverRemittanceListPage> {
         });
       },
       (profile) async {
-        _driverName = profile.fullName;
+        // Obtener el email del usuario autenticado para buscar remisiones
+        // El driver_name en routes puede ser el email o el nombre completo
+        final currentUser = Supabase.instance.client.auth.currentUser;
+        final userEmail = currentUser?.email;
+        
+        // Usar email si está disponible, sino usar fullName
+        _driverName = userEmail ?? profile.fullName;
         
         if (_driverName == null || _driverName!.isEmpty) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('No se encontró el nombre del conductor en tu perfil'),
+                content: Text('No se encontró información del conductor en tu perfil'),
                 backgroundColor: Colors.orange,
                 behavior: SnackBarBehavior.floating,
               ),
@@ -68,6 +75,7 @@ class _DriverRemittanceListPageState extends State<DriverRemittanceListPage> {
         }
 
         // Obtener remisiones pendientes del conductor
+        // Buscar tanto por email como por nombre completo
         final result = await _remittanceRepository.getDriverPendingRemittances(_driverName!);
 
         result.fold(

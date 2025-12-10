@@ -15,10 +15,12 @@ class ProfileModel extends ProfileEntity {
 
   /// Crea un ProfileModel desde un Map (JSON de Supabase)
   /// Mapeo estricto: las claves deben coincidir con las columnas de la tabla 'profiles'
+  /// En profiles, el id es la clave primaria que coincide con auth.uid()
   factory ProfileModel.fromJson(Map<String, dynamic> json) {
+    final profileId = json['id'] as String;
     return ProfileModel(
-      id: json['id'] as String,
-      userId: json['user_id'] as String, // Mapeo estricto: user_id
+      id: profileId,
+      userId: profileId, // En profiles, id y userId son el mismo (id = auth.uid())
       role: json['role'] as String, // Mapeo estricto: role
       fullName: json['full_name'] as String?, // Mapeo estricto: full_name
       phone: json['phone'] as String?,
@@ -32,10 +34,10 @@ class ProfileModel extends ProfileEntity {
   }
 
   /// Convierte un ProfileModel a Map (JSON para Supabase)
+  /// En profiles, solo existe la columna 'id' (clave primaria), no 'user_id'
   Map<String, dynamic> toJson() {
     return {
-      'id': id,
-      'user_id': userId,
+      'id': id, // id es la clave primaria que coincide con auth.uid()
       'role': role,
       if (fullName != null) 'full_name': fullName,
       if (phone != null) 'phone': phone,

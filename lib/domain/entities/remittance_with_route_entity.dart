@@ -15,16 +15,16 @@ class RemittanceWithRouteEntity {
   String get status => remittance.status;
   String get startLocation => route.startLocation;
   String get endLocation => route.endLocation;
-  String? get documentUrl => remittance.documentUrl;
+  String? get receiptUrl => remittance.receiptUrl;
   DateTime? get createdAt => remittance.createdAt;
   String? get id => remittance.id;
-  String? get routeId => remittance.routeId;
+  String? get tripId => remittance.tripId; // FK a routes (columna trip_id en Supabase)
   String? get driverName => route.driverName;
   String? get clientName => route.clientName;
   String get vehicleId => route.vehicleId;
 
   bool get isPending => remittance.isPending;
   bool get isCollected => remittance.isCollected;
-  bool get hasDocument => documentUrl != null && documentUrl!.isNotEmpty;
+  bool get hasDocument => receiptUrl != null && receiptUrl!.isNotEmpty;
 }
 

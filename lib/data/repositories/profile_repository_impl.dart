@@ -33,10 +33,11 @@ class ProfileRepositoryImpl implements ProfileRepository {
   Future<Either<ProfileFailure, ProfileEntity>> getProfileByUserId(
       String userId) async {
     try {
+      // En profiles, el id es la clave primaria que coincide con auth.uid()
       final response = await _supabase
           .from(_tableName)
           .select()
-          .eq('user_id', userId)
+          .eq('id', userId)
           .single();
 
       final profile = ProfileModel.fromJson(response);

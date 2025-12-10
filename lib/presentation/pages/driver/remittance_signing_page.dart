@@ -35,8 +35,8 @@ class _RemittanceSigningPageState extends State<RemittanceSigningPage> {
   void initState() {
     super.initState();
     // Verificar si ya hay una imagen adjunta
-    _hasImage = widget.remittanceWithRoute.remittance.documentUrl != null &&
-        widget.remittanceWithRoute.remittance.documentUrl!.isNotEmpty;
+    _hasImage = widget.remittanceWithRoute.remittance.receiptUrl != null &&
+        widget.remittanceWithRoute.remittance.receiptUrl!.isNotEmpty;
   }
 
   @override
@@ -132,43 +132,73 @@ class _RemittanceSigningPageState extends State<RemittanceSigningPage> {
     });
 
     try {
-      String? documentUrl;
+      String? receiptUrl;
+
+      // Generar un nombre de archivo limpio y simple basado en el ID de la remisión
+      // IMPORTANTE: El nombre debe ser el mismo para subir y obtener la URL
+      final remittanceId = widget.remittanceWithRoute.remittance.id ?? 
+                          DateTime.now().millisecondsSinceEpoch.toString();
+      
+      // Determinar la extensión del archivo
+      String fileExtension = 'jpg'; // Por defecto
+      if (kIsWeb && _selectedXFile != null) {
+        final originalName = _selectedXFile!.name.toLowerCase();
+        if (originalName.endsWith('.png')) {
+          fileExtension = 'png';
+        } else if (originalName.endsWith('.jpeg') || originalName.endsWith('.jpg')) {
+          fileExtension = 'jpg';
+        }
+      } else if (_selectedImage != null) {
+        final originalPath = _selectedImage!.path.toLowerCase();
+        if (originalPath.endsWith('.png')) {
+          fileExtension = 'png';
+        } else if (originalPath.endsWith('.jpeg') || originalPath.endsWith('.jpg')) {
+          fileExtension = 'jpg';
+        }
+      }
+      
+      // Nombre de archivo limpio: remittance_{id}.{extension}
+      final cleanFileName = 'remittance_$remittanceId.$fileExtension';
 
       // Subir la imagen
       if (kIsWeb && _selectedXFile != null) {
         final fileBytes = await _selectedXFile!.readAsBytes();
-        final fileName = '${DateTime.now().millisecondsSinceEpoch}_${_selectedXFile!.name}';
         
-        final uploadResult = await _remittanceRepository.uploadMemorandumImage(fileBytes, fileName);
+        final uploadResult = await _remittanceRepository.uploadMemorandumImage(
+          fileBytes, 
+          cleanFileName, // Usar el nombre limpio
+        );
         await uploadResult.fold(
           (failure) {
             throw Exception(failure.message);
           },
           (url) {
-            documentUrl = url;
+            receiptUrl = url;
           },
         );
       } else if (_selectedImage != null) {
         final fileBytes = await _selectedImage!.readAsBytes();
-        final fileName = '${DateTime.now().millisecondsSinceEpoch}_${_selectedImage!.path.split('/').last}';
         
-        final uploadResult = await _remittanceRepository.uploadMemorandumImage(fileBytes, fileName);
+        final uploadResult = await _remittanceRepository.uploadMemorandumImage(
+          fileBytes, 
+          cleanFileName, // Usar el mismo nombre limpio
+        );
         await uploadResult.fold(
           (failure) {
             throw Exception(failure.message);
           },
           (url) {
-            documentUrl = url;
+            receiptUrl = url;
           },
         );
-      } else if (widget.remittanceWithRoute.remittance.documentUrl != null) {
+      } else if (widget.remittanceWithRoute.remittance.receiptUrl != null) {
         // Si ya había una imagen, usar la existente
-        documentUrl = widget.remittanceWithRoute.remittance.documentUrl;
+        receiptUrl = widget.remittanceWithRoute.remittance.receiptUrl;
       }
 
-      // Actualizar la remittance con document_url
+      // Actualizar la remittance con receipt_url
       final updatedRemittance = widget.remittanceWithRoute.remittance.copyWith(
-        documentUrl: documentUrl,
+        receiptUrl: receiptUrl,
         receiverName: _receivedByController.text.trim().isNotEmpty
             ? _receivedByController.text.trim()
             : widget.remittanceWithRoute.remittance.receiverName,
@@ -341,9 +371,9 @@ class _RemittanceSigningPageState extends State<RemittanceSigningPage> {
                                             _selectedImage!,
                                             fit: BoxFit.contain,
                                           )
-                                        : widget.remittanceWithRoute.remittance.documentUrl != null
+                                        : widget.remittanceWithRoute.remittance.receiptUrl != null
                                             ? Image.network(
-                                                widget.remittanceWithRoute.remittance.documentUrl!,
+                                                widget.remittanceWithRoute.remittance.receiptUrl!,
                                                 fit: BoxFit.contain,
                                               )
                                             : const Icon(Icons.image, size: 80),

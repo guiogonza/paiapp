@@ -42,27 +42,20 @@ class _VehiclesMapPageState extends State<VehiclesMapPage> {
       _isLoading = true;
     });
 
-    try {
-      final locations = await _locationService.getVehicleLocations();
-      setState(() {
-        _vehicleLocations = locations;
-        _isLoading = false;
-      });
+    // El servicio ahora retorna lista vacía en caso de error, no lanza excepciones
+    final locations = await _locationService.getVehicleLocations();
+    setState(() {
+      _vehicleLocations = locations;
+      _isLoading = false;
+    });
+    
+    // Solo actualizar marcadores y centrar si hay vehículos
+    if (locations.isNotEmpty) {
       _updateMarkers();
       _centerMapOnVehicles();
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al cargar ubicaciones: ${e.toString()}'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-      setState(() {
-        _isLoading = false;
-      });
+    } else {
+      // Si no hay vehículos, simplemente no mostrar marcadores
+      _updateMarkers(); // Esto limpiará los marcadores
     }
   }
 

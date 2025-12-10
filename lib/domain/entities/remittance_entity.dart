@@ -1,37 +1,37 @@
 class RemittanceEntity {
   final String? id;
-  final String routeId; // FK a routes
+  final String tripId; // FK a routes (columna trip_id en Supabase)
   final String receiverName; // Nombre del receptor/cliente
   final String status; // 'pendiente' o 'cobrado'
-  final String? documentUrl; // URL de la foto del documento
+  final String? receiptUrl; // URL de la foto del memorando (columna receipt_url en Supabase)
   final DateTime? createdAt; // Fecha de creación
   final DateTime? updatedAt; // Fecha de actualización
 
   const RemittanceEntity({
     this.id,
-    required this.routeId,
+    required this.tripId,
     required this.receiverName,
     this.status = 'pendiente',
-    this.documentUrl,
+    this.receiptUrl,
     this.createdAt,
     this.updatedAt,
   });
 
   RemittanceEntity copyWith({
     String? id,
-    String? routeId,
+    String? tripId,
     String? receiverName,
     String? status,
-    String? documentUrl,
+    String? receiptUrl,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
     return RemittanceEntity(
       id: id ?? this.id,
-      routeId: routeId ?? this.routeId,
+      tripId: tripId ?? this.tripId,
       receiverName: receiverName ?? this.receiverName,
       status: status ?? this.status,
-      documentUrl: documentUrl ?? this.documentUrl,
+      receiptUrl: receiptUrl ?? this.receiptUrl,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -45,7 +45,7 @@ class RemittanceEntity {
     if (identical(this, other)) return true;
     return other is RemittanceEntity &&
         other.id == id &&
-        other.routeId == routeId &&
+        other.tripId == tripId &&
         other.receiverName == receiverName &&
         other.status == status;
   }
@@ -53,7 +53,7 @@ class RemittanceEntity {
   @override
   int get hashCode {
     return id.hashCode ^
-        routeId.hashCode ^
+        tripId.hashCode ^
         receiverName.hashCode ^
         status.hashCode;
   }

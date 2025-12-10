@@ -28,7 +28,7 @@ abstract class RemittanceRepository {
   /// Actualiza una remisión
   Future<Either<RemittanceFailure, RemittanceEntity>> updateRemittance(RemittanceEntity remittance);
 
-  /// Obtiene remisiones pendientes del conductor (donde driver_name coincide y document_url es NULL)
+  /// Obtiene remisiones pendientes del conductor (donde driver_name coincide y receipt_url es NULL)
   Future<Either<RemittanceFailure, List<RemittanceWithRouteEntity>>> getDriverPendingRemittances(String driverName);
 
   /// Sube una imagen del memorando a Storage

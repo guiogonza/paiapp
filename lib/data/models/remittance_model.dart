@@ -1,13 +1,16 @@
 import 'package:pai_app/domain/entities/remittance_entity.dart';
 
 /// Modelo que mapea RemittanceEntity a/desde JSON para Supabase
+/// IMPORTANTE: 
+/// - La columna de FK se llama 'trip_id' (no 'route_id')
+/// - La columna de foto se llama 'receipt_url' (no 'document_url')
 class RemittanceModel extends RemittanceEntity {
   const RemittanceModel({
     super.id,
-    required super.routeId,
+    required super.tripId,
     required super.receiverName,
     super.status,
-    super.documentUrl,
+    super.receiptUrl,
     super.createdAt,
     super.updatedAt,
   });
@@ -15,10 +18,10 @@ class RemittanceModel extends RemittanceEntity {
   factory RemittanceModel.fromJson(Map<String, dynamic> json) {
     return RemittanceModel(
       id: json['id'] as String?,
-      routeId: json['route_id'] as String,
+      tripId: json['trip_id'] as String, // Mapeo a trip_id en Supabase
       receiverName: json['receiver_name'] as String,
       status: (json['status'] as String?) ?? 'pendiente',
-      documentUrl: json['document_url'] as String?,
+      receiptUrl: json['receipt_url'] as String?, // Mapeo a receipt_url en Supabase
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'] as String)
           : null,
@@ -31,10 +34,10 @@ class RemittanceModel extends RemittanceEntity {
   Map<String, dynamic> toJson() {
     return {
       if (id != null) 'id': id,
-      'route_id': routeId,
+      'trip_id': tripId, // Mapeo a trip_id en Supabase
       'receiver_name': receiverName,
       'status': status,
-      if (documentUrl != null) 'document_url': documentUrl,
+      if (receiptUrl != null) 'receipt_url': receiptUrl, // Mapeo a receipt_url en Supabase
       if (createdAt != null) 'created_at': createdAt!.toIso8601String(),
       if (updatedAt != null) 'updated_at': updatedAt!.toIso8601String(),
     };
@@ -43,10 +46,10 @@ class RemittanceModel extends RemittanceEntity {
   factory RemittanceModel.fromEntity(RemittanceEntity entity) {
     return RemittanceModel(
       id: entity.id,
-      routeId: entity.routeId,
+      tripId: entity.tripId,
       receiverName: entity.receiverName,
       status: entity.status,
-      documentUrl: entity.documentUrl,
+      receiptUrl: entity.receiptUrl,
       createdAt: entity.createdAt,
       updatedAt: entity.updatedAt,
     );
@@ -55,10 +58,10 @@ class RemittanceModel extends RemittanceEntity {
   RemittanceEntity toEntity() {
     return RemittanceEntity(
       id: id,
-      routeId: routeId,
+      tripId: tripId,
       receiverName: receiverName,
       status: status,
-      documentUrl: documentUrl,
+      receiptUrl: receiptUrl,
       createdAt: createdAt,
       updatedAt: updatedAt,
     );

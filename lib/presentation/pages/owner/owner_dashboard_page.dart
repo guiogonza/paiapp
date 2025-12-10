@@ -14,6 +14,9 @@ import 'package:pai_app/domain/entities/vehicle_location_entity.dart';
 import 'package:pai_app/presentation/pages/login/login_page.dart';
 import 'package:pai_app/presentation/pages/vehicle_history/vehicle_history_page.dart';
 import 'package:pai_app/presentation/pages/billing/billing_dashboard_page.dart';
+import 'package:pai_app/presentation/pages/trips/trips_list_page.dart';
+import 'package:pai_app/presentation/pages/expenses/expenses_list_page.dart';
+import 'package:pai_app/presentation/pages/vehicles/vehicles_list_page.dart';
 
 class OwnerDashboardPage extends StatefulWidget {
   const OwnerDashboardPage({super.key});
@@ -143,49 +146,27 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
       _isLoading = true;
     });
 
-    try {
-      print('🔄 Cargando ubicaciones de vehículos...');
-      final locations = await _locationService.getVehicleLocations();
-      print('✅ Ubicaciones cargadas: ${locations.length} vehículos');
-      
-      setState(() {
-        _vehicleLocations = locations;
-        _isLoading = false;
-      });
+    // El servicio ahora retorna lista vacía en caso de error, no lanza excepciones
+    print('🔄 Cargando ubicaciones de vehículos...');
+    final locations = await _locationService.getVehicleLocations();
+    print('✅ Ubicaciones cargadas: ${locations.length} vehículos');
+    
+    setState(() {
+      _vehicleLocations = locations;
+      _isLoading = false;
+    });
+    
+    // Solo actualizar marcadores y centrar si hay vehículos
+    if (locations.isNotEmpty) {
       _updateMarkers();
       _centerMapOnVehicles();
       
       // Cargar y guardar el historial de cada vehículo en segundo plano
       _loadAndSaveVehicleHistory(locations);
-    } catch (e) {
-      print('❌ Error al cargar ubicaciones: ${e.toString()}');
-      if (mounted) {
-        String errorMessage = 'Error al cargar ubicaciones';
-        
-        // Mensajes más amigables según el tipo de error
-        if (e.toString().contains('CORS') || e.toString().contains('Failed to fetch')) {
-          errorMessage = 'Error de CORS: El servidor no permite peticiones desde el navegador. '
-              'Prueba ejecutando la app en un dispositivo móvil o contacta al administrador del servidor.';
-        } else if (e.toString().contains('Timeout')) {
-          errorMessage = 'Timeout: El servidor tardó demasiado en responder.';
-        } else if (e.toString().contains('No se pudo obtener el API key')) {
-          errorMessage = 'Error de autenticación: No se pudo obtener el API key.';
-        } else {
-          errorMessage = 'Error: ${e.toString()}';
-        }
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 5),
-          ),
-        );
-      }
-      setState(() {
-        _isLoading = false;
-      });
+    } else {
+      // Si no hay vehículos, simplemente no mostrar marcadores
+      // La interfaz sigue siendo funcional (menú, botones, etc.)
+      _updateMarkers(); // Esto limpiará los marcadores
     }
   }
 
@@ -575,25 +556,94 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
                             ],
                           ),
                           const SizedBox(height: 12),
-                          // Botón para Cobranza y Facturación
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton.icon(
-                              onPressed: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => const BillingDashboardPage(),
-                                  ),
-                                );
-                              },
-                              icon: const Icon(Icons.payment),
-                              label: const Text('Cobranza y Facturación'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.primary,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                              ),
+                          // Sección de Módulos
+                          const Text(
+                            'Módulos',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.textSecondary,
                             ),
+                          ),
+                          const SizedBox(height: 8),
+                          // Botones de módulos en grid
+                          GridView.count(
+                            crossAxisCount: 2,
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            crossAxisSpacing: 8,
+                            mainAxisSpacing: 8,
+                            childAspectRatio: 2.5,
+                            children: [
+                              // Viajes
+                              ElevatedButton.icon(
+                                onPressed: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => const TripsListPage(),
+                                    ),
+                                  );
+                                },
+                                icon: const Icon(Icons.route, size: 18),
+                                label: const Text('Viajes', style: TextStyle(fontSize: 12)),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.accent,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                ),
+                              ),
+                              // Gastos
+                              ElevatedButton.icon(
+                                onPressed: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => const ExpensesListPage(),
+                                    ),
+                                  );
+                                },
+                                icon: const Icon(Icons.receipt, size: 18),
+                                label: const Text('Gastos', style: TextStyle(fontSize: 12)),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.orange,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                ),
+                              ),
+                              // Vehículos
+                              ElevatedButton.icon(
+                                onPressed: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => const VehiclesListPage(),
+                                    ),
+                                  );
+                                },
+                                icon: const Icon(Icons.directions_car, size: 18),
+                                label: const Text('Vehículos', style: TextStyle(fontSize: 12)),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.blue,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                ),
+                              ),
+                              // Cobranza y Facturación
+                              ElevatedButton.icon(
+                                onPressed: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => const BillingDashboardPage(),
+                                    ),
+                                  );
+                                },
+                                icon: const Icon(Icons.payment, size: 18),
+                                label: const Text('Cobranza', style: TextStyle(fontSize: 12)),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.primary,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                ),
+                              ),
+                            ],
                           ),
                           if (!_hasLocationPermission && !kIsWeb) ...[
                             const SizedBox(height: 8),

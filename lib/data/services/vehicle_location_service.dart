@@ -9,6 +9,7 @@ class VehicleLocationService {
   final GPSAuthService _authService = GPSAuthService();
 
   /// Obtiene las ubicaciones de todos los vehículos desde la API real
+  /// Retorna lista vacía si hay cualquier error (no lanza excepciones)
   Future<List<VehicleLocationEntity>> getVehicleLocations() async {
     try {
       // Obtener el API key
@@ -17,13 +18,19 @@ class VehicleLocationService {
       if (apiKey == null || apiKey.isEmpty) {
         // Si no hay API key, intentar hacer login automático
         print('⚠️ No hay API key, intentando login automático...');
-        final newApiKey = await _authService.login(
-          'luisr@rastrear.com.co',
-          '2023',
-        );
-        
-        if (newApiKey == null) {
-          throw Exception('No se pudo obtener el API key');
+        try {
+          final newApiKey = await _authService.login(
+            'luisr@rastrear.com.co',
+            '2023',
+          );
+          
+          if (newApiKey == null) {
+            print('Error API GPS: No se pudo obtener el API key, continuando en modo offline');
+            return [];
+          }
+        } catch (e) {
+          print('Error API GPS: Fallo en login automático ($e), continuando en modo offline');
+          return [];
         }
       }
 
@@ -31,9 +38,10 @@ class VehicleLocationService {
       final currentApiKey = await _authService.getApiKey();
       
       if (currentApiKey == null || currentApiKey.isEmpty) {
-        throw Exception('No se pudo obtener el API key');
+        print('Error API GPS: No se pudo obtener el API key, continuando en modo offline');
+        return [];
       }
-      
+
       // Hacer la petición a la API
       // El endpoint requiere: user_api_hash (no api_key) y lang=es
       final uri = Uri.parse(_devicesUrl).replace(queryParameters: {
@@ -55,30 +63,29 @@ class VehicleLocationService {
       ).timeout(
         const Duration(seconds: 30),
         onTimeout: () {
-          throw Exception('Timeout al consultar devices');
+          print('Error API GPS: Timeout al consultar devices, continuando en modo offline');
+          return http.Response('', 408); // Retornar respuesta de timeout
         },
       );
       
       print('📡 Status Code: ${response.statusCode}');
-      
-      
       print('📡 Response Headers: ${response.headers}');
 
       if (response.statusCode == 200) {
         return _parseDevicesResponse(response);
       } else {
-        print('❌ Error al obtener devices: ${response.statusCode}');
-        print('   Respuesta: ${response.body}');
-        print('   Headers: ${response.headers}');
-        throw Exception('Error al obtener ubicaciones: ${response.statusCode} - ${response.body}');
+        // Error 401, 404, 500, etc. - retornar lista vacía
+        print('Error API GPS: Error ${response.statusCode} al obtener devices (${response.body}), continuando en modo offline');
+        return [];
       }
     } on http.ClientException catch (e) {
-      print('❌ Error de cliente HTTP: ${e.toString()}');
-      print('   Esto puede ser un problema de CORS o conectividad');
-      throw Exception('Error de conexión: ${e.toString()}. Verifica que el servidor permita peticiones desde tu origen.');
+      // Error de conexión (sin internet, CORS, etc.)
+      print('Error API GPS: Error de cliente HTTP ($e), continuando en modo offline');
+      return [];
     } catch (e) {
-      print('❌ Error de conexión: ${e.toString()}');
-      throw Exception('Error de conexión: ${e.toString()}');
+      // Cualquier otro error
+      print('Error API GPS: Error inesperado ($e), continuando en modo offline');
+      return [];
     }
   }
 

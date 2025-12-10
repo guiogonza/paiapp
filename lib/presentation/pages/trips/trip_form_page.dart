@@ -359,18 +359,28 @@ class _TripFormPageState extends State<TripFormPage> {
               const SizedBox(height: 20),
 
               // Driver Name (Conductor) - Obligatorio
+              // IMPORTANTE: Debe ser el EMAIL del conductor, no el nombre
               TextFormField(
                 controller: _driverNameController,
+                keyboardType: TextInputType.emailAddress,
                 decoration: InputDecoration(
-                  labelText: 'Conductor *',
-                  hintText: 'Nombre del conductor',
-                  prefixIcon: const Icon(Icons.person),
+                  labelText: 'Conductor (Email) *',
+                  hintText: 'pepe@pai.com',
+                  prefixIcon: const Icon(Icons.email),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
+                  helperText: 'Ingresa el email del conductor',
                 ),
-                validator: (value) =>
-                    Validators.validateRequired(value, 'Conductor'),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'El email del conductor es requerido';
+                  }
+                  if (!value.contains('@') || !value.contains('.')) {
+                    return 'Ingresa un email válido';
+                  }
+                  return null;
+                },
                 textInputAction: TextInputAction.next,
               ),
               const SizedBox(height: 20),
