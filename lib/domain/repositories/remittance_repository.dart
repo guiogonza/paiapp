@@ -19,6 +19,9 @@ abstract class RemittanceRepository {
   /// Obtiene una remisión por ID
   Future<Either<RemittanceFailure, RemittanceEntity>> getRemittanceById(String id);
 
+  /// Obtiene una remisión por trip_id
+  Future<Either<RemittanceFailure, RemittanceEntity?>> getRemittanceByTripId(String tripId);
+
   /// Actualiza el status de una remisión a 'cobrado'
   Future<Either<RemittanceFailure, void>> markAsCollected(String id);
 

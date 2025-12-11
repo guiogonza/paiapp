@@ -219,12 +219,12 @@ class _ExpensesListPageState extends State<ExpensesListPage> {
             leading: CircleAvatar(
               backgroundColor: AppColors.accent.withOpacity(0.2),
               child: Icon(
-                _getCategoryIcon(expense.category),
+                _getCategoryIcon(expense.type),
                 color: AppColors.accent,
               ),
             ),
             title: Text(
-              expense.category,
+              expense.type,
               style: const TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 18,

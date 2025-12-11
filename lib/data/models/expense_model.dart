@@ -1,14 +1,18 @@
 import 'package:pai_app/domain/entities/expense_entity.dart';
 
 /// Modelo de datos para gastos (mapeo estricto con Supabase)
-/// Las claves JSON deben coincidir exactamente con los nombres de las columnas
+/// IMPORTANTE: 
+/// - La columna FK se llama 'trip_id' (no 'route_id')
+/// - La columna de tipo se llama 'type' (no 'category')
+/// - La columna de conductor se llama 'driver_id'
 class ExpenseModel extends ExpenseEntity {
   const ExpenseModel({
     super.id,
-    required super.routeId,
+    required super.tripId,
+    super.driverId,
     required super.amount,
     required super.date,
-    required super.category,
+    required super.type,
     super.description,
     super.receiptUrl,
   });
@@ -18,12 +22,13 @@ class ExpenseModel extends ExpenseEntity {
   factory ExpenseModel.fromJson(Map<String, dynamic> json) {
     return ExpenseModel(
       id: json['id'] as String?,
-      routeId: json['route_id'] as String, // Mapeo estricto: route_id
-      amount: (json['amount'] as num).toDouble(), // Mapeo estricto: amount
-      date: DateTime.parse(json['date'] as String), // Mapeo estricto: date
-      category: json['category'] as String, // Mapeo estricto: category
-      description: json['description'] as String?, // Mapeo estricto: description
-      receiptUrl: json['receipt_url'] as String?, // Mapeo estricto: receipt_url
+      tripId: json['trip_id'] as String, // Mapeo a trip_id en Supabase
+      driverId: json['driver_id'] as String?, // Mapeo a driver_id en Supabase
+      amount: (json['amount'] as num).toDouble(),
+      date: DateTime.parse(json['date'] as String),
+      type: json['type'] as String, // Mapeo a type en Supabase
+      description: json['description'] as String?,
+      receiptUrl: json['receipt_url'] as String?,
     );
   }
 
@@ -32,12 +37,13 @@ class ExpenseModel extends ExpenseEntity {
   Map<String, dynamic> toJson() {
     return {
       if (id != null) 'id': id,
-      'route_id': routeId, // Mapeo estricto: route_id
-      'amount': amount, // Mapeo estricto: amount
-      'date': date.toIso8601String().split('T')[0], // Mapeo estricto: date (formato YYYY-MM-DD)
-      'category': category, // Mapeo estricto: category
-      if (description != null) 'description': description, // Mapeo estricto: description
-      if (receiptUrl != null) 'receipt_url': receiptUrl, // Mapeo estricto: receipt_url
+      'trip_id': tripId, // Mapeo a trip_id en Supabase
+      if (driverId != null) 'driver_id': driverId, // Mapeo a driver_id en Supabase
+      'amount': amount,
+      'date': date.toIso8601String().split('T')[0], // Formato YYYY-MM-DD
+      'type': type, // Mapeo a type en Supabase
+      if (description != null) 'description': description,
+      if (receiptUrl != null) 'receipt_url': receiptUrl,
     };
   }
 
@@ -45,10 +51,11 @@ class ExpenseModel extends ExpenseEntity {
   factory ExpenseModel.fromEntity(ExpenseEntity entity) {
     return ExpenseModel(
       id: entity.id,
-      routeId: entity.routeId,
+      tripId: entity.tripId,
+      driverId: entity.driverId,
       amount: entity.amount,
       date: entity.date,
-      category: entity.category,
+      type: entity.type,
       description: entity.description,
       receiptUrl: entity.receiptUrl,
     );
@@ -58,10 +65,11 @@ class ExpenseModel extends ExpenseEntity {
   ExpenseEntity toEntity() {
     return ExpenseEntity(
       id: id,
-      routeId: routeId,
+      tripId: tripId,
+      driverId: driverId,
       amount: amount,
       date: date,
-      category: category,
+      type: type,
       description: description,
       receiptUrl: receiptUrl,
     );

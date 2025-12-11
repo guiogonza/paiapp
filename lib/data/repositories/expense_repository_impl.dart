@@ -11,7 +11,8 @@ import 'package:pai_app/data/models/expense_model.dart';
 class ExpenseRepositoryImpl implements ExpenseRepository {
   final SupabaseClient _supabase = Supabase.instance.client;
   static const String _tableName = 'expenses';
-  static const String _storageBucket = 'receipts';
+  // IMPORTANTE: El bucket de storage se llama 'signatures' (mismo que remittances)
+  static const String _storageBucket = 'signatures';
 
   @override
   Future<Either<ExpenseFailure, List<ExpenseEntity>>> getExpenses() async {
@@ -46,11 +47,52 @@ class ExpenseRepositoryImpl implements ExpenseRepository {
   @override
   Future<Either<ExpenseFailure, List<ExpenseEntity>>> getExpensesByRoute(
       String routeId) async {
+    // NOTA: Este método mantiene routeId por compatibilidad, pero internamente usa trip_id
+    // La tabla expenses usa trip_id, no route_id
+    return getExpensesByTripId(routeId);
+  }
+
+  @override
+  Future<Either<ExpenseFailure, List<ExpenseEntity>>> getExpensesByTripId(
+      String tripId) async {
     try {
       final response = await _supabase
           .from(_tableName)
           .select()
-          .eq('route_id', routeId)
+          .eq('trip_id', tripId)
+          .order('date', ascending: false);
+
+      final expenses = (response as List)
+          .map((json) => ExpenseModel.fromJson(json))
+          .map((model) => model.toEntity())
+          .toList();
+
+      return Right(expenses);
+    } on PostgrestException catch (e) {
+      if (e.message.contains('row-level security') || 
+          e.message.contains('policy') ||
+          e.code == 'PGRST301') {
+        return Left(ValidationFailure(
+          'No tienes permisos. Asegúrate de estar autenticado correctamente.'
+        ));
+      }
+      return Left(DatabaseFailure(_mapPostgrestError(e)));
+    } on SocketException catch (_) {
+      return const Left(NetworkFailure());
+    } catch (e) {
+      return Left(UnknownFailure(_mapGenericError(e)));
+    }
+  }
+
+  @override
+  Future<Either<ExpenseFailure, List<ExpenseEntity>>> getExpensesByTripIdAndDriver(
+      String tripId, String driverId) async {
+    try {
+      final response = await _supabase
+          .from(_tableName)
+          .select()
+          .eq('trip_id', tripId)
+          .eq('driver_id', driverId)
           .order('date', ascending: false);
 
       final expenses = (response as List)
@@ -109,6 +151,15 @@ class ExpenseRepositoryImpl implements ExpenseRepository {
       final model = ExpenseModel.fromEntity(expense);
       final json = model.toJson();
       json.remove('id'); // No incluir id en la creación
+      
+      // Asegurar que driver_id sea el auth.uid() del usuario actual
+      // Si no viene en la entidad, obtenerlo del usuario autenticado
+      if (json['driver_id'] == null) {
+        final currentUserId = _supabase.auth.currentUser?.id;
+        if (currentUserId != null) {
+          json['driver_id'] = currentUserId;
+        }
+      }
 
       final response = await _supabase
           .from(_tableName)

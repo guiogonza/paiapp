@@ -3,6 +3,7 @@ import 'package:pai_app/core/theme/app_colors.dart';
 import 'package:pai_app/data/repositories/auth_repository_impl.dart';
 import 'package:pai_app/presentation/pages/login/login_page.dart';
 import 'package:pai_app/presentation/pages/driver/driver_remittance_list_page.dart';
+import 'package:pai_app/presentation/pages/expenses/expenses_page.dart';
 
 class DriverDashboardPage extends StatelessWidget {
   const DriverDashboardPage({super.key});
@@ -59,6 +60,30 @@ class DriverDashboardPage extends StatelessWidget {
                 label: const Text('Mis Remisiones'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            // Botón para Gastos
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const ExpensesPage(),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.receipt),
+                label: const Text('Registrar Gastos'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(

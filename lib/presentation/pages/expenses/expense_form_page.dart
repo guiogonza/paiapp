@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:pai_app/core/theme/app_colors.dart';
 import 'package:pai_app/data/repositories/expense_repository_impl.dart';
 import 'package:pai_app/data/repositories/trip_repository_impl.dart';
@@ -13,8 +14,13 @@ import 'package:pai_app/domain/entities/trip_entity.dart';
 
 class ExpenseFormPage extends StatefulWidget {
   final ExpenseEntity? expense;
+  final String? tripId; // ID del viaje seleccionado (viene de TripSelectionPage)
 
-  const ExpenseFormPage({super.key, this.expense});
+  const ExpenseFormPage({
+    super.key,
+    this.expense,
+    this.tripId, // Si viene tripId, no se necesita seleccionar viaje
+  });
 
   @override
   State<ExpenseFormPage> createState() => _ExpenseFormPageState();
@@ -28,19 +34,21 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
   final _tripRepository = TripRepositoryImpl();
   final _imagePicker = ImagePicker();
 
-  String? _selectedRouteId;
+  String? _selectedTripId;
   List<TripEntity> _activeTrips = [];
-  bool _isLoadingRoutes = true;
-  String? _selectedCategory;
+  bool _isLoadingRoutes = false; // Solo cargar si no viene tripId
+  String? _selectedType;
   DateTime? _selectedDate;
   File? _selectedImage;
   XFile? _selectedXFile; // Para web, guardar el XFile directamente
   String? _existingImageUrl;
   bool _isLoading = false;
   bool _isFormValid = false;
+  List<ExpenseEntity> _driverExpenses = [];
+  bool _isLoadingExpenses = false;
 
-  // Categorías estrictas
-  static const List<String> _categories = [
+  // Tipos de gasto (columna type en Supabase)
+  static const List<String> _expenseTypes = [
     'Gasolina',
     'Comida',
     'Peajes',
@@ -53,12 +61,22 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
   @override
   void initState() {
     super.initState();
-    _loadActiveRoutes();
+    
+    // Si viene tripId, usarlo directamente; si no, cargar viajes
+    if (widget.tripId != null) {
+      _selectedTripId = widget.tripId;
+      // Cargar gastos inmediatamente si hay tripId
+      _loadDriverExpenses();
+    } else if (widget.expense == null) {
+      // Solo cargar viajes si no viene tripId y no es edición
+      _loadActiveRoutes();
+    }
+    
     if (widget.expense != null) {
-      _selectedRouteId = widget.expense!.routeId;
+      _selectedTripId = widget.expense!.tripId;
       _amountController.text = widget.expense!.amount.toStringAsFixed(0);
       _descriptionController.text = widget.expense!.description ?? '';
-      _selectedCategory = widget.expense!.category;
+      _selectedType = widget.expense!.type;
       _selectedDate = widget.expense!.date;
       _existingImageUrl = widget.expense!.receiptUrl;
     } else {
@@ -70,6 +88,44 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
 
     // Agregar listeners para validación en tiempo real
     _amountController.addListener(_validateForm);
+  }
+
+  Future<void> _loadDriverExpenses() async {
+    final tripId = widget.tripId ?? _selectedTripId;
+    final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+    
+    if (tripId == null || tripId.isEmpty || currentUserId == null) {
+      setState(() {
+        _driverExpenses = [];
+        _isLoadingExpenses = false;
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoadingExpenses = true;
+    });
+
+    final result = await _expenseRepository.getExpensesByTripIdAndDriver(tripId, currentUserId);
+    
+    result.fold(
+      (failure) {
+        if (mounted) {
+          setState(() {
+            _driverExpenses = [];
+            _isLoadingExpenses = false;
+          });
+        }
+      },
+      (expenses) {
+        if (mounted) {
+          setState(() {
+            _driverExpenses = expenses;
+            _isLoadingExpenses = false;
+          });
+        }
+      },
+    );
   }
 
   @override
@@ -122,10 +178,10 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
 
   void _validateForm() {
     final formValid = _formKey.currentState?.validate() ?? false;
-    final routeSelected = _selectedRouteId != null && _selectedRouteId!.isNotEmpty;
-    final categorySelected = _selectedCategory != null && _selectedCategory!.isNotEmpty;
+    final tripSelected = _selectedTripId != null && _selectedTripId!.isNotEmpty;
+    final typeSelected = _selectedType != null && _selectedType!.isNotEmpty;
     final dateSelected = _selectedDate != null;
-    final isValid = formValid && routeSelected && categorySelected && dateSelected;
+    final isValid = formValid && tripSelected && typeSelected && dateSelected;
     
     if (_isFormValid != isValid) {
       setState(() {
@@ -257,10 +313,10 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
       return;
     }
 
-    if (_selectedRouteId == null || _selectedRouteId!.isEmpty) {
+    if (_selectedTripId == null || _selectedTripId!.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Debes seleccionar un viaje activo'),
+          content: Text('Debes seleccionar un viaje'),
           backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
         ),
@@ -268,10 +324,10 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
       return;
     }
 
-    if (_selectedCategory == null || _selectedCategory!.isEmpty) {
+    if (_selectedType == null || _selectedType!.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Debes seleccionar una categoría'),
+          content: Text('Debes seleccionar un tipo de gasto'),
           backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
         ),
@@ -337,12 +393,16 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
         }
       }
 
+      // Obtener el driver_id del usuario actual (auth.uid())
+      final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+      
       final expense = ExpenseEntity(
         id: widget.expense?.id,
-        routeId: _selectedRouteId!,
+        tripId: _selectedTripId!,
+        driverId: currentUserId, // auth.uid() del usuario que registra el gasto
         amount: amount,
         date: _selectedDate!,
-        category: _selectedCategory!,
+        type: _selectedType!,
         description: _descriptionController.text.trim().isEmpty
             ? null
             : _descriptionController.text.trim(),
@@ -365,7 +425,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
             );
           }
         },
-        (savedExpense) {
+        (savedExpense) async {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -378,7 +438,14 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
                 behavior: SnackBarBehavior.floating,
               ),
             );
-            Navigator.of(context).pop(savedExpense);
+            
+            // Recargar gastos después de guardar
+            await _loadDriverExpenses();
+            
+            // Si es edición, cerrar la página; si es nuevo, mantenerla abierta
+            if (widget.expense != null) {
+              Navigator.of(context).pop(savedExpense);
+            }
           }
         },
       );
@@ -406,8 +473,115 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
     return DateFormat('dd/MM/yyyy').format(date);
   }
 
+  Widget _buildExpensesHistorySection() {
+    final dateFormat = DateFormat('dd/MM/yyyy');
+    final currencyFormat = NumberFormat.currency(symbol: '\$', decimalDigits: 0);
+    final totalAmount = _driverExpenses.fold<double>(
+      0.0,
+      (sum, expense) => sum + expense.amount,
+    );
+
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.receipt_long, color: AppColors.accent),
+                const SizedBox(width: 8),
+                Text(
+                  'Mis Gastos Registrados',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (_isLoadingExpenses)
+              const Center(child: CircularProgressIndicator())
+            else if (_driverExpenses.isEmpty)
+              Text(
+                'No hay gastos registrados para este viaje',
+                style: TextStyle(
+                  color: Colors.grey[600],
+                  fontSize: 14,
+                ),
+              )
+            else ...[
+              ..._driverExpenses.map((expense) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                expense.type,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              Text(
+                                dateFormat.format(expense.date),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Text(
+                          currencyFormat.format(expense.amount),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.accent,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )),
+              const Divider(),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Total:',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                  Text(
+                    currencyFormat.format(totalAmount),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: AppColors.accent,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
   String _getTripDisplayName(TripEntity trip) {
-    return '${trip.driverName} - ${DateFormat('dd/MM/yyyy').format(trip.startDate ?? DateTime.now())}';
+    final dateStr = trip.startDate != null 
+        ? DateFormat('dd/MM/yyyy').format(trip.startDate!)
+        : 'Sin fecha';
+    return '${trip.origin} → ${trip.destination} ($dateStr)';
   }
 
   Future<Widget> _buildImagePreview() async {
@@ -464,78 +638,79 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Selector de Viaje Activo (Dropdown) - Obligatorio
-              DropdownButtonFormField<String>(
-                value: _selectedRouteId,
-                decoration: InputDecoration(
-                  labelText: 'Viaje Activo *',
-                  hintText: 'Selecciona un viaje activo',
-                  prefixIcon: const Icon(Icons.route),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+              // Selector de Viaje (solo si no viene tripId)
+              if (widget.tripId == null)
+                DropdownButtonFormField<String>(
+                  value: _selectedTripId,
+                  decoration: InputDecoration(
+                    labelText: 'Viaje *',
+                    hintText: 'Selecciona un viaje',
+                    prefixIcon: const Icon(Icons.route),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
+                  items: _isLoadingRoutes
+                      ? [
+                          const DropdownMenuItem<String>(
+                            value: null,
+                            child: Text('Cargando viajes...'),
+                          )
+                        ]
+                      : _activeTrips.isEmpty
+                          ? [
+                              const DropdownMenuItem<String>(
+                                value: null,
+                                child: Text('No hay viajes disponibles'),
+                              )
+                            ]
+                          : _activeTrips.map((trip) {
+                              return DropdownMenuItem<String>(
+                                value: trip.id,
+                                child: Text(_getTripDisplayName(trip)),
+                              );
+                            }).toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedTripId = value;
+                    });
+                    _validateForm();
+                  },
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Debes seleccionar un viaje';
+                    }
+                    return null;
+                  },
                 ),
-                items: _isLoadingRoutes
-                    ? [
-                        const DropdownMenuItem<String>(
-                          value: null,
-                          child: Text('Cargando viajes...'),
-                        )
-                      ]
-                    : _activeTrips.isEmpty
-                        ? [
-                            const DropdownMenuItem<String>(
-                              value: null,
-                              child: Text('No hay viajes activos'),
-                            )
-                          ]
-                        : _activeTrips.map((trip) {
-                            return DropdownMenuItem<String>(
-                              value: trip.id,
-                              child: Text(_getTripDisplayName(trip)),
-                            );
-                          }).toList(),
-                onChanged: (value) {
-                  setState(() {
-                    _selectedRouteId = value;
-                  });
-                  _validateForm();
-                },
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Debes seleccionar un viaje activo';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 20),
+              if (widget.tripId == null) const SizedBox(height: 20),
 
-              // Categoría (Dropdown) - Obligatorio con opciones estrictas
+              // Tipo de Gasto (Dropdown) - Obligatorio
               DropdownButtonFormField<String>(
-                value: _selectedCategory,
+                value: _selectedType,
                 decoration: InputDecoration(
-                  labelText: 'Categoría *',
-                  hintText: 'Selecciona una categoría',
+                  labelText: 'Tipo de Gasto *',
+                  hintText: 'Selecciona un tipo',
                   prefixIcon: const Icon(Icons.category),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                items: _categories.map((category) {
+                items: _expenseTypes.map((type) {
                   return DropdownMenuItem<String>(
-                    value: category,
-                    child: Text(category),
+                    value: type,
+                    child: Text(type),
                   );
                 }).toList(),
                 onChanged: (value) {
                   setState(() {
-                    _selectedCategory = value;
+                    _selectedType = value;
                   });
                   _validateForm();
                 },
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Debes seleccionar una categoría';
+                    return 'Debes seleccionar un tipo de gasto';
                   }
                   return null;
                 },
@@ -677,6 +852,12 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
                   },
                 ),
               const SizedBox(height: 32),
+
+              // Historial de Gastos del Conductor
+              if (_driverExpenses.isNotEmpty || _isLoadingExpenses) ...[
+                _buildExpensesHistorySection(),
+                const SizedBox(height: 24),
+              ],
 
               // Save Button
               SizedBox(

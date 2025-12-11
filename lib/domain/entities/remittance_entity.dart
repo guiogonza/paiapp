@@ -11,7 +11,7 @@ class RemittanceEntity {
     this.id,
     required this.tripId,
     required this.receiverName,
-    this.status = 'pendiente',
+    this.status = 'pendiente_completar', // Estado inicial: pendiente_completar
     this.receiptUrl,
     this.createdAt,
     this.updatedAt,

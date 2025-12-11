@@ -1,4 +1,6 @@
+import 'dart:html' as html;
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:intl/intl.dart';
 import 'package:pai_app/core/theme/app_colors.dart';
 import 'package:pai_app/data/repositories/remittance_repository_impl.dart';
@@ -220,40 +222,57 @@ class _BillingDashboardPageState extends State<BillingDashboardPage> {
                     ],
                   ),
                 ),
-                // Indicador de documento
-                if (remittance.hasDocument)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.green.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: Colors.green,
-                        width: 1,
+                // Indicador de estado y documento
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Estado de la remisión
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _getStatusColor(remittance.status).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: _getStatusColor(remittance.status),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _getStatusIcon(remittance.status),
+                            size: 16,
+                            color: _getStatusColor(remittance.status),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            _getStatusLabel(remittance.status),
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: _getStatusColor(remittance.status),
+                                  fontWeight: FontWeight.bold,
+                                ),
+                          ),
+                        ],
                       ),
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.attach_file,
-                          size: 16,
-                          color: Colors.green,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Documento',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: Colors.green,
-                                fontWeight: FontWeight.bold,
-                              ),
-                        ),
-                      ],
-                    ),
-                  ),
+                    // Botón de descarga (solo para pendiente_cobrar)
+                    if (remittance.status == 'pendiente_cobrar' && remittance.hasDocument) ...[
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: const Icon(Icons.download, size: 20),
+                        onPressed: () => _downloadRemittanceImage(remittance),
+                        tooltip: 'Descargar remisión',
+                        color: AppColors.accent,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                    ],
+                  ],
+                ),
               ],
             ),
             const SizedBox(height: 16),
@@ -326,24 +345,88 @@ class _BillingDashboardPageState extends State<BillingDashboardPage> {
             const SizedBox(height: 16),
             const Divider(),
             const SizedBox(height: 16),
-            // Botón de acción
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () => _markAsCollected(remittance),
-                icon: const Icon(Icons.check_circle),
-                label: const Text('Marcar como Cobrado'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
+            // Botón de acción (solo para pendiente_cobrar)
+            if (remittance.status == 'pendiente_cobrar')
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => _markAsCollected(remittance),
+                  icon: const Icon(Icons.check_circle),
+                  label: const Text('Marcar como Cobrado'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
                 ),
               ),
-            ),
           ],
         ),
       ),
     );
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status) {
+      case 'pendiente_completar':
+        return Colors.orange;
+      case 'pendiente_cobrar':
+        return Colors.blue;
+      case 'cobrado':
+        return Colors.green;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  IconData _getStatusIcon(String status) {
+    switch (status) {
+      case 'pendiente_completar':
+        return Icons.pending;
+      case 'pendiente_cobrar':
+        return Icons.payment;
+      case 'cobrado':
+        return Icons.check_circle;
+      default:
+        return Icons.help_outline;
+    }
+  }
+
+  String _getStatusLabel(String status) {
+    switch (status) {
+      case 'pendiente_completar':
+        return 'Pendiente Completar';
+      case 'pendiente_cobrar':
+        return 'Pendiente Cobrar';
+      case 'cobrado':
+        return 'Cobrado';
+      default:
+        return status;
+    }
+  }
+
+  void _downloadRemittanceImage(RemittanceWithRouteEntity remittance) {
+    if (remittance.receiptUrl == null || remittance.receiptUrl!.isEmpty) {
+      return;
+    }
+
+    if (kIsWeb) {
+      final dateStr = remittance.createdAt != null
+          ? DateFormat('yyyy-MM-dd').format(remittance.createdAt!)
+          : 'remision';
+      final fileName = 'remision_${remittance.clientName ?? remittance.receiverName}_$dateStr.jpg';
+      html.AnchorElement(href: remittance.receiptUrl!)
+        ..setAttribute('download', fileName)
+        ..click();
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Descarga iniciada'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
   }
 }
 

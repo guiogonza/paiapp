@@ -123,13 +123,13 @@ class RemittanceRepositoryImpl implements RemittanceRepository {
   @override
   Future<Either<RemittanceFailure, List<RemittanceWithRouteEntity>>> getPendingRemittancesWithRoutes() async {
     try {
-      // Obtener remisiones pendientes
+      // Obtener TODOS los estados: pendiente_completar, pendiente_cobrar, y cobrado
       // IMPORTANTE: La FK se llama trip_id (NO route_id)
       // La columna updated_at ya existe en la tabla
       final remittancesResponse = await _supabase
           .from(_tableName)
           .select('id, trip_id, receiver_name, status, receipt_url, created_at, updated_at')
-          .eq('status', 'pendiente')
+          .or('status.eq.pendiente_completar,status.eq.pendiente_cobrar,status.eq.cobrado')
           .order('created_at', ascending: false);
 
       final remittancesWithRoutes = <RemittanceWithRouteEntity>[];
@@ -247,6 +247,30 @@ class RemittanceRepositoryImpl implements RemittanceRepository {
 
       final createdRemittance = RemittanceModel.fromJson(response).toEntity();
       return Right(createdRemittance);
+    } on PostgrestException catch (e) {
+      return Left(DatabaseFailure(_mapPostgrestError(e)));
+    } on SocketException catch (_) {
+      return const Left(NetworkFailure());
+    } catch (e) {
+      return Left(UnknownFailure(_mapGenericError(e)));
+    }
+  }
+
+  @override
+  Future<Either<RemittanceFailure, RemittanceEntity?>> getRemittanceByTripId(String tripId) async {
+    try {
+      final response = await _supabase
+          .from(_tableName)
+          .select()
+          .eq('trip_id', tripId)
+          .maybeSingle();
+
+      if (response == null) {
+        return const Right(null);
+      }
+
+      final remittance = RemittanceModel.fromJson(response).toEntity();
+      return Right(remittance);
     } on PostgrestException catch (e) {
       return Left(DatabaseFailure(_mapPostgrestError(e)));
     } on SocketException catch (_) {

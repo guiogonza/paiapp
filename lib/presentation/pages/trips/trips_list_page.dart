@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:pai_app/core/theme/app_colors.dart';
 import 'package:pai_app/data/repositories/trip_repository_impl.dart';
+import 'package:pai_app/data/repositories/expense_repository_impl.dart';
 import 'package:pai_app/domain/entities/trip_entity.dart';
+import 'package:pai_app/domain/entities/expense_entity.dart';
 import 'package:pai_app/domain/failures/trip_failure.dart';
 import 'package:pai_app/presentation/pages/trips/trip_form_page.dart';
+import 'package:pai_app/presentation/pages/trips/trip_detail_page.dart';
 
 class TripsListPage extends StatefulWidget {
   const TripsListPage({super.key});
@@ -15,7 +18,9 @@ class TripsListPage extends StatefulWidget {
 
 class _TripsListPageState extends State<TripsListPage> {
   final _repository = TripRepositoryImpl();
+  final _expenseRepository = ExpenseRepositoryImpl();
   List<TripEntity> _trips = [];
+  Map<String, List<ExpenseEntity>> _expensesByTrip = {}; // tripId -> expenses
   bool _isLoading = true;
   TripFailure? _error;
 
@@ -46,6 +51,8 @@ class _TripsListPageState extends State<TripsListPage> {
           _isLoading = false;
           _error = null;
         });
+        // Cargar gastos para todos los viajes
+        _loadExpensesForTrips(trips);
       },
     );
   }
@@ -95,6 +102,45 @@ class _TripsListPageState extends State<TripsListPage> {
         _loadTrips();
       },
     );
+  }
+
+  Future<void> _loadExpensesForTrips(List<TripEntity> trips) async {
+    for (final trip in trips) {
+      if (trip.id == null) continue;
+      
+      try {
+        final expensesResult = await _expenseRepository.getExpensesByTripId(trip.id!);
+        
+        expensesResult.fold(
+          (failure) {
+            // Ignorar errores, simplemente no mostrar gastos
+          },
+          (expenses) {
+            if (mounted) {
+              setState(() {
+                _expensesByTrip[trip.id!] = expenses;
+              });
+            }
+          },
+        );
+      } catch (e) {
+        // Ignorar errores
+      }
+    }
+  }
+
+  double _getTotalExpenses(String? tripId) {
+    if (tripId == null || !_expensesByTrip.containsKey(tripId)) {
+      return 0.0;
+    }
+    return _expensesByTrip[tripId]!.fold<double>(
+      0.0,
+      (sum, expense) => sum + expense.amount,
+    );
+  }
+
+  double _calculateProfit(TripEntity trip) {
+    return trip.revenueAmount - _getTotalExpenses(trip.id);
   }
 
   String _formatCurrency(double amount) {
@@ -217,20 +263,29 @@ class _TripsListPageState extends State<TripsListPage> {
         return Card(
           margin: const EdgeInsets.only(bottom: 12),
           child: ListTile(
-            leading: CircleAvatar(
-              backgroundColor: AppColors.accent.withOpacity(0.2),
-              child: Icon(
-                Icons.route,
-                color: AppColors.accent,
+            onTap: () {
+              if (trip.id != null) {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => TripDetailPage(tripId: trip.id!),
+                  ),
+                );
+              }
+            },
+              leading: CircleAvatar(
+                backgroundColor: AppColors.accent.withOpacity(0.2),
+                child: Icon(
+                  Icons.route,
+                  color: AppColors.accent,
+                ),
               ),
-            ),
-            title: Text(
-              trip.driverName,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 18,
+              title: Text(
+                trip.driverName,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                ),
               ),
-            ),
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -245,70 +300,107 @@ class _TripsListPageState extends State<TripsListPage> {
                   ),
                 ),
                 const SizedBox(height: 6),
-                // Ingreso y Presupuesto visibles en la tarjeta
-                Row(
+                // Ingreso, Gastos y Resultado
+                Column(
                   children: [
-                    Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.green.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.trending_up,
-                              size: 16,
+                    // Ingreso
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.trending_up,
+                            size: 16,
+                            color: Colors.green[700],
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Ingreso: ${_formatCurrency(trip.revenueAmount)}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
                               color: Colors.green[700],
                             ),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Ingreso: ${_formatCurrency(trip.revenueAmount)}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.green[700],
-                              ),
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.orange.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.account_balance_wallet,
-                              size: 16,
+                    const SizedBox(height: 4),
+                    // Gastos Totales
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.receipt_long,
+                            size: 16,
+                            color: Colors.orange[700],
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Gastos: ${_formatCurrency(_getTotalExpenses(trip.id))}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
                               color: Colors.orange[700],
                             ),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Presupuesto: ${_formatCurrency(trip.budgetAmount)}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.orange[700],
-                              ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    // Resultado
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _calculateProfit(trip) >= 0
+                            ? Colors.green.withOpacity(0.2)
+                            : Colors.red.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            _calculateProfit(trip) >= 0
+                                ? Icons.trending_up
+                                : Icons.trending_down,
+                            size: 16,
+                            color: _calculateProfit(trip) >= 0
+                                ? Colors.green[700]
+                                : Colors.red[700],
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Resultado: ${_formatCurrency(_calculateProfit(trip))}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: _calculateProfit(trip) >= 0
+                                  ? Colors.green[700]
+                                  : Colors.red[700],
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
                   ],

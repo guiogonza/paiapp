@@ -8,5 +8,9 @@ abstract class ProfileRepository {
   
   /// Obtiene un perfil por ID de usuario
   Future<Either<ProfileFailure, ProfileEntity>> getProfileByUserId(String userId);
+  
+  /// Obtiene la lista de todos los conductores (usuarios con role 'driver')
+  /// Retorna un Map donde la clave es el id del usuario y el valor es el email
+  Future<Either<ProfileFailure, Map<String, String>>> getDriversList();
 }
 

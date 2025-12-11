@@ -3,9 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:pai_app/core/theme/app_colors.dart';
 import 'package:pai_app/data/repositories/remittance_repository_impl.dart';
+import 'package:pai_app/data/repositories/expense_repository_impl.dart';
 import 'package:pai_app/domain/entities/remittance_with_route_entity.dart';
+import 'package:pai_app/domain/entities/expense_entity.dart';
 
 class RemittanceSigningPage extends StatefulWidget {
   final RemittanceWithRouteEntity remittanceWithRoute;
@@ -23,6 +26,7 @@ class RemittanceSigningPage extends StatefulWidget {
 
 class _RemittanceSigningPageState extends State<RemittanceSigningPage> {
   final RemittanceRepositoryImpl _remittanceRepository = RemittanceRepositoryImpl();
+  final ExpenseRepositoryImpl _expenseRepository = ExpenseRepositoryImpl();
   final _formKey = GlobalKey<FormState>();
   final _receivedByController = TextEditingController();
   
@@ -30,6 +34,8 @@ class _RemittanceSigningPageState extends State<RemittanceSigningPage> {
   XFile? _selectedXFile;
   bool _isLoading = false;
   bool _hasImage = false;
+  List<ExpenseEntity> _driverExpenses = [];
+  bool _isLoadingExpenses = false;
 
   @override
   void initState() {
@@ -37,6 +43,42 @@ class _RemittanceSigningPageState extends State<RemittanceSigningPage> {
     // Verificar si ya hay una imagen adjunta
     _hasImage = widget.remittanceWithRoute.remittance.receiptUrl != null &&
         widget.remittanceWithRoute.remittance.receiptUrl!.isNotEmpty;
+    // Cargar historial de gastos del conductor para este viaje
+    _loadDriverExpenses();
+  }
+
+  Future<void> _loadDriverExpenses() async {
+    final tripId = widget.remittanceWithRoute.tripId;
+    final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+    
+    if (tripId == null || tripId.isEmpty || currentUserId == null) {
+      return;
+    }
+
+    setState(() {
+      _isLoadingExpenses = true;
+    });
+
+    final result = await _expenseRepository.getExpensesByTripIdAndDriver(tripId, currentUserId);
+    
+    result.fold(
+      (failure) {
+        // No mostrar error, simplemente no mostrar gastos
+        if (mounted) {
+          setState(() {
+            _isLoadingExpenses = false;
+          });
+        }
+      },
+      (expenses) {
+        if (mounted) {
+          setState(() {
+            _driverExpenses = expenses;
+            _isLoadingExpenses = false;
+          });
+        }
+      },
+    );
   }
 
   @override
@@ -196,12 +238,13 @@ class _RemittanceSigningPageState extends State<RemittanceSigningPage> {
         receiptUrl = widget.remittanceWithRoute.remittance.receiptUrl;
       }
 
-      // Actualizar la remittance con receipt_url
+      // Actualizar la remittance con receipt_url y cambiar el status a pendiente_cobrar
       final updatedRemittance = widget.remittanceWithRoute.remittance.copyWith(
         receiptUrl: receiptUrl,
         receiverName: _receivedByController.text.trim().isNotEmpty
             ? _receivedByController.text.trim()
             : widget.remittanceWithRoute.remittance.receiverName,
+        status: 'pendiente_cobrar', // CRÍTICO: Cambiar el estado al finalizar
         updatedAt: DateTime.now(),
       );
 
@@ -306,6 +349,12 @@ class _RemittanceSigningPageState extends State<RemittanceSigningPage> {
                 ),
               ),
               const SizedBox(height: 24),
+
+              // Historial de Gastos del Conductor
+              if (_driverExpenses.isNotEmpty) ...[
+                _buildExpensesHistorySection(),
+                const SizedBox(height: 24),
+              ],
 
               // Botón gigante para adjuntar foto (OBLIGATORIO)
               Text(
@@ -474,6 +523,110 @@ class _RemittanceSigningPageState extends State<RemittanceSigningPage> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildExpensesHistorySection() {
+    final dateFormat = DateFormat('dd/MM/yyyy');
+    final currencyFormat = NumberFormat.currency(symbol: '\$', decimalDigits: 0);
+    final totalAmount = _driverExpenses.fold<double>(
+      0.0,
+      (sum, expense) => sum + expense.amount,
+    );
+
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.receipt_long, color: AppColors.accent),
+                const SizedBox(width: 8),
+                Text(
+                  'Mis Gastos Registrados',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (_isLoadingExpenses)
+              const Center(child: CircularProgressIndicator())
+            else if (_driverExpenses.isEmpty)
+              Text(
+                'No hay gastos registrados para este viaje',
+                style: TextStyle(
+                  color: Colors.grey[600],
+                  fontSize: 14,
+                ),
+              )
+            else ...[
+              ..._driverExpenses.map((expense) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                expense.type,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              Text(
+                                dateFormat.format(expense.date),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Text(
+                          currencyFormat.format(expense.amount),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.accent,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )),
+              const Divider(),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Total:',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                  Text(
+                    currencyFormat.format(totalAmount),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: AppColors.accent,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
         ),
       ),
     );

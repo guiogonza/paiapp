@@ -15,8 +15,9 @@ import 'package:pai_app/presentation/pages/login/login_page.dart';
 import 'package:pai_app/presentation/pages/vehicle_history/vehicle_history_page.dart';
 import 'package:pai_app/presentation/pages/billing/billing_dashboard_page.dart';
 import 'package:pai_app/presentation/pages/trips/trips_list_page.dart';
-import 'package:pai_app/presentation/pages/expenses/expenses_list_page.dart';
+import 'package:pai_app/presentation/pages/expenses/expenses_page.dart';
 import 'package:pai_app/presentation/pages/vehicles/vehicles_list_page.dart';
+import 'package:pai_app/presentation/pages/documents/documents_management_page.dart';
 
 class OwnerDashboardPage extends StatefulWidget {
   const OwnerDashboardPage({super.key});
@@ -568,12 +569,12 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
                           const SizedBox(height: 8),
                           // Botones de módulos en grid
                           GridView.count(
-                            crossAxisCount: 2,
+                            crossAxisCount: 3, // 3 columnas para que quepan más botones
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
-                            crossAxisSpacing: 8,
-                            mainAxisSpacing: 8,
-                            childAspectRatio: 2.5,
+                            crossAxisSpacing: 6,
+                            mainAxisSpacing: 6,
+                            childAspectRatio: 1.1, // Más compacto (casi cuadrados)
                             children: [
                               // Viajes
                               ElevatedButton.icon(
@@ -584,12 +585,13 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
                                     ),
                                   );
                                 },
-                                icon: const Icon(Icons.route, size: 18),
-                                label: const Text('Viajes', style: TextStyle(fontSize: 12)),
+                                icon: const Icon(Icons.route, size: 16),
+                                label: const Text('Viajes', style: TextStyle(fontSize: 11)),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: AppColors.accent,
                                   foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                                  minimumSize: const Size(0, 0),
                                 ),
                               ),
                               // Gastos
@@ -597,16 +599,17 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
                                 onPressed: () {
                                   Navigator.of(context).push(
                                     MaterialPageRoute(
-                                      builder: (_) => const ExpensesListPage(),
+                                      builder: (_) => const ExpensesPage(),
                                     ),
                                   );
                                 },
-                                icon: const Icon(Icons.receipt, size: 18),
-                                label: const Text('Gastos', style: TextStyle(fontSize: 12)),
+                                icon: const Icon(Icons.receipt, size: 16),
+                                label: const Text('Gastos', style: TextStyle(fontSize: 11)),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.orange,
                                   foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                                  minimumSize: const Size(0, 0),
                                 ),
                               ),
                               // Vehículos
@@ -618,12 +621,13 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
                                     ),
                                   );
                                 },
-                                icon: const Icon(Icons.directions_car, size: 18),
-                                label: const Text('Vehículos', style: TextStyle(fontSize: 12)),
+                                icon: const Icon(Icons.directions_car, size: 16),
+                                label: const Text('Vehículos', style: TextStyle(fontSize: 11)),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.blue,
                                   foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                                  minimumSize: const Size(0, 0),
                                 ),
                               ),
                               // Cobranza y Facturación
@@ -635,12 +639,31 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
                                     ),
                                   );
                                 },
-                                icon: const Icon(Icons.payment, size: 18),
-                                label: const Text('Cobranza', style: TextStyle(fontSize: 12)),
+                                icon: const Icon(Icons.payment, size: 16),
+                                label: const Text('Cobranza', style: TextStyle(fontSize: 11)),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: AppColors.primary,
                                   foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                                  minimumSize: const Size(0, 0),
+                                ),
+                              ),
+                              // Documentos / Gestión
+                              ElevatedButton.icon(
+                                onPressed: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => const DocumentsManagementPage(),
+                                    ),
+                                  );
+                                },
+                                icon: const Icon(Icons.description, size: 16),
+                                label: const Text('Documentos', style: TextStyle(fontSize: 11)),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.purple,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                                  minimumSize: const Size(0, 0),
                                 ),
                               ),
                             ],

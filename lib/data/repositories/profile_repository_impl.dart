@@ -66,6 +66,57 @@ class ProfileRepositoryImpl implements ProfileRepository {
     return e.message.isNotEmpty ? e.message : 'Error en la base de datos';
   }
 
+  @override
+  Future<Either<ProfileFailure, Map<String, String>>> getDriversList() async {
+    try {
+      // Log para debugging
+      print('🔍 Buscando conductores en la tabla profiles...');
+      
+      final response = await _supabase
+          .from(_tableName)
+          .select('id, email, full_name')
+          .eq('role', 'driver');
+
+      print('📊 Respuesta de Supabase: ${response.length} registros encontrados');
+
+      final driversMap = <String, String>{};
+      
+      for (var profile in (response as List)) {
+        final profileId = profile['id'] as String?;
+        final email = profile['email'] as String?;
+        final fullName = profile['full_name'] as String?;
+        
+        print('👤 Perfil encontrado: id=$profileId, email=$email, full_name=$fullName');
+        
+        if (profileId != null && email != null) {
+          // Usar email como valor mostrado, pero el id como clave
+          // Si hay full_name, mostrarlo junto con el email
+          final displayName = fullName != null && fullName.isNotEmpty
+              ? '$fullName ($email)'
+              : email;
+          driversMap[profileId] = displayName;
+          print('✅ Conductor agregado: $displayName (id: $profileId)');
+        } else {
+          print('⚠️ Perfil ignorado: id o email faltante');
+        }
+      }
+
+      print('📋 Total de conductores en el mapa: ${driversMap.length}');
+      return Right(driversMap);
+    } on PostgrestException catch (e) {
+      print('❌ Error PostgrestException al obtener conductores: ${e.message}');
+      print('   Código: ${e.code}');
+      print('   Detalles: ${e.details}');
+      return Left(DatabaseFailure(_mapPostgrestError(e)));
+    } on SocketException catch (_) {
+      print('❌ Error de red al obtener conductores');
+      return const Left(NetworkFailure());
+    } catch (e) {
+      print('❌ Error desconocido al obtener conductores: $e');
+      return Left(UnknownFailure(_mapGenericError(e)));
+    }
+  }
+
   String _mapGenericError(dynamic e) {
     return e.toString().isNotEmpty ? e.toString() : 'Error desconocido';
   }

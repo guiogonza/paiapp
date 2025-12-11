@@ -20,7 +20,7 @@ class RemittanceModel extends RemittanceEntity {
       id: json['id'] as String?,
       tripId: json['trip_id'] as String, // Mapeo a trip_id en Supabase
       receiverName: json['receiver_name'] as String,
-      status: (json['status'] as String?) ?? 'pendiente',
+      status: (json['status'] as String?) ?? 'pendiente_completar',
       receiptUrl: json['receipt_url'] as String?, // Mapeo a receipt_url en Supabase
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'] as String)
