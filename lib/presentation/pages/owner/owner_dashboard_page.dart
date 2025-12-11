@@ -18,6 +18,7 @@ import 'package:pai_app/presentation/pages/trips/trips_list_page.dart';
 import 'package:pai_app/presentation/pages/expenses/expenses_page.dart';
 import 'package:pai_app/presentation/pages/vehicles/vehicles_list_page.dart';
 import 'package:pai_app/presentation/pages/documents/documents_management_page.dart';
+import 'package:pai_app/presentation/pages/drivers/drivers_management_page.dart';
 
 class OwnerDashboardPage extends StatefulWidget {
   const OwnerDashboardPage({super.key});
@@ -572,9 +573,9 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
                             crossAxisCount: 3, // 3 columnas para que quepan más botones
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
-                            crossAxisSpacing: 6,
-                            mainAxisSpacing: 6,
-                            childAspectRatio: 1.1, // Más compacto (casi cuadrados)
+                            crossAxisSpacing: 4,
+                            mainAxisSpacing: 4,
+                            childAspectRatio: 1.2, // Más ancho que alto para botones más compactos
                             children: [
                               // Viajes
                               ElevatedButton.icon(
@@ -585,13 +586,14 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
                                     ),
                                   );
                                 },
-                                icon: const Icon(Icons.route, size: 16),
-                                label: const Text('Viajes', style: TextStyle(fontSize: 11)),
+                                icon: const Icon(Icons.route, size: 14),
+                                label: const Text('Viajes', style: TextStyle(fontSize: 10)),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: AppColors.accent,
                                   foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                                  padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
                                   minimumSize: const Size(0, 0),
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                 ),
                               ),
                               // Gastos
@@ -603,13 +605,14 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
                                     ),
                                   );
                                 },
-                                icon: const Icon(Icons.receipt, size: 16),
-                                label: const Text('Gastos', style: TextStyle(fontSize: 11)),
+                                icon: const Icon(Icons.receipt, size: 14),
+                                label: const Text('Gastos', style: TextStyle(fontSize: 10)),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.orange,
                                   foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                                  padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
                                   minimumSize: const Size(0, 0),
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                 ),
                               ),
                               // Vehículos
@@ -621,13 +624,14 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
                                     ),
                                   );
                                 },
-                                icon: const Icon(Icons.directions_car, size: 16),
-                                label: const Text('Vehículos', style: TextStyle(fontSize: 11)),
+                                icon: const Icon(Icons.directions_car, size: 14),
+                                label: const Text('Vehículos', style: TextStyle(fontSize: 10)),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.blue,
                                   foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                                  padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
                                   minimumSize: const Size(0, 0),
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                 ),
                               ),
                               // Cobranza y Facturación
@@ -639,13 +643,14 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
                                     ),
                                   );
                                 },
-                                icon: const Icon(Icons.payment, size: 16),
-                                label: const Text('Cobranza', style: TextStyle(fontSize: 11)),
+                                icon: const Icon(Icons.payment, size: 14),
+                                label: const Text('Cobranza', style: TextStyle(fontSize: 10)),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: AppColors.primary,
                                   foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                                  padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
                                   minimumSize: const Size(0, 0),
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                 ),
                               ),
                               // Documentos / Gestión
@@ -657,13 +662,33 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
                                     ),
                                   );
                                 },
-                                icon: const Icon(Icons.description, size: 16),
-                                label: const Text('Documentos', style: TextStyle(fontSize: 11)),
+                                icon: const Icon(Icons.description, size: 14),
+                                label: const Text('Documentos', style: TextStyle(fontSize: 10)),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.purple,
                                   foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                                  padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
                                   minimumSize: const Size(0, 0),
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                ),
+                              ),
+                              // Administrar Conductores
+                              ElevatedButton.icon(
+                                onPressed: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => const DriversManagementPage(),
+                                    ),
+                                  );
+                                },
+                                icon: const Icon(Icons.people, size: 14),
+                                label: const Text('Conductores', style: TextStyle(fontSize: 10)),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.teal,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+                                  minimumSize: const Size(0, 0),
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                 ),
                               ),
                             ],

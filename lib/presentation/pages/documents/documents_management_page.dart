@@ -100,43 +100,8 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
         },
       );
 
-      // Cargar conductores desde ProfileRepository
-      final driversResult = await _profileRepository.getDriversList();
-      driversResult.fold(
-        (failure) {
-          print('❌ Error al cargar conductores: ${failure.message}');
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Error al cargar conductores: ${failure.message}'),
-                backgroundColor: Colors.orange,
-                duration: const Duration(seconds: 4),
-              ),
-            );
-            setState(() {
-              _driverNames = {}; // Asegurar que esté vacío en caso de error
-            });
-          }
-        },
-        (driversMap) {
-          print('✅ Conductores cargados: ${driversMap.length}');
-          if (mounted) {
-            setState(() {
-              _driverNames = driversMap;
-            });
-            // Mostrar advertencia si no hay conductores
-            if (driversMap.isEmpty && mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('No hay conductores registrados en el sistema. Por favor, crea usuarios con rol "driver" primero.'),
-                  backgroundColor: Colors.orange,
-                  duration: Duration(seconds: 5),
-                ),
-              );
-            }
-          }
-        },
-      );
+      // Cargar conductores
+      await _loadDrivers();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -153,6 +118,53 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
         });
       }
     }
+  }
+
+  Future<void> _loadDrivers() async {
+    print('🔄 Recargando lista de conductores...');
+    final driversResult = await _profileRepository.getDriversList();
+    driversResult.fold(
+      (failure) {
+        print('❌ Error al cargar conductores: ${failure.message}');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error al cargar conductores: ${failure.message}'),
+              backgroundColor: Colors.orange,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+          setState(() {
+            _driverNames = {}; // Asegurar que esté vacío en caso de error
+          });
+        }
+      },
+      (driversMap) {
+        print('✅ Conductores cargados: ${driversMap.length}');
+        if (mounted) {
+          setState(() {
+            _driverNames = driversMap;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Lista de conductores actualizada: ${driversMap.length} encontrados'),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+          // Mostrar advertencia si no hay conductores
+          if (driversMap.isEmpty && mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('No hay conductores registrados en el sistema. Por favor, crea usuarios con rol "driver" primero.'),
+                backgroundColor: Colors.orange,
+                duration: Duration(seconds: 5),
+              ),
+            );
+          }
+        }
+      },
+    );
   }
 
 
@@ -516,7 +528,27 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loadData,
-            tooltip: 'Actualizar',
+            tooltip: 'Actualizar todo',
+          ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            onSelected: (value) {
+              if (value == 'refresh_drivers') {
+                _loadDrivers();
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'refresh_drivers',
+                child: Row(
+                  children: [
+                    Icon(Icons.people, size: 20),
+                    SizedBox(width: 8),
+                    Text('Actualizar lista de conductores'),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),

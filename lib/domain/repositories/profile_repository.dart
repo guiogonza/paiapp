@@ -12,5 +12,9 @@ abstract class ProfileRepository {
   /// Obtiene la lista de todos los conductores (usuarios con role 'driver')
   /// Retorna un Map donde la clave es el id del usuario y el valor es el email
   Future<Either<ProfileFailure, Map<String, String>>> getDriversList();
+  
+  /// Crea un nuevo conductor (usuario con role 'driver')
+  /// Crea el usuario en auth.users y luego crea el perfil en profiles con role='driver'
+  Future<Either<ProfileFailure, ProfileEntity>> createDriver(String email, String password, {String? fullName});
 }
 
