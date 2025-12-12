@@ -5,10 +5,15 @@ class MaintenanceModel extends MaintenanceEntity {
   const MaintenanceModel({
     super.id,
     required super.vehicleId,
-    required super.type,
+    required super.serviceType,
+    required super.serviceDate,
+    required super.kmAtService,
+    super.nextChangeKm,
+    super.alertDate,
     required super.cost,
-    required super.date,
-    super.description,
+    super.customServiceName,
+    super.providerName,
+    super.receiptUrl,
     required super.createdBy,
   });
 
@@ -17,10 +22,19 @@ class MaintenanceModel extends MaintenanceEntity {
     return MaintenanceModel(
       id: json['id'] as String?,
       vehicleId: json['vehicle_id'] as String,
-      type: json['type'] as String,
+      serviceType: json['service_type'] as String,
+      serviceDate: DateTime.parse(json['service_date'] as String),
+      kmAtService: (json['km_at_service'] as num).toDouble(),
+      nextChangeKm: json['next_change_km'] != null 
+          ? (json['next_change_km'] as num).toDouble() 
+          : null,
+      alertDate: json['alert_date'] != null
+          ? DateTime.parse(json['alert_date'] as String)
+          : null,
       cost: (json['cost'] as num).toDouble(),
-      date: DateTime.parse(json['date'] as String),
-      description: json['description'] as String?,
+      customServiceName: json['custom_service_name'] as String?,
+      providerName: json['provider_name'] as String?,
+      receiptUrl: json['receipt_url'] as String?,
       createdBy: json['created_by'] as String,
     );
   }
@@ -30,10 +44,15 @@ class MaintenanceModel extends MaintenanceEntity {
     return {
       if (id != null) 'id': id,
       'vehicle_id': vehicleId,
-      'type': type,
+      'service_type': serviceType,
+      'service_date': serviceDate.toIso8601String().split('T')[0], // Solo fecha (YYYY-MM-DD)
+      'km_at_service': kmAtService,
+      if (nextChangeKm != null) 'next_change_km': nextChangeKm,
+      if (alertDate != null) 'alert_date': alertDate!.toIso8601String().split('T')[0],
       'cost': cost,
-      'date': date.toIso8601String().split('T')[0], // Solo fecha (YYYY-MM-DD)
-      if (description != null && description!.isNotEmpty) 'description': description,
+      if (customServiceName != null && customServiceName!.isNotEmpty) 'custom_service_name': customServiceName,
+      if (providerName != null && providerName!.isNotEmpty) 'provider_name': providerName,
+      if (receiptUrl != null && receiptUrl!.isNotEmpty) 'receipt_url': receiptUrl,
       'created_by': createdBy,
     };
   }
@@ -43,10 +62,15 @@ class MaintenanceModel extends MaintenanceEntity {
     return MaintenanceModel(
       id: entity.id,
       vehicleId: entity.vehicleId,
-      type: entity.type,
+      serviceType: entity.serviceType,
+      serviceDate: entity.serviceDate,
+      kmAtService: entity.kmAtService,
+      nextChangeKm: entity.nextChangeKm,
+      alertDate: entity.alertDate,
       cost: entity.cost,
-      date: entity.date,
-      description: entity.description,
+      customServiceName: entity.customServiceName,
+      providerName: entity.providerName,
+      receiptUrl: entity.receiptUrl,
       createdBy: entity.createdBy,
     );
   }
@@ -56,10 +80,15 @@ class MaintenanceModel extends MaintenanceEntity {
     return MaintenanceEntity(
       id: id,
       vehicleId: vehicleId,
-      type: type,
+      serviceType: serviceType,
+      serviceDate: serviceDate,
+      kmAtService: kmAtService,
+      nextChangeKm: nextChangeKm,
+      alertDate: alertDate,
       cost: cost,
-      date: date,
-      description: description,
+      customServiceName: customServiceName,
+      providerName: providerName,
+      receiptUrl: receiptUrl,
       createdBy: createdBy,
     );
   }

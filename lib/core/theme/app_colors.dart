@@ -11,9 +11,10 @@ class AppColors {
   static const Color cyan = Color(0xFF00BCD4);
   static const Color lightCyan = Color(0xFF4DD0E1);
   
-  // Naranja (color de acento)
+  // Naranja (color de acento) - Ajustado según mockups
   static const Color orange = Color(0xFFFF6F00);
   static const Color lightOrange = Color(0xFFFFB74D);
+  static const Color orangeAccent = Color(0xFFFF9800); // Naranja más vibrante para acciones
   
   // Colores neutros
   static const Color white = Color(0xFFFFFFFF);

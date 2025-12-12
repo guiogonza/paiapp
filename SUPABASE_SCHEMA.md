@@ -67,12 +67,13 @@ Tabla para registrar mantenimientos de vehículos.
 |---------|------|-------------|
 | `id` | uuid | Clave primaria |
 | `vehicle_id` | uuid | ID del vehículo |
-| `service_type` | text | Tipo de servicio (Aceite, Llantas, Batería, Frenos, Filtros, Otro) |
+| `service_type` | text | Tipo de servicio (Aceite, Llantas, Batería, Frenos, Filtro Aire, Otro) |
 | `service_date` | date | Fecha del servicio |
 | `km_at_service` | numeric | Kilometraje al momento del servicio |
-| `next_change_km` | numeric | Próximo cambio en km (nullable) |
+| `next_change_km` | numeric | Próximo cambio en km (nullable) - usado como alert_km |
+| `alert_date` | date | Fecha de alerta para próximo mantenimiento (nullable) |
 | `cost` | numeric | Costo del servicio |
-| `description` | text | Descripción (nullable) |
+| `custom_service_name` | text | Nombre del servicio personalizado (solo para "Otro", nullable) |
 | `provider_name` | text | Nombre del proveedor (nullable) |
 | `receipt_url` | text | URL del recibo (nullable) |
 | `created_by` | uuid | ID del usuario que creó el registro |
@@ -81,6 +82,9 @@ Tabla para registrar mantenimientos de vehículos.
 **Notas:**
 - `created_by` es obligatorio
 - Al registrar mantenimiento, actualizar `vehicles.current_mileage` con `km_at_service`
+- `next_change_km` se calcula automáticamente según reglas (Aceite: +10,000 km, Llantas: +9,000 km, etc.)
+- `alert_date` se calcula automáticamente para Batería (+4 años) o se define manualmente
+- Para tipo "Otro", `custom_service_name` es obligatorio y `alert_date` es obligatorio
 
 ---
 

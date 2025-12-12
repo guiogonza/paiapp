@@ -8,18 +8,43 @@ class GPSAuthService {
   static const String _apiKeyStorageKey = 'gps_api_key';
 
   /// Realiza login y guarda el API key
+  /// Usa POST con body x-www-form-urlencoded (NO query string)
   Future<String?> login(String email, String password) async {
     try {
-      final response = await http.get(
-        Uri.parse('$_loginUrl?email=$email&password=$password'),
+      final uri = Uri.parse(_loginUrl);
+      
+      print('🔐 Intentando login con: $email');
+      print('📡 URL: $uri');
+      print('📡 Método: POST');
+      print('📡 Body: email=$email&password=***');
+      
+      // Preparar el body manualmente para asegurar el formato correcto
+      final body = 'email=${Uri.encodeComponent(email)}&password=${Uri.encodeComponent(password)}';
+      print('📡 Body codificado: email=${Uri.encodeComponent(email)}&password=***');
+      
+      final response = await http.post(
+        uri,
+        body: body,
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Accept': 'application/json',
+          'User-Agent': 'Flutter-App/1.0',
+        },
       );
 
-      print('🔐 Intentando login con: $email');
-      print('📡 URL: $_loginUrl?email=$email&password=$password');
+      print('📡 Status Code: ${response.statusCode}');
+      print('📡 Response Headers: ${response.headers}');
+      print('📡 Response Body: ${response.body}');
       
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         print('📦 Respuesta del login: $data');
+        
+        // Verificar si el servidor respondió con error
+        if (data is Map && data['status'] == 0) {
+          print('❌ El servidor rechazó las credenciales: ${data['message'] ?? 'Datos incorrectos'}');
+          return null;
+        }
         
         // Extraer el API key de la respuesta
         // El endpoint devuelve: {"status":1,"user_api_hash":"..."}
@@ -47,6 +72,17 @@ class GPSAuthService {
       } else {
         print('❌ Error en login: ${response.statusCode}');
         print('   Respuesta: ${response.body}');
+        
+        // Intentar parsear el error si es JSON
+        try {
+          final errorData = json.decode(response.body);
+          if (errorData is Map && errorData['message'] != null) {
+            print('   Mensaje del servidor: ${errorData['message']}');
+          }
+        } catch (_) {
+          // No es JSON, mostrar el body tal cual
+        }
+        
         return null;
       }
     } catch (e) {
@@ -83,11 +119,22 @@ class GPSAuthService {
       
       // Paso 1: Login
       print('\n📡 PASO 1: Realizando login...');
-      final email = 'luisr@rastrear.com';
+      final email = 'luisr@rastrear.com.co';
       final password = '2023';
       
-      final loginResponse = await http.get(
-        Uri.parse('$_loginUrl?email=$email&password=$password'),
+      final uri = Uri.parse(_loginUrl);
+      print('📡 URL: $uri');
+      print('📡 Método: POST');
+      
+      final loginResponse = await http.post(
+        uri,
+        body: {
+          'email': email,
+          'password': password,
+        },
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
       );
       
       print('📡 Status Code: ${loginResponse.statusCode}');

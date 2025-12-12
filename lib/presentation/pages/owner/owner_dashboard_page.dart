@@ -22,6 +22,7 @@ import 'package:pai_app/presentation/pages/documents/documents_management_page.d
 import 'package:pai_app/presentation/pages/drivers/drivers_management_page.dart';
 import 'package:pai_app/presentation/pages/maintenance/maintenance_page.dart';
 import 'package:pai_app/data/services/fleet_sync_service.dart';
+import 'package:pai_app/data/repositories/maintenance_repository_impl.dart';
 
 class OwnerDashboardPage extends StatefulWidget {
   const OwnerDashboardPage({super.key});
@@ -37,6 +38,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
   final _location = Location();
   final _gpsAuthService = GPSAuthService();
   final _fleetSyncService = FleetSyncService();
+  final _maintenanceRepository = MaintenanceRepositoryImpl();
   bool _isSyncing = false;
   
   gmaps.GoogleMapController? _mapController;
@@ -47,6 +49,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
   bool _hasLocationPermission = false;
   Set<gmaps.Marker> _markers = {};
   List<Marker> _flutterMarkers = [];
+  int _activeAlertsCount = 0; // Contador de alertas activas
 
   // Ubicación por defecto: Bogotá, Colombia
   static const gmaps.LatLng _defaultLocation = gmaps.LatLng(4.7110, -74.0721);
@@ -65,9 +68,29 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
       });
     }
     _loadVehicleLocations();
+    _checkActiveAlerts(); // Verificar alertas al iniciar
     if (kIsWeb) {
       _flutterMapController = MapController();
     }
+  }
+
+  /// Verifica alertas activas de mantenimiento
+  Future<void> _checkActiveAlerts() async {
+    final result = await _maintenanceRepository.checkActiveAlerts();
+    result.fold(
+      (failure) {
+        // Silenciar errores, no bloquear el dashboard
+        debugPrint('Error al verificar alertas: ${failure.message}');
+      },
+      (count) {
+        if (mounted) {
+          setState(() {
+            _activeAlertsCount = count;
+          });
+          debugPrint('🔔 Alertas activas encontradas: $count');
+        }
+      },
+    );
   }
 
   Future<void> _requestLocationPermission() async {
@@ -262,6 +285,66 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
     }
   }
 
+  /// Construye una tarjeta de módulo con diseño moderno tipo mockups
+  Widget _buildModuleCard(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.08),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  icon,
+                  color: color,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _updateMarkers() {
     if (kIsWeb) {
       // Usar flutter_map markers para web
@@ -449,11 +532,60 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Dashboard - Dueño'),
+        title: const Text('Panel Principal'),
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        elevation: 0,
         actions: [
+          // Icono de notificación de alertas (rojo si hay alertas activas)
+          if (_activeAlertsCount > 0)
+            Stack(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.notifications, color: Colors.white),
+                  onPressed: () {
+                    // Navegar a la página de alertas
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const MaintenancePage(),
+                      ),
+                    ).then((_) {
+                      // Recargar alertas al volver
+                      _checkActiveAlerts();
+                    });
+                  },
+                  tooltip: 'Tienes $_activeAlertsCount alertas de mantenimiento',
+                ),
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 16,
+                      minHeight: 16,
+                    ),
+                    child: Text(
+                      _activeAlertsCount > 9 ? '9+' : '$_activeAlertsCount',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           // Botón temporal de debug GPS
           IconButton(
-            icon: const Icon(Icons.bug_report, color: Colors.orange),
+            icon: const Icon(Icons.bug_report, color: Colors.white),
             onPressed: () async {
               print('🔍 Iniciando debug GPS JSON...');
               ScaffoldMessenger.of(context).showSnackBar(
@@ -477,7 +609,10 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
           ),
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: _loadVehicleLocations,
+            onPressed: () {
+              _loadVehicleLocations();
+              _checkActiveAlerts(); // Recargar alertas al actualizar
+            },
             tooltip: 'Actualizar ubicaciones',
           ),
           IconButton(
@@ -538,29 +673,105 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
                         tiltGesturesEnabled: true,
                         rotateGesturesEnabled: true,
                       ),
-                // Panel de información
+                // Banner de alertas activas
+                if (_activeAlertsCount > 0)
+                  Positioned(
+                    top: 16,
+                    left: 16,
+                    right: 16,
+                    child: Material(
+                      elevation: 4,
+                      borderRadius: BorderRadius.circular(12),
+                      color: Colors.red,
+                      child: InkWell(
+                        onTap: () {
+                          // Navegar a la página de alertas
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const MaintenancePage(),
+                            ),
+                          ).then((_) {
+                            // Recargar alertas al volver
+                            _checkActiveAlerts();
+                          });
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.red.shade700, width: 2),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.warning,
+                                color: Colors.white,
+                                size: 24,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  'Tienes $_activeAlertsCount mantenimiento${_activeAlertsCount > 1 ? 's' : ''} pendiente${_activeAlertsCount > 1 ? 's' : ''} o que requieren pre-aviso',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              const Icon(
+                                Icons.arrow_forward_ios,
+                                color: Colors.white,
+                                size: 16,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                // Panel de información mejorado - Scrolleable
                 Positioned(
-                  top: 16,
+                  top: _activeAlertsCount > 0 ? 80 : 16, // Ajustar posición si hay banner
                   left: 16,
                   right: 16,
+                  bottom: 80, // Espacio para el FAB
                   child: Card(
-                    elevation: 4,
-                    child: Padding(
-                      padding: const EdgeInsets.all(12.0),
+                    elevation: 6,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(16.0),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // Header con vehículos en ruta
                           Row(
                             children: [
-                              const Icon(Icons.directions_car, color: AppColors.primary),
-                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: AppColors.royalBlue.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(
+                                  Icons.directions_car,
+                                  color: AppColors.royalBlue,
+                                  size: 20,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
                               Expanded(
                                 child: Text(
                                   'Vehículos en ruta: ${_vehicleLocations.length}',
                                   style: const TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
+                                    color: AppColors.textPrimary,
                                   ),
                                 ),
                               ),
@@ -569,11 +780,23 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
                                   // Mostrar lista de vehículos para ver historial
                                   showModalBottomSheet(
                                     context: context,
+                                    shape: const RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                                    ),
                                     builder: (context) => Container(
                                       padding: const EdgeInsets.all(16),
                                       child: Column(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
+                                          Container(
+                                            width: 40,
+                                            height: 4,
+                                            margin: const EdgeInsets.only(bottom: 16),
+                                            decoration: BoxDecoration(
+                                              color: Colors.grey[300],
+                                              borderRadius: BorderRadius.circular(2),
+                                            ),
+                                          ),
                                           const Text(
                                             'Ver historial de vehículo',
                                             style: TextStyle(
@@ -587,8 +810,22 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
                                                 ? '${vehicle.timestamp!.hour.toString().padLeft(2, '0')}:${vehicle.timestamp!.minute.toString().padLeft(2, '0')}'
                                                 : '--:--';
                                             return ListTile(
-                                              leading: const Icon(Icons.directions_car),
-                                              title: Text(vehicle.plate),
+                                              leading: Container(
+                                                padding: const EdgeInsets.all(8),
+                                                decoration: BoxDecoration(
+                                                  color: AppColors.royalBlue.withOpacity(0.1),
+                                                  borderRadius: BorderRadius.circular(8),
+                                                ),
+                                                child: const Icon(
+                                                  Icons.directions_car,
+                                                  color: AppColors.royalBlue,
+                                                  size: 20,
+                                                ),
+                                              ),
+                                              title: Text(
+                                                vehicle.plate,
+                                                style: const TextStyle(fontWeight: FontWeight.w600),
+                                              ),
                                               subtitle: Text('Último reporte: $timeStr'),
                                               trailing: const Icon(Icons.arrow_forward_ios, size: 16),
                                               onTap: () {
@@ -611,161 +848,129 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
                                 },
                                 icon: const Icon(Icons.history, size: 18),
                                 label: const Text('Ver historiales'),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: AppColors.royalBlue,
+                                ),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 16),
                           // Sección de Módulos
                           const Text(
                             'Módulos',
                             style: TextStyle(
-                              fontSize: 14,
+                              fontSize: 16,
                               fontWeight: FontWeight.bold,
-                              color: AppColors.textSecondary,
+                              color: AppColors.textPrimary,
                             ),
                           ),
-                          const SizedBox(height: 8),
-                          // Botones de módulos en grid
+                          const SizedBox(height: 12),
+                          // Botones de módulos en grid - Diseño moderno tipo mockups
                           GridView.count(
-                            crossAxisCount: 3, // 3 columnas para que quepan más botones
+                            crossAxisCount: 3, // 3 columnas
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
-                            crossAxisSpacing: 4,
-                            mainAxisSpacing: 4,
-                            childAspectRatio: 1.2, // Más ancho que alto para botones más compactos
+                            crossAxisSpacing: 8,
+                            mainAxisSpacing: 8,
+                            childAspectRatio: 1.0, // Más compacto
                             children: [
-                              // Viajes
-                              ElevatedButton.icon(
-                                onPressed: () {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (_) => const TripsListPage(),
-                                    ),
-                                  );
-                                },
-                                icon: const Icon(Icons.route, size: 14),
-                                label: const Text('Viajes', style: TextStyle(fontSize: 10)),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.accent,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
-                                  minimumSize: const Size(0, 0),
-                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                ),
-                              ),
-                              // Gastos
-                              ElevatedButton.icon(
-                                onPressed: () {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (_) => const ExpensesPage(),
-                                    ),
-                                  );
-                                },
-                                icon: const Icon(Icons.receipt, size: 14),
-                                label: const Text('Gastos', style: TextStyle(fontSize: 10)),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.orange,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
-                                  minimumSize: const Size(0, 0),
-                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                ),
-                              ),
                               // Vehículos
-                              ElevatedButton.icon(
-                                onPressed: () {
+                              _buildModuleCard(
+                                context,
+                                icon: Icons.directions_car,
+                                label: 'Vehículos',
+                                color: AppColors.royalBlue,
+                                onTap: () {
                                   Navigator.of(context).push(
                                     MaterialPageRoute(
                                       builder: (_) => const VehiclesListPage(),
                                     ),
                                   );
                                 },
-                                icon: const Icon(Icons.directions_car, size: 14),
-                                label: const Text('Vehículos', style: TextStyle(fontSize: 10)),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.blue,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
-                                  minimumSize: const Size(0, 0),
-                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                ),
                               ),
-                              // Cobranza y Facturación
-                              ElevatedButton.icon(
-                                onPressed: () {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (_) => const BillingDashboardPage(),
-                                    ),
-                                  );
-                                },
-                                icon: const Icon(Icons.payment, size: 14),
-                                label: const Text('Cobranza', style: TextStyle(fontSize: 10)),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.primary,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
-                                  minimumSize: const Size(0, 0),
-                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                ),
-                              ),
-                              // Documentos / Gestión
-                              ElevatedButton.icon(
-                                onPressed: () {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (_) => const DocumentsManagementPage(),
-                                    ),
-                                  );
-                                },
-                                icon: const Icon(Icons.description, size: 14),
-                                label: const Text('Documentos', style: TextStyle(fontSize: 10)),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.purple,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
-                                  minimumSize: const Size(0, 0),
-                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                ),
-                              ),
-                              // Administrar Conductores
-                              ElevatedButton.icon(
-                                onPressed: () {
+                              // Conductores
+                              _buildModuleCard(
+                                context,
+                                icon: Icons.people,
+                                label: 'Conductores',
+                                color: AppColors.royalBlue,
+                                onTap: () {
                                   Navigator.of(context).push(
                                     MaterialPageRoute(
                                       builder: (_) => const DriversManagementPage(),
                                     ),
                                   );
                                 },
-                                icon: const Icon(Icons.people, size: 14),
-                                label: const Text('Conductores', style: TextStyle(fontSize: 10)),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.teal,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
-                                  minimumSize: const Size(0, 0),
-                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                ),
+                              ),
+                              // Viajes
+                              _buildModuleCard(
+                                context,
+                                icon: Icons.route,
+                                label: 'Viajes',
+                                color: AppColors.royalBlue,
+                                onTap: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => const TripsListPage(),
+                                    ),
+                                  );
+                                },
+                              ),
+                              // Cobranza
+                              _buildModuleCard(
+                                context,
+                                icon: Icons.payment,
+                                label: 'Cobranza',
+                                color: AppColors.orangeAccent,
+                                onTap: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => const BillingDashboardPage(),
+                                    ),
+                                  );
+                                },
+                              ),
+                              // Gastos
+                              _buildModuleCard(
+                                context,
+                                icon: Icons.receipt,
+                                label: 'Gastos',
+                                color: AppColors.orangeAccent,
+                                onTap: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => const ExpensesPage(),
+                                    ),
+                                  );
+                                },
+                              ),
+                              // Documentos
+                              _buildModuleCard(
+                                context,
+                                icon: Icons.description,
+                                label: 'Documentos',
+                                color: AppColors.royalBlue,
+                                onTap: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => const DocumentsManagementPage(),
+                                    ),
+                                  );
+                                },
                               ),
                               // Mantenimiento
-                              ElevatedButton.icon(
-                                onPressed: () {
+                              _buildModuleCard(
+                                context,
+                                icon: Icons.build,
+                                label: 'Mantenimiento',
+                                color: AppColors.darkGray,
+                                onTap: () {
                                   Navigator.of(context).push(
                                     MaterialPageRoute(
                                       builder: (_) => const MaintenancePage(),
                                     ),
                                   );
                                 },
-                                icon: const Icon(Icons.build, size: 14),
-                                label: const Text('Mantenimiento', style: TextStyle(fontSize: 10)),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.brown,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
-                                  minimumSize: const Size(0, 0),
-                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                ),
                               ),
                             ],
                           ),

@@ -70,6 +70,9 @@ class VehicleModel extends VehicleEntity {
       modelo: modelo,
       ano: ano,
       conductor: conductor,
+      gpsDeviceId: gpsDeviceId, // CRÍTICO: Incluir gpsDeviceId
+      ownerId: ownerId, // CRÍTICO: Incluir ownerId
+      currentMileage: currentMileage, // CRÍTICO: Incluir currentMileage
     );
   }
 }

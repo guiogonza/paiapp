@@ -145,26 +145,29 @@ class _MaintenanceHistoryPageState extends State<MaintenanceHistoryPage> {
                               leading: CircleAvatar(
                                 backgroundColor: AppColors.primary,
                                 child: Text(
-                                  maintenance.type[0],
+                                  maintenance.serviceType[0],
                                   style: const TextStyle(color: Colors.white),
                                 ),
                               ),
                               title: Text(
-                                maintenance.type,
+                                maintenance.serviceType,
                                 style: const TextStyle(fontWeight: FontWeight.bold),
                               ),
                               subtitle: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'Fecha: ${DateFormat('dd/MM/yyyy').format(maintenance.date)}',
+                                    'Fecha: ${DateFormat('dd/MM/yyyy').format(maintenance.serviceDate)}',
+                                  ),
+                                  Text(
+                                    'Kilometraje: ${NumberFormat('#,##0').format(maintenance.kmAtService)} km',
                                   ),
                                   Text(
                                     'Costo: \$${NumberFormat('#,##0.00').format(maintenance.cost)}',
                                   ),
-                                  if (maintenance.description != null && maintenance.description!.isNotEmpty)
+                                  if (maintenance.customServiceName != null && maintenance.customServiceName!.isNotEmpty)
                                     Text(
-                                      maintenance.description!,
+                                      'Servicio: ${maintenance.customServiceName}',
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
                                     ),

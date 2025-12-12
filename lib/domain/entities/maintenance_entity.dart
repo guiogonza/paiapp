@@ -1,38 +1,58 @@
 class MaintenanceEntity {
   final String? id;
   final String vehicleId;
-  final String type; // Aceite, Llantas, Batería, Frenos, Filtros, Otro
+  final String serviceType; // Aceite, Llantas, Batería, Frenos, Filtro Aire, Otro
+  final DateTime serviceDate;
+  final double kmAtService; // Kilometraje al momento del servicio
+  final double? nextChangeKm; // Próximo cambio en km (nullable) - usado como alert_km
+  final DateTime? alertDate; // Fecha de alerta (nullable) - para Batería o fecha manual
   final double cost;
-  final DateTime date;
-  final String? description;
+  final String? customServiceName; // Nombre del servicio personalizado (solo para "Otro")
+  final String? providerName; // Nombre del proveedor (nullable)
+  final String? receiptUrl; // URL del recibo (nullable)
   final String createdBy; // ID del usuario que creó el registro
 
   const MaintenanceEntity({
     this.id,
     required this.vehicleId,
-    required this.type,
+    required this.serviceType,
+    required this.serviceDate,
+    required this.kmAtService,
+    this.nextChangeKm,
+    this.alertDate,
     required this.cost,
-    required this.date,
-    this.description,
+    this.customServiceName,
+    this.providerName,
+    this.receiptUrl,
     required this.createdBy,
   });
 
   MaintenanceEntity copyWith({
     String? id,
     String? vehicleId,
-    String? type,
+    String? serviceType,
+    DateTime? serviceDate,
+    double? kmAtService,
+    double? nextChangeKm,
+    DateTime? alertDate,
     double? cost,
-    DateTime? date,
-    String? description,
+    String? customServiceName,
+    String? providerName,
+    String? receiptUrl,
     String? createdBy,
   }) {
     return MaintenanceEntity(
       id: id ?? this.id,
       vehicleId: vehicleId ?? this.vehicleId,
-      type: type ?? this.type,
+      serviceType: serviceType ?? this.serviceType,
+      serviceDate: serviceDate ?? this.serviceDate,
+      kmAtService: kmAtService ?? this.kmAtService,
+      nextChangeKm: nextChangeKm ?? this.nextChangeKm,
+      alertDate: alertDate ?? this.alertDate,
       cost: cost ?? this.cost,
-      date: date ?? this.date,
-      description: description ?? this.description,
+      customServiceName: customServiceName ?? this.customServiceName,
+      providerName: providerName ?? this.providerName,
+      receiptUrl: receiptUrl ?? this.receiptUrl,
       createdBy: createdBy ?? this.createdBy,
     );
   }
@@ -43,10 +63,15 @@ class MaintenanceEntity {
     return other is MaintenanceEntity &&
         other.id == id &&
         other.vehicleId == vehicleId &&
-        other.type == type &&
+        other.serviceType == serviceType &&
+        other.serviceDate == serviceDate &&
+        other.kmAtService == kmAtService &&
+        other.nextChangeKm == nextChangeKm &&
+        other.alertDate == alertDate &&
         other.cost == cost &&
-        other.date == date &&
-        other.description == description &&
+        other.customServiceName == customServiceName &&
+        other.providerName == providerName &&
+        other.receiptUrl == receiptUrl &&
         other.createdBy == createdBy;
   }
 
@@ -54,10 +79,15 @@ class MaintenanceEntity {
   int get hashCode {
     return id.hashCode ^
         vehicleId.hashCode ^
-        type.hashCode ^
+        serviceType.hashCode ^
+        serviceDate.hashCode ^
+        kmAtService.hashCode ^
+        (nextChangeKm?.hashCode ?? 0) ^
+        (alertDate?.hashCode ?? 0) ^
         cost.hashCode ^
-        date.hashCode ^
-        (description?.hashCode ?? 0) ^
+        (customServiceName?.hashCode ?? 0) ^
+        (providerName?.hashCode ?? 0) ^
+        (receiptUrl?.hashCode ?? 0) ^
         createdBy.hashCode;
   }
 }

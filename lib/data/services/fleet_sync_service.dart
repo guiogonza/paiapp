@@ -17,7 +17,7 @@ class FleetSyncService {
       print('🔄 Iniciando sincronización de flota (primeros 5 dispositivos)...');
       
       // Paso 1: Autenticación
-      final email = 'luisr@rastrear.com';
+      final email = 'luisr@rastrear.com.co';
       final password = '2023';
       
       final apiKey = await _gpsAuthService.login(email, password);
