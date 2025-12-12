@@ -10,6 +10,7 @@ import 'package:pai_app/data/repositories/auth_repository_impl.dart';
 import 'package:pai_app/data/repositories/vehicle_history_repository_impl.dart';
 import 'package:pai_app/data/services/vehicle_location_service.dart';
 import 'package:pai_app/data/services/vehicle_history_service.dart';
+import 'package:pai_app/data/services/gps_auth_service.dart';
 import 'package:pai_app/domain/entities/vehicle_location_entity.dart';
 import 'package:pai_app/presentation/pages/login/login_page.dart';
 import 'package:pai_app/presentation/pages/vehicle_history/vehicle_history_page.dart';
@@ -19,6 +20,8 @@ import 'package:pai_app/presentation/pages/expenses/expenses_page.dart';
 import 'package:pai_app/presentation/pages/vehicles/vehicles_list_page.dart';
 import 'package:pai_app/presentation/pages/documents/documents_management_page.dart';
 import 'package:pai_app/presentation/pages/drivers/drivers_management_page.dart';
+import 'package:pai_app/presentation/pages/maintenance/maintenance_page.dart';
+import 'package:pai_app/data/services/fleet_sync_service.dart';
 
 class OwnerDashboardPage extends StatefulWidget {
   const OwnerDashboardPage({super.key});
@@ -32,6 +35,9 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
   final _historyService = VehicleHistoryService();
   final _historyRepository = VehicleHistoryRepositoryImpl();
   final _location = Location();
+  final _gpsAuthService = GPSAuthService();
+  final _fleetSyncService = FleetSyncService();
+  bool _isSyncing = false;
   
   gmaps.GoogleMapController? _mapController;
   MapController? _flutterMapController;
@@ -229,6 +235,33 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
     );
   }
 
+  Future<void> _handleSyncFleet() async {
+    setState(() {
+      _isSyncing = true;
+    });
+
+    final result = await _fleetSyncService.syncFleetLimited();
+
+    if (mounted) {
+      setState(() {
+        _isSyncing = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result['message'] ?? 'Sincronización completada'),
+          backgroundColor: result['success'] == true ? Colors.green : Colors.red,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+
+      // Si se sincronizaron vehículos, recargar ubicaciones
+      if (result['success'] == true && result['synced'] > 0) {
+        _loadVehicleLocations();
+      }
+    }
+  }
+
   void _updateMarkers() {
     if (kIsWeb) {
       // Usar flutter_map markers para web
@@ -418,6 +451,30 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
       appBar: AppBar(
         title: const Text('Dashboard - Dueño'),
         actions: [
+          // Botón temporal de debug GPS
+          IconButton(
+            icon: const Icon(Icons.bug_report, color: Colors.orange),
+            onPressed: () async {
+              print('🔍 Iniciando debug GPS JSON...');
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Ejecutando debug GPS... Revisa la consola del navegador (F12)'),
+                  duration: Duration(seconds: 3),
+                ),
+              );
+              await _gpsAuthService.debugGpsStructure();
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Debug completado. Revisa la consola (F12 → Console)'),
+                    backgroundColor: Colors.green,
+                    duration: Duration(seconds: 3),
+                  ),
+                );
+              }
+            },
+            tooltip: 'TEST GPS JSON (Debug)',
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loadVehicleLocations,
@@ -691,6 +748,25 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
                                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                 ),
                               ),
+                              // Mantenimiento
+                              ElevatedButton.icon(
+                                onPressed: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => const MaintenancePage(),
+                                    ),
+                                  );
+                                },
+                                icon: const Icon(Icons.build, size: 14),
+                                label: const Text('Mantenimiento', style: TextStyle(fontSize: 10)),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.brown,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+                                  minimumSize: const Size(0, 0),
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                ),
+                              ),
                             ],
                           ),
                           if (!_hasLocationPermission && !kIsWeb) ...[
@@ -710,8 +786,30 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
                 ),
               ],
             ),
-      floatingActionButton: kIsWeb
-          ? FloatingActionButton(
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Botón de sincronización de flota
+          FloatingActionButton.extended(
+            onPressed: _isSyncing ? null : _handleSyncFleet,
+            icon: _isSyncing
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                : const Icon(Icons.sync),
+            label: Text(_isSyncing ? 'Sincronizando...' : 'Sync Flota (Test)'),
+            backgroundColor: Colors.green,
+            heroTag: 'sync_fleet',
+          ),
+          const SizedBox(height: 8),
+          // Botón de ubicación actual
+          if (kIsWeb)
+            FloatingActionButton(
               onPressed: () {
                 if (_currentLocation != null && _flutterMapController != null) {
                   _flutterMapController!.move(
@@ -725,14 +823,17 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
               },
               tooltip: 'Ir a mi ubicación',
               child: const Icon(Icons.my_location),
+              heroTag: 'my_location',
             )
-          : _hasLocationPermission
-              ? FloatingActionButton(
-                  onPressed: _getCurrentLocation,
-                  tooltip: 'Ir a mi ubicación',
-                  child: const Icon(Icons.my_location),
-                )
-              : null,
+          else if (_hasLocationPermission)
+            FloatingActionButton(
+              onPressed: _getCurrentLocation,
+              tooltip: 'Ir a mi ubicación',
+              child: const Icon(Icons.my_location),
+              heroTag: 'my_location',
+            ),
+        ],
+      ),
     );
   }
 

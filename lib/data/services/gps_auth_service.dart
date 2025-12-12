@@ -72,5 +72,146 @@ class GPSAuthService {
     final apiKey = await getApiKey();
     return apiKey != null && apiKey.isNotEmpty;
   }
+
+  /// Función de debug para inspeccionar la estructura JSON del API de GPS
+  /// Realiza el flujo completo: login -> obtener devices -> mostrar JSON completo
+  Future<void> debugGpsStructure() async {
+    try {
+      print('🔍 ==========================================');
+      print('🔍 INICIANDO DEBUG GPS STRUCTURE');
+      print('🔍 ==========================================');
+      
+      // Paso 1: Login
+      print('\n📡 PASO 1: Realizando login...');
+      final email = 'luisr@rastrear.com';
+      final password = '2023';
+      
+      final loginResponse = await http.get(
+        Uri.parse('$_loginUrl?email=$email&password=$password'),
+      );
+      
+      print('📡 Status Code: ${loginResponse.statusCode}');
+      print('📡 Response Headers: ${loginResponse.headers}');
+      print('📡 Response Body: ${loginResponse.body}');
+      
+      if (loginResponse.statusCode != 200) {
+        print('❌ Error en login: ${loginResponse.statusCode}');
+        print('   Respuesta: ${loginResponse.body}');
+        return;
+      }
+      
+      final loginData = json.decode(loginResponse.body);
+      print('📦 Login JSON: $loginData');
+      
+      // Paso 2: Extraer token/API key
+      final apiKey = loginData['user_api_hash'] ??
+                    loginData['api_key'] ?? 
+                    loginData['apikey'] ?? 
+                    loginData['key'] ?? 
+                    loginData['token'] ?? 
+                    loginData['apiKey'] ??
+                    loginData['access_token'] ??
+                    (loginData is String ? loginData : null);
+      
+      if (apiKey == null) {
+        print('❌ No se encontró API key en la respuesta');
+        print('   Keys disponibles: ${loginData.keys.toList()}');
+        return;
+      }
+      
+      print('\n✅ API Key obtenido: ${apiKey.toString().substring(0, apiKey.toString().length > 30 ? 30 : apiKey.toString().length)}...');
+      
+      // Paso 3: Obtener devices
+      print('\n📡 PASO 3: Obteniendo devices...');
+      const devicesUrl = 'https://plataforma.sistemagps.online/api/get_devices';
+      final devicesUri = Uri.parse(devicesUrl).replace(queryParameters: {
+        'user_api_hash': apiKey.toString(),
+        'lang': 'es',
+      });
+      
+      print('📡 URL: $devicesUri');
+      
+      final devicesResponse = await http.get(
+        devicesUri,
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Flutter-App/1.0',
+        },
+      );
+      
+      print('📡 Status Code: ${devicesResponse.statusCode}');
+      print('📡 Response Headers: ${devicesResponse.headers}');
+      
+      if (devicesResponse.statusCode != 200) {
+        print('❌ Error al obtener devices: ${devicesResponse.statusCode}');
+        print('   Respuesta: ${devicesResponse.body}');
+        return;
+      }
+      
+      // Paso 4: Parsear y mostrar JSON completo del primer dispositivo
+      print('\n📦 PASO 4: Parseando respuesta...');
+      final devicesData = json.decode(devicesResponse.body);
+      
+      print('\n🔍 ==========================================');
+      print('🔍 RESPUESTA COMPLETA DE DEVICES');
+      print('🔍 ==========================================');
+      print('📦 Tipo de respuesta: ${devicesData.runtimeType}');
+      print('📦 Respuesta completa (formateada):');
+      print(const JsonEncoder.withIndent('  ').convert(devicesData));
+      
+      // Buscar el primer dispositivo
+      print('\n🔍 ==========================================');
+      print('🔍 PRIMER DISPOSITIVO ENCONTRADO');
+      print('🔍 ==========================================');
+      
+      if (devicesData is List && devicesData.isNotEmpty) {
+        // La respuesta es un array de grupos
+        for (var group in devicesData) {
+          if (group is Map && group['items'] != null) {
+            final items = group['items'] as List;
+            if (items.isNotEmpty) {
+              final firstDevice = items[0];
+              print('\n📦 ESTRUCTURA DEL PRIMER DISPOSITIVO:');
+              print(const JsonEncoder.withIndent('  ').convert(firstDevice));
+              
+              print('\n🔍 CAMPOS CLAVE ENCONTRADOS:');
+              if (firstDevice is Map) {
+                print('   - ID: ${firstDevice['id']}');
+                print('   - Name: ${firstDevice['name']}');
+                print('   - Label: ${firstDevice['label']}');
+                print('   - Alias: ${firstDevice['alias']}');
+                print('   - Plate: ${firstDevice['plate']}');
+                print('   - Title: ${firstDevice['title']}');
+                print('   - Odometer: ${firstDevice['odometer']}');
+                print('   - TotalDistance: ${firstDevice['totalDistance']}');
+                print('   - Total_distance: ${firstDevice['total_distance']}');
+                print('   - Lat: ${firstDevice['lat']}');
+                print('   - Lng: ${firstDevice['lng']}');
+                print('   - Timestamp: ${firstDevice['timestamp']}');
+                print('   - Time: ${firstDevice['time']}');
+                print('   - Speed: ${firstDevice['speed']}');
+                print('   - Course: ${firstDevice['course']}');
+                print('\n📋 TODOS LOS CAMPOS DISPONIBLES:');
+                firstDevice.keys.forEach((key) {
+                  print('   - $key: ${firstDevice[key]} (${firstDevice[key].runtimeType})');
+                });
+              }
+              break; // Solo mostrar el primer dispositivo
+            }
+          }
+        }
+      } else {
+        print('⚠️ La respuesta no es un array o está vacía');
+        print('   Tipo: ${devicesData.runtimeType}');
+      }
+      
+      print('\n🔍 ==========================================');
+      print('🔍 FIN DEL DEBUG GPS STRUCTURE');
+      print('🔍 ==========================================');
+    } catch (e, stackTrace) {
+      print('❌ Error en debugGpsStructure: $e');
+      print('   Stack trace: $stackTrace');
+    }
+  }
 }
 

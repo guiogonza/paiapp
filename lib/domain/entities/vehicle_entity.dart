@@ -5,6 +5,9 @@ class VehicleEntity {
   final String modelo;
   final int ano;
   final String? conductor; // Opcional
+  final String? gpsDeviceId; // ID del dispositivo GPS
+  final String? ownerId; // ID del dueño
+  final double? currentMileage; // Kilometraje actual en km
 
   const VehicleEntity({
     this.id,
@@ -13,6 +16,9 @@ class VehicleEntity {
     required this.modelo,
     required this.ano,
     this.conductor,
+    this.gpsDeviceId,
+    this.ownerId,
+    this.currentMileage,
   });
 
   VehicleEntity copyWith({
@@ -22,6 +28,9 @@ class VehicleEntity {
     String? modelo,
     int? ano,
     String? conductor,
+    String? gpsDeviceId,
+    String? ownerId,
+    double? currentMileage,
   }) {
     return VehicleEntity(
       id: id ?? this.id,
@@ -30,6 +39,9 @@ class VehicleEntity {
       modelo: modelo ?? this.modelo,
       ano: ano ?? this.ano,
       conductor: conductor ?? this.conductor,
+      gpsDeviceId: gpsDeviceId ?? this.gpsDeviceId,
+      ownerId: ownerId ?? this.ownerId,
+      currentMileage: currentMileage ?? this.currentMileage,
     );
   }
 
