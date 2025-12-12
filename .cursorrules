@@ -1,0 +1,144 @@
+# REGLAS DE ORO PARA CURSOR (PROYECTO FLUTTER + SUPABASE)
+
+## LEER EL ESQUEMA PRIMERO
+
+**ANTES de escribir cualquier código de Supabase (Repository, Model, Query), DEBES leer el archivo 'SUPABASE_SCHEMA.md' en la raíz del proyecto.**
+
+Este archivo es la **FUENTE DE LA VERDAD** sobre la estructura de la base de datos.
+
+---
+
+## NO INVENTAR COLUMNAS
+
+**NUNCA asumas que existe una columna si no está explícitamente en 'SUPABASE_SCHEMA.md'.**
+
+Ejemplos de errores comunes a evitar:
+- ❌ Asumir que `profiles` tiene `email` (SÍ existe, pero verifica)
+- ❌ Asumir que `profiles` tiene `user_id` (NO existe, usa `id` directamente)
+- ❌ Asumir que `vehicles` tiene `email` (NO existe)
+- ❌ Asumir que `maintenance` tiene `type` (NO existe, usa `service_type`)
+
+**Siempre verifica el esquema antes de mapear campos en Models o hacer queries.**
+
+---
+
+## VERIFICAR RLS (Row Level Security)
+
+Si vas a hacer queries, recuerda que usamos RLS en todas las tablas.
+
+- **Preferencia:** Usa REST estándar de Supabase si es posible
+- **Si hay problemas de RLS:** Considera funciones RPC, pero primero intenta ajustar las políticas
+- **Asegúrate:** El usuario autenticado tiene permisos para la operación que intentas hacer
+
+---
+
+## JOIN vs CAMPOS FANTASMA
+
+Si necesitas un dato que no está en la tabla actual:
+
+1. **Busca la relación** en SUPABASE_SCHEMA.md
+2. **Haz el JOIN explícito** usando la sintaxis de Supabase PostgREST:
+   ```dart
+   .select('*, auth.users(email)')  // JOIN con auth.users
+   ```
+3. **NO inventes la columna** en la tabla actual
+
+Ejemplo:
+- ✅ `profiles` NO tiene `email` directamente, pero puedes hacer JOIN con `auth.users`
+- ✅ O usar `profiles.email` si fue agregada manualmente (verificar en esquema)
+
+---
+
+## FLUTTER BLINDADO
+
+**Usa 'try-catch' robustos** y maneja los errores de Supabase mostrando mensajes claros al usuario.
+
+- Captura `PostgrestException` para errores de BD
+- Captura `AuthException` para errores de autenticación
+- Captura `SocketException` para errores de red
+- **Nunca dejes que un error de Supabase crashee la app**
+
+Ejemplo:
+```dart
+try {
+  // Operación Supabase
+} on PostgrestException catch (e) {
+  return Left(DatabaseFailure(e.message));
+} on SocketException catch (_) {
+  return const Left(NetworkFailure());
+} catch (e) {
+  return Left(UnknownFailure(e.toString()));
+}
+```
+
+---
+
+## MAPEO DE CAMPOS
+
+Al crear Models que mapean a Supabase:
+
+1. **Lee SUPABASE_SCHEMA.md** para conocer los nombres reales de las columnas
+2. **Usa snake_case** en los nombres de columnas de Supabase
+3. **Usa camelCase** en los nombres de propiedades de Dart
+4. **Mapea correctamente** en `fromJson` y `toJson`
+
+Ejemplo:
+```dart
+// En Supabase: current_mileage (numeric)
+// En Dart: currentMileage (double?)
+'current_mileage': currentMileage,  // toJson
+currentMileage: json['current_mileage'] != null 
+    ? (json['current_mileage'] as num).toDouble() 
+    : null,  // fromJson
+```
+
+---
+
+## TIPOS DE DATOS
+
+Mapea correctamente los tipos de Supabase a Dart:
+
+- `uuid` → `String`
+- `text` → `String` o `String?`
+- `numeric` → `double` o `double?` (convertir con `(json['campo'] as num).toDouble()`)
+- `integer` → `int` o `int?`
+- `date` → `DateTime` (parsear con `DateTime.parse()`)
+- `timestamp with time zone` → `DateTime` (parsear con `DateTime.parse()`)
+- `boolean` → `bool` o `bool?`
+- `double precision` → `double` o `double?`
+
+---
+
+## CAMPOS OBLIGATORIOS vs OPCIONALES
+
+Verifica en SUPABASE_SCHEMA.md qué campos son NOT NULL:
+
+- Si es NOT NULL en BD → Campo requerido en Entity
+- Si es nullable en BD → Campo opcional (`String?`, `int?`, etc.)
+
+---
+
+## ACTUALIZAR EL ESQUEMA
+
+Si el usuario modifica la estructura de la BD:
+
+1. **Actualiza SUPABASE_SCHEMA.md** inmediatamente
+2. **Actualiza los Models** correspondientes
+3. **Actualiza los Repositories** si es necesario
+4. **Verifica las queries** existentes
+
+---
+
+## DEBUGGING
+
+Si hay errores de "column does not exist":
+
+1. **Consulta SUPABASE_SCHEMA.md** para verificar el nombre real
+2. **Verifica el mapeo** en el Model
+3. **Revisa la query** en el Repository
+4. **No asumas**, siempre verifica
+
+---
+
+**Recuerda:** SUPABASE_SCHEMA.md es tu mejor amigo. Léelo antes de escribir código de Supabase.
+
