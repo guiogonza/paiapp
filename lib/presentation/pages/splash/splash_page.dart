@@ -140,15 +140,15 @@ class _SplashPageState extends State<SplashPage>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.navyBlue,
+      backgroundColor: AppColors.paiNavy,
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              AppColors.navyBlue,
-              AppColors.royalBlue,
+              AppColors.paiNavy,
+              AppColors.paiBlue,
             ],
           ),
         ),
@@ -163,7 +163,7 @@ class _SplashPageState extends State<SplashPage>
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // Logo I°PAI
+                      // Logo PPAI
                       _buildLogo(),
                       const SizedBox(height: 24),
                       // Tagline
@@ -191,15 +191,40 @@ class _SplashPageState extends State<SplashPage>
   }
 
   Widget _buildLogo() {
-    // Logo de texto simple: "PAI"
-    return Text(
-      'PAI',
-      style: TextStyle(
-        fontSize: 72,
-        fontWeight: FontWeight.bold,
-        color: AppColors.orange,
-        letterSpacing: 4,
-        height: 1.0,
+    // Logo PPAI con imagen corporativa
+    return Container(
+      width: 200.0,
+      child: Image.asset(
+        'assets/images/ppai_logo.png',
+        width: 200.0,
+        fit: BoxFit.contain,
+        errorBuilder: (context, error, stackTrace) {
+          // Si la imagen no existe, mostrar mensaje de ayuda
+          debugPrint('Error cargando logo: $error');
+          return Container(
+            width: 200.0,
+            height: 120,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.image_not_supported,
+                  size: 32,
+                  color: AppColors.white,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Coloca ppai_logo.png\nen assets/images/',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: AppColors.white,
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }

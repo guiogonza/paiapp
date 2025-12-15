@@ -27,6 +27,29 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
+  /// Construye el logo PPAI con imagen corporativa (tamaño compacto)
+  Widget _buildPpaiLogo() {
+    return Image.asset(
+      'assets/images/ppai_logo.png',
+      height: 160,
+      fit: BoxFit.contain,
+      errorBuilder: (context, error, stackTrace) {
+        // Si la imagen no existe, mostrar mensaje de ayuda
+        debugPrint('Error cargando logo: $error');
+        return const SizedBox(
+          height: 160,
+          child: Center(
+            child: Icon(
+              Icons.image_not_supported,
+              size: 32,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -174,36 +197,27 @@ class _LoginPageState extends State<LoginPage> {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24.0),
+            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
             child: Form(
               key: _formKey,
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Logo PAI
-                  Text(
-                    'PAI',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 64,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.primary,
-                      letterSpacing: 8,
-                    ),
-                  ),
+                  // Logo PPAI
+                  _buildPpaiLogo(),
                   const SizedBox(height: 8),
                   Text(
                     'TECNOLOGÍA A TU ALCANCE',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: 14,
+                      fontSize: 12,
                       fontWeight: FontWeight.w300,
                       color: AppColors.textSecondary,
                       letterSpacing: 2,
                     ),
                   ),
-                  const SizedBox(height: 48),
+                  const SizedBox(height: 32),
                   // Email Field
                   TextFormField(
                     controller: _emailController,
@@ -226,7 +240,7 @@ class _LoginPageState extends State<LoginPage> {
                       return null;
                     },
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 16),
                   // Password Field
                   TextFormField(
                     controller: _passwordController,
@@ -259,7 +273,7 @@ class _LoginPageState extends State<LoginPage> {
                       return null;
                     },
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 24),
                   // Login Button
                   SizedBox(
                     height: 56,
@@ -293,7 +307,7 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
                   // Register Link
                   TextButton(
                     onPressed: _isLoading ? null : _handleRegister,
@@ -329,4 +343,5 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 }
+
 
