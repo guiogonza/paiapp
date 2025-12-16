@@ -74,6 +74,7 @@ Tabla para registrar mantenimientos de vehículos.
 | `alert_date` | date | Fecha de alerta para próximo mantenimiento (nullable) |
 | `cost` | numeric | Costo del servicio |
 | `custom_service_name` | text | Nombre del servicio personalizado (solo para "Otro", nullable) |
+| `tire_position` | integer | Posición de la llanta (1-22, solo para "Llantas", nullable) |
 | `provider_name` | text | Nombre del proveedor (nullable) |
 | `receipt_url` | text | URL del recibo (nullable) |
 | `created_by` | uuid | ID del usuario que creó el registro |
@@ -85,6 +86,7 @@ Tabla para registrar mantenimientos de vehículos.
 - `next_change_km` se calcula automáticamente según reglas (Aceite: +10,000 km, Llantas: +9,000 km, etc.)
 - `alert_date` se calcula automáticamente para Batería (+4 años) o se define manualmente
 - Para tipo "Otro", `custom_service_name` es obligatorio y `alert_date` es obligatorio
+- Para tipo "Llantas", `tire_position` (1-22) es obligatorio para identificar la posición específica de la llanta
 
 ---
 

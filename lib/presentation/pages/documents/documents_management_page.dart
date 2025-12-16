@@ -11,6 +11,8 @@ import 'package:pai_app/data/repositories/vehicle_repository_impl.dart';
 import 'package:pai_app/data/repositories/profile_repository_impl.dart';
 import 'package:pai_app/domain/entities/document_entity.dart';
 import 'package:pai_app/domain/entities/vehicle_entity.dart';
+import 'package:pai_app/presentation/pages/documents/document_renewal_page.dart';
+import 'package:pai_app/presentation/pages/documents/document_history_page.dart';
 
 class DocumentsManagementPage extends StatefulWidget {
   const DocumentsManagementPage({super.key});
@@ -899,46 +901,32 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
 
   Widget _buildDocumentAlertItem(DocumentEntity document) {
     final dateFormat = DateFormat('dd/MM/yyyy');
-    final isExpiringSoon = document.isExpiringSoon;
-    final isExpired = document.isExpired;
+    final trafficLightStatus = document.trafficLightStatus;
+    final trafficLightColor = document.trafficLightColor;
+    final trafficLightIcon = document.trafficLightIcon;
     final daysUntilExpiration = document.daysUntilExpiration;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       elevation: 1,
-      color: isExpired
-          ? Colors.red.withValues(alpha: 0.1)
-          : isExpiringSoon
-              ? Colors.orange.withValues(alpha: 0.1)
-              : Colors.grey[50],
+      color: trafficLightColor.withValues(alpha: 0.1),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
         side: BorderSide(
-          color: isExpired
-              ? Colors.red
-              : isExpiringSoon
-                  ? Colors.orange
-                  : Colors.transparent,
-          width: isExpired || isExpiringSoon ? 2 : 0,
+          color: trafficLightColor,
+          width: 2,
         ),
       ),
       child: Padding(
         padding: const EdgeInsets.all(12.0),
         child: Row(
           children: [
-            // Icono de alerta
-            if (isExpired || isExpiringSoon)
-              Icon(
-                isExpired ? Icons.error : Icons.warning,
-                color: isExpired ? Colors.red : Colors.orange,
-                size: 32,
-              )
-            else
-              Icon(
-                Icons.check_circle,
-                color: Colors.green,
-                size: 32,
-              ),
+            // Semáforo (ícono de color)
+            Icon(
+              trafficLightIcon,
+              color: trafficLightColor,
+              size: 32,
+            ),
             const SizedBox(width: 12),
             // Información del documento
             Expanded(
@@ -950,7 +938,7 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
-                      color: isExpired ? Colors.red[700] : AppColors.textPrimary,
+                      color: trafficLightStatus == 'vencido' ? Colors.red[700] : AppColors.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -966,15 +954,11 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
                     'Expira: ${dateFormat.format(document.expirationDate)}',
                     style: TextStyle(
                       fontSize: 12,
-                      color: isExpired
-                          ? Colors.red[700]
-                          : isExpiringSoon
-                              ? Colors.orange[700]
-                              : Colors.grey[600],
-                      fontWeight: isExpired || isExpiringSoon ? FontWeight.bold : FontWeight.normal,
+                      color: trafficLightColor,
+                      fontWeight: trafficLightStatus != 'bien' ? FontWeight.bold : FontWeight.normal,
                     ),
                   ),
-                  if (isExpired)
+                  if (trafficLightStatus == 'vencido')
                     Text(
                       'EXPIRADO hace ${-daysUntilExpiration} días',
                       style: TextStyle(
@@ -983,7 +967,7 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
                         fontWeight: FontWeight.bold,
                       ),
                     )
-                  else if (isExpiringSoon)
+                  else if (trafficLightStatus == 'atencion')
                     Text(
                       'Expira en $daysUntilExpiration días',
                       style: TextStyle(
@@ -991,9 +975,48 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
                         color: Colors.orange[700],
                         fontWeight: FontWeight.bold,
                       ),
+                    )
+                  else
+                    Text(
+                      'Válido por $daysUntilExpiration días más',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.green[700],
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                 ],
               ),
+            ),
+            // Botón de historial (siempre visible)
+            IconButton(
+              icon: const Icon(Icons.history),
+              color: AppColors.primary,
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => DocumentHistoryPage(currentDocument: document),
+                  ),
+                );
+              },
+              tooltip: 'Ver historial',
+            ),
+            // Botón de renovación
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              color: AppColors.paiOrange,
+              onPressed: () async {
+                final result = await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => DocumentRenewalPage(document: document),
+                  ),
+                );
+                if (result == true) {
+                  // Recargar documentos después de renovar
+                  _loadData();
+                }
+              },
+              tooltip: 'Renovar documento',
             ),
             // Botón para ver documento si existe
             if (document.documentUrl != null && document.documentUrl!.isNotEmpty)

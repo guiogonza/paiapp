@@ -22,6 +22,7 @@ class RemittanceWithRouteEntity {
   String? get driverName => route.driverName;
   String? get clientName => route.clientName;
   String get vehicleId => route.vehicleId;
+  double? get revenueAmount => route.revenueAmount; // Importe a cobrar
 
   bool get isPending => remittance.isPending;
   bool get isCollected => remittance.isCollected;

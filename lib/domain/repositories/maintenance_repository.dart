@@ -25,5 +25,8 @@ abstract class MaintenanceRepository {
   /// Verifica alertas activas para el usuario actual
   /// Retorna el número de alertas activas (current_km >= alert_km O current_date >= alert_date)
   Future<Either<MaintenanceFailure, int>> checkActiveAlerts();
+
+  /// Obtiene todos los mantenimientos (para cálculos financieros)
+  Future<Either<MaintenanceFailure, List<MaintenanceEntity>>> getAllMaintenance();
 }
 

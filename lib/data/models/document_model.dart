@@ -12,6 +12,7 @@ class DocumentModel extends DocumentEntity {
     super.createdBy,
     super.createdAt,
     super.updatedAt,
+    super.isArchived,
   });
 
   factory DocumentModel.fromJson(Map<String, dynamic> json) {
@@ -29,6 +30,7 @@ class DocumentModel extends DocumentEntity {
       updatedAt: json['updated_at'] != null
           ? DateTime.parse(json['updated_at'] as String)
           : null,
+      isArchived: json['is_archived'] as bool? ?? false,
     );
   }
 
@@ -43,6 +45,7 @@ class DocumentModel extends DocumentEntity {
       if (createdBy != null) 'created_by': createdBy,
       if (createdAt != null) 'created_at': createdAt!.toIso8601String(),
       if (updatedAt != null) 'updated_at': updatedAt!.toIso8601String(),
+      'is_archived': isArchived ?? false,
     };
   }
 
@@ -57,6 +60,7 @@ class DocumentModel extends DocumentEntity {
       createdBy: entity.createdBy,
       createdAt: entity.createdAt,
       updatedAt: entity.updatedAt,
+      isArchived: entity.isArchived,
     );
   }
 
@@ -71,6 +75,7 @@ class DocumentModel extends DocumentEntity {
       createdBy: createdBy,
       createdAt: createdAt,
       updatedAt: updatedAt,
+      isArchived: isArchived,
     );
   }
 }

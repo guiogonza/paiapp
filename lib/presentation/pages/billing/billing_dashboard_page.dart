@@ -342,6 +342,41 @@ class _BillingDashboardPageState extends State<BillingDashboardPage> {
                 ],
               ),
             ],
+            // Importe a cobrar
+            if (remittance.revenueAmount != null && remittance.revenueAmount! > 0) ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.attach_money,
+                    size: 20,
+                    color: AppColors.paiOrange,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Importe a cobrar',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: AppColors.textSecondary,
+                              ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '\$${remittance.revenueAmount!.toStringAsFixed(0)}',
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.paiOrange,
+                              ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
             const SizedBox(height: 16),
             const Divider(),
             const SizedBox(height: 16),

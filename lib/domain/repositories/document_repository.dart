@@ -29,5 +29,15 @@ abstract class DocumentRepository {
 
   /// Elimina un documento de Storage
   Future<Either<DocumentFailure, void>> deleteDocumentImage(String imageUrl);
+
+  /// Renueva un documento: archiva el antiguo y crea uno nuevo
+  Future<Either<DocumentFailure, DocumentEntity>> renewDocument(
+    String oldDocumentId,
+    DocumentEntity newDocument,
+  );
+
+  /// Obtiene el historial de documentos archivados para un documento específico
+  /// (mismo tipo, mismo vehículo o conductor)
+  Future<Either<DocumentFailure, List<DocumentEntity>>> getDocumentHistory(DocumentEntity document);
 }
 

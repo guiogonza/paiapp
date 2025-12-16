@@ -10,7 +10,16 @@ import 'package:pai_app/domain/entities/vehicle_entity.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class MaintenanceFormPage extends StatefulWidget {
-  const MaintenanceFormPage({super.key});
+  final String? preSelectedVehicleId;
+  final String? preSelectedServiceType;
+  final int? preSelectedTirePosition;
+  
+  const MaintenanceFormPage({
+    super.key,
+    this.preSelectedVehicleId,
+    this.preSelectedServiceType,
+    this.preSelectedTirePosition,
+  });
 
   @override
   State<MaintenanceFormPage> createState() => _MaintenanceFormPageState();
@@ -26,11 +35,13 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
   String? _selectedType;
   final _costController = TextEditingController();
   final _customServiceNameController = TextEditingController();
+  int? _selectedTirePosition; // Posición de llanta (1-22, solo para "Llantas")
   double? _currentMileage; // Kilometraje actual (readonly, desde GPS)
   DateTime? _serviceDate;
   DateTime? _alertDate; // Fecha de aviso (opcional para estándar, obligatorio para "Otro")
   bool _isLoading = false;
   bool _isLoadingMileage = false;
+  
 
   static const List<String> _maintenanceTypes = [
     'Aceite',
@@ -46,6 +57,14 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
     super.initState();
     _serviceDate = DateTime.now();
     _loadVehicles();
+    
+    // Pre-llenar campos si vienen desde alertas
+    if (widget.preSelectedServiceType != null) {
+      _selectedType = widget.preSelectedServiceType;
+      if (widget.preSelectedServiceType == 'Llantas' && widget.preSelectedTirePosition != null) {
+        _selectedTirePosition = widget.preSelectedTirePosition;
+      }
+    }
   }
 
   @override
@@ -72,6 +91,24 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
         if (mounted) {
           setState(() {
             _vehicles = vehicles;
+            
+            // Pre-seleccionar vehículo si viene desde alertas
+            if (widget.preSelectedVehicleId != null) {
+              try {
+                _selectedVehicle = vehicles.firstWhere(
+                  (v) => v.id == widget.preSelectedVehicleId,
+                );
+                if (_selectedVehicle != null) {
+                  _loadGpsMileage();
+                }
+              } catch (e) {
+                // Si no se encuentra, usar el primero disponible
+                if (vehicles.isNotEmpty) {
+                  _selectedVehicle = vehicles.first;
+                  _loadGpsMileage();
+                }
+              }
+            }
           });
         }
       },
@@ -293,6 +330,33 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
       }
     }
 
+    // Validar campos específicos
+    if (_selectedType == 'Otro' && _customServiceNameController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('El nombre del servicio es obligatorio para tipo "Otro"'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      setState(() {
+        _isLoading = false;
+      });
+      return;
+    }
+    
+    if (_selectedType == 'Llantas' && _selectedTirePosition == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Debes seleccionar la posición de la llanta'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      setState(() {
+        _isLoading = false;
+      });
+      return;
+    }
+
     // Para "Otro", el serviceType debe ser "Otro" y el nombre personalizado va en customServiceName
     final maintenance = MaintenanceEntity(
       vehicleId: _selectedVehicle!.id!,
@@ -303,6 +367,7 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
       alertDate: alertDate, // Fecha de alerta anticipada (con umbral de 30 días)
       cost: cost,
       customServiceName: _selectedType == 'Otro' ? _customServiceNameController.text.trim() : null,
+      tirePosition: _selectedType == 'Llantas' ? _selectedTirePosition : null,
       createdBy: currentUser.id,
     );
 
@@ -536,7 +601,39 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
               ),
               const SizedBox(height: 16),
 
-              // Campo "Nombre del Servicio" solo para "Otro"
+              // Selector de Posición solo para "Llantas"
+              if (_selectedType == 'Llantas') ...[
+                DropdownButtonFormField<int>(
+                  value: _selectedTirePosition,
+                  decoration: InputDecoration(
+                    labelText: 'Posición de Llanta *',
+                    prefixIcon: const Icon(Icons.location_on),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  items: List.generate(22, (index) => index + 1)
+                      .map((position) => DropdownMenuItem(
+                            value: position,
+                            child: Text('Posición $position'),
+                          ))
+                      .toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedTirePosition = value;
+                    });
+                  },
+                  validator: (value) {
+                    if (_selectedType == 'Llantas' && value == null) {
+                      return 'Selecciona la posición de la llanta';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+              ],
+              
+              // Campo "Nombre del Servicio" solo para "Otro" (obligatorio)
               if (isOtherType)
                 TextFormField(
                   controller: _customServiceNameController,
@@ -549,7 +646,7 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
                   ),
                   validator: (value) {
                     if (isOtherType && (value == null || value.trim().isEmpty)) {
-                      return 'Ingresa el nombre del servicio';
+                      return 'El nombre del servicio es obligatorio';
                     }
                     return null;
                   },

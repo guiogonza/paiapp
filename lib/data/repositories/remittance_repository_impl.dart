@@ -76,6 +76,7 @@ class RemittanceRepositoryImpl implements RemittanceRepository {
               end_location,
               driver_name,
               client_name,
+              revenue_amount,
               created_at
             )
           ''')
@@ -96,6 +97,9 @@ class RemittanceRepositoryImpl implements RemittanceRepository {
             endLocation: routeData['end_location'] as String? ?? '',
             driverName: routeData['driver_name'] as String?,
             clientName: routeData['client_name'] as String?,
+            revenueAmount: routeData['revenue_amount'] != null
+                ? (routeData['revenue_amount'] as num).toDouble()
+                : null,
             createdAt: routeData['created_at'] != null
                 ? DateTime.parse(routeData['created_at'] as String)
                 : null,
@@ -146,7 +150,7 @@ class RemittanceRepositoryImpl implements RemittanceRepository {
         try {
           final routeResponse = await _supabase
               .from('routes')
-              .select()
+              .select('id, vehicle_id, start_location, end_location, driver_name, client_name, revenue_amount, created_at')
               .eq('id', tripId)
               .maybeSingle();
 
@@ -159,6 +163,9 @@ class RemittanceRepositoryImpl implements RemittanceRepository {
               endLocation: routeData['end_location'] as String? ?? '',
               driverName: routeData['driver_name'] as String?,
               clientName: routeData['client_name'] as String?,
+              revenueAmount: routeData['revenue_amount'] != null
+                  ? (routeData['revenue_amount'] as num).toDouble()
+                  : null,
               createdAt: routeData['created_at'] != null
                   ? DateTime.parse(routeData['created_at'] as String)
                   : null,
@@ -368,6 +375,9 @@ class RemittanceRepositoryImpl implements RemittanceRepository {
                 endLocation: routeData['end_location'] as String? ?? '',
                 driverName: routeData['driver_name'] as String?,
                 clientName: routeData['client_name'] as String?,
+                revenueAmount: routeData['revenue_amount'] != null
+                    ? (routeData['revenue_amount'] as num).toDouble()
+                    : null,
                 createdAt: routeData['created_at'] != null
                     ? DateTime.parse(routeData['created_at'] as String)
                     : null,

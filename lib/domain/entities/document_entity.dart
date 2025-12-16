@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 class DocumentEntity {
   final String? id;
   final String? vehicleId; // FK a vehicles (NULLABLE)
@@ -8,6 +10,7 @@ class DocumentEntity {
   final String? createdBy; // FK a auth.users - Usuario que creó el documento
   final DateTime? createdAt;
   final DateTime? updatedAt;
+  final bool? isArchived; // Si el documento fue reemplazado/archivado (para historial)
 
   const DocumentEntity({
     this.id,
@@ -19,6 +22,7 @@ class DocumentEntity {
     this.createdBy,
     this.createdAt,
     this.updatedAt,
+    this.isArchived,
   });
 
   /// Verifica si el documento está asociado a un vehículo
@@ -43,6 +47,47 @@ class DocumentEntity {
     return expirationDate.difference(DateTime.now()).inDays;
   }
 
+  /// Lógica de Semáforo: 🟢 Verde (>30 días) | 🟡 Amarillo (<=30 días) | 🔴 Rojo (vencido)
+  /// Retorna: 'vencido', 'atencion', o 'bien'
+  String get trafficLightStatus {
+    final daysRemaining = daysUntilExpiration;
+    if (daysRemaining < 0) {
+      return 'vencido'; // Rojo
+    } else if (daysRemaining <= 30) {
+      return 'atencion'; // Amarillo
+    } else {
+      return 'bien'; // Verde
+    }
+  }
+
+  /// Obtiene el color del semáforo
+  Color get trafficLightColor {
+    switch (trafficLightStatus) {
+      case 'vencido':
+        return Colors.red;
+      case 'atencion':
+        return Colors.orange;
+      case 'bien':
+        return Colors.green;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  /// Obtiene el ícono del semáforo
+  IconData get trafficLightIcon {
+    switch (trafficLightStatus) {
+      case 'vencido':
+        return Icons.error;
+      case 'atencion':
+        return Icons.warning;
+      case 'bien':
+        return Icons.check_circle;
+      default:
+        return Icons.info;
+    }
+  }
+
   DocumentEntity copyWith({
     String? id,
     String? vehicleId,
@@ -53,6 +98,7 @@ class DocumentEntity {
     String? createdBy,
     DateTime? createdAt,
     DateTime? updatedAt,
+    bool? isArchived,
   }) {
     return DocumentEntity(
       id: id ?? this.id,
@@ -64,6 +110,7 @@ class DocumentEntity {
       createdBy: createdBy ?? this.createdBy,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      isArchived: isArchived ?? this.isArchived,
     );
   }
 

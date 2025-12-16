@@ -8,6 +8,7 @@ class MaintenanceEntity {
   final DateTime? alertDate; // Fecha de alerta (nullable) - para Batería o fecha manual
   final double cost;
   final String? customServiceName; // Nombre del servicio personalizado (solo para "Otro")
+  final int? tirePosition; // Posición de la llanta (1-22, solo para "Llantas")
   final String? providerName; // Nombre del proveedor (nullable)
   final String? receiptUrl; // URL del recibo (nullable)
   final String createdBy; // ID del usuario que creó el registro
@@ -22,6 +23,7 @@ class MaintenanceEntity {
     this.alertDate,
     required this.cost,
     this.customServiceName,
+    this.tirePosition,
     this.providerName,
     this.receiptUrl,
     required this.createdBy,
@@ -37,6 +39,7 @@ class MaintenanceEntity {
     DateTime? alertDate,
     double? cost,
     String? customServiceName,
+    int? tirePosition,
     String? providerName,
     String? receiptUrl,
     String? createdBy,
@@ -51,6 +54,7 @@ class MaintenanceEntity {
       alertDate: alertDate ?? this.alertDate,
       cost: cost ?? this.cost,
       customServiceName: customServiceName ?? this.customServiceName,
+      tirePosition: tirePosition ?? this.tirePosition,
       providerName: providerName ?? this.providerName,
       receiptUrl: receiptUrl ?? this.receiptUrl,
       createdBy: createdBy ?? this.createdBy,
@@ -70,6 +74,7 @@ class MaintenanceEntity {
         other.alertDate == alertDate &&
         other.cost == cost &&
         other.customServiceName == customServiceName &&
+        other.tirePosition == tirePosition &&
         other.providerName == providerName &&
         other.receiptUrl == receiptUrl &&
         other.createdBy == createdBy;
@@ -86,6 +91,7 @@ class MaintenanceEntity {
         (alertDate?.hashCode ?? 0) ^
         cost.hashCode ^
         (customServiceName?.hashCode ?? 0) ^
+        (tirePosition?.hashCode ?? 0) ^
         (providerName?.hashCode ?? 0) ^
         (receiptUrl?.hashCode ?? 0) ^
         createdBy.hashCode;

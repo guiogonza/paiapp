@@ -83,6 +83,29 @@ class MaintenanceRepositoryImpl implements MaintenanceRepository {
   }
 
   @override
+  Future<Either<MaintenanceFailure, List<MaintenanceEntity>>> getAllMaintenance() async {
+    try {
+      final response = await _supabase
+          .from(_tableName)
+          .select()
+          .order('service_date', ascending: false);
+
+      final maintenanceList = (response as List)
+          .map((json) => MaintenanceModel.fromJson(json))
+          .map((model) => model.toEntity())
+          .toList();
+
+      return Right(maintenanceList);
+    } on PostgrestException catch (e) {
+      return Left(MaintenanceDatabaseFailure(_mapPostgrestError(e)));
+    } on SocketException catch (_) {
+      return const Left(MaintenanceNetworkFailure());
+    } catch (e) {
+      return Left(MaintenanceUnknownFailure(_mapGenericError(e)));
+    }
+  }
+
+  @override
   Future<Either<MaintenanceFailure, MaintenanceEntity>> registerMaintenance(
     MaintenanceEntity maintenance,
   ) async {
@@ -120,6 +143,28 @@ class MaintenanceRepositoryImpl implements MaintenanceRepository {
           .eq('id', maintenance.vehicleId);
 
       print('✅ Kilometraje actualizado: ${maintenance.kmAtService} km');
+
+      // 3. Limpiar alertas pendientes del mismo tipo (y posición si es llanta) para este vehículo
+      // Esto hace que las alertas anteriores desaparezcan de la lista
+      var alertCleanupQuery = _supabase
+          .from(_tableName)
+          .update({
+            'next_change_km': null,
+            'alert_date': null,
+          })
+          .eq('vehicle_id', maintenance.vehicleId)
+          .eq('service_type', maintenance.serviceType)
+          .neq('id', maintenanceResponse['id'] as String); // Excluir el mantenimiento recién creado
+
+      // Si es llanta, también filtrar por posición
+      if (maintenance.serviceType == 'Llantas' && maintenance.tirePosition != null) {
+        final tirePos = maintenance.tirePosition!; // Safe: ya verificamos que no es null
+        alertCleanupQuery = alertCleanupQuery.eq('tire_position', tirePos);
+      }
+
+      await alertCleanupQuery;
+
+      print('✅ Alertas anteriores limpiadas para ${maintenance.serviceType}${maintenance.tirePosition != null ? ' - Posición ${maintenance.tirePosition}' : ''}');
 
       final createdMaintenance = MaintenanceModel.fromJson(maintenanceResponse);
       return Right(createdMaintenance.toEntity());

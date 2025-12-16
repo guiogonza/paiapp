@@ -15,9 +15,11 @@ class DocumentRepositoryImpl implements DocumentRepository {
   @override
   Future<Either<DocumentFailure, List<DocumentEntity>>> getDocuments() async {
     try {
+      // Filtrar solo documentos activos (no archivados)
       final response = await _supabase
           .from(_tableName)
           .select()
+          .eq('is_archived', false)
           .order('expiration_date', ascending: true);
 
       final documents = (response as List)
@@ -72,10 +74,12 @@ class DocumentRepositoryImpl implements DocumentRepository {
   @override
   Future<Either<DocumentFailure, List<DocumentEntity>>> getDocumentsByVehicleId(String vehicleId) async {
     try {
+      // Filtrar solo documentos activos (no archivados)
       final response = await _supabase
           .from(_tableName)
           .select()
           .eq('vehicle_id', vehicleId)
+          .eq('is_archived', false)
           .order('expiration_date', ascending: true);
 
       final documents = (response as List)
@@ -96,10 +100,12 @@ class DocumentRepositoryImpl implements DocumentRepository {
   @override
   Future<Either<DocumentFailure, List<DocumentEntity>>> getDocumentsByDriverId(String driverId) async {
     try {
+      // Filtrar solo documentos activos (no archivados)
       final response = await _supabase
           .from(_tableName)
           .select()
           .eq('driver_id', driverId)
+          .eq('is_archived', false)
           .order('expiration_date', ascending: true);
 
       final documents = (response as List)
@@ -278,6 +284,78 @@ class DocumentRepositoryImpl implements DocumentRepository {
         return 'application/pdf';
       default:
         return 'application/octet-stream';
+    }
+  }
+
+  @override
+  Future<Either<DocumentFailure, DocumentEntity>> renewDocument(
+    String oldDocumentId,
+    DocumentEntity newDocument,
+  ) async {
+    try {
+      // 1. Archivar el documento antiguo (marcar is_archived = true)
+      await _supabase
+          .from(_tableName)
+          .update({
+            'is_archived': true,
+            'updated_at': DateTime.now().toIso8601String(),
+          })
+          .eq('id', oldDocumentId);
+
+      // 2. Crear el nuevo documento
+      final newDocumentData = DocumentModel.fromEntity(newDocument).toJson();
+      newDocumentData.remove('id'); // No incluir id en la creación
+      newDocumentData['is_archived'] = false; // El nuevo documento está activo
+
+      final response = await _supabase
+          .from(_tableName)
+          .insert(newDocumentData)
+          .select()
+          .single();
+
+      final renewedDocument = DocumentModel.fromJson(response).toEntity();
+      return Right(renewedDocument);
+    } on PostgrestException catch (e) {
+      return Left(DatabaseFailure(_mapPostgrestError(e)));
+    } on SocketException catch (_) {
+      return const Left(NetworkFailure());
+    } catch (e) {
+      return Left(UnknownFailure(_mapGenericError(e)));
+    }
+  }
+
+  @override
+  Future<Either<DocumentFailure, List<DocumentEntity>>> getDocumentHistory(DocumentEntity document) async {
+    try {
+      // Buscar documentos archivados con el mismo tipo y asociación (vehículo o conductor)
+      var query = _supabase
+          .from(_tableName)
+          .select()
+          .eq('type', document.documentType)
+          .eq('is_archived', true);
+
+      // Filtrar por vehicle_id o driver_id según corresponda
+      if (document.vehicleId != null && document.vehicleId!.isNotEmpty) {
+        query = query.eq('vehicle_id', document.vehicleId!);
+      } else if (document.driverId != null && document.driverId!.isNotEmpty) {
+        query = query.eq('driver_id', document.driverId!);
+      }
+
+      // Aplicar orden después de todos los filtros
+      final response = await query.order('expiration_date', ascending: false);
+
+      final documents = (response as List)
+          .map((json) => DocumentModel.fromJson(json))
+          .map((model) => model.toEntity())
+          .toList();
+
+      return Right(documents);
+    } on PostgrestException catch (e) {
+      return Left(DatabaseFailure(_mapPostgrestError(e)));
+    } on SocketException catch (_) {
+      return const Left(NetworkFailure());
+    } catch (e) {
+      return Left(UnknownFailure(_mapGenericError(e)));
     }
   }
 

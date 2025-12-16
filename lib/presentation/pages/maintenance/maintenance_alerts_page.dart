@@ -5,6 +5,7 @@ import 'package:pai_app/data/repositories/maintenance_repository_impl.dart';
 import 'package:pai_app/data/repositories/vehicle_repository_impl.dart';
 import 'package:pai_app/domain/entities/maintenance_entity.dart';
 import 'package:pai_app/domain/entities/vehicle_entity.dart';
+import 'package:pai_app/presentation/pages/maintenance/maintenance_form_page.dart';
 
 class MaintenanceAlertsPage extends StatefulWidget {
   const MaintenanceAlertsPage({super.key});
@@ -194,6 +195,20 @@ class _MaintenanceAlertsPageState extends State<MaintenanceAlertsPage> {
     }
   }
 
+  /// Obtiene el texto a mostrar para el tipo de servicio
+  /// - Para "Llantas": "Llantas - Posición [X]"
+  /// - Para "Otro": muestra custom_service_name en lugar de "Otro"
+  /// - Para otros tipos: muestra el tipo directamente
+  String _getServiceTypeDisplay(MaintenanceEntity maintenance) {
+    if (maintenance.serviceType == 'Llantas' && maintenance.tirePosition != null) {
+      return 'Llantas - Posición ${maintenance.tirePosition}';
+    }
+    if (maintenance.serviceType == 'Otro' && maintenance.customServiceName != null && maintenance.customServiceName!.isNotEmpty) {
+      return maintenance.customServiceName!;
+    }
+    return maintenance.serviceType;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -295,7 +310,7 @@ class _MaintenanceAlertsPageState extends State<MaintenanceAlertsPage> {
                             children: [
                               const SizedBox(height: 4),
                               Text(
-                                '${alert.serviceType}',
+                                _getServiceTypeDisplay(alert),
                                 style: const TextStyle(
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -327,18 +342,44 @@ class _MaintenanceAlertsPageState extends State<MaintenanceAlertsPage> {
                                 ),
                             ],
                           ),
-                          trailing: Icon(
-                            Icons.arrow_forward_ios,
-                            size: 16,
-                            color: Colors.grey[400],
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // Botón Renovar
+                              IconButton(
+                                icon: const Icon(Icons.refresh),
+                                color: AppColors.paiOrange,
+                                onPressed: () {
+                                  Navigator.pop(context); // Cerrar cualquier diálogo abierto
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => MaintenanceFormPage(
+                                        preSelectedVehicleId: alert.vehicleId,
+                                        preSelectedServiceType: alert.serviceType,
+                                        preSelectedTirePosition: alert.tirePosition,
+                                      ),
+                                    ),
+                                  ).then((_) {
+                                    // Recargar alertas después de renovar
+                                    _loadAlerts();
+                                  });
+                                },
+                                tooltip: 'Renovar mantenimiento',
+                              ),
+                              Icon(
+                                Icons.arrow_forward_ios,
+                                size: 16,
+                                color: Colors.grey[400],
+                              ),
+                            ],
                           ),
                           onTap: () {
-                            // Navegar al historial del vehículo o al formulario
-                            // Por ahora solo mostramos un diálogo
+                            // Mostrar detalles de la alerta
                             showDialog(
                               context: context,
                               builder: (context) => AlertDialog(
-                                title: Text('Alerta: ${alert.serviceType}'),
+                                title: Text('Alerta: ${_getServiceTypeDisplay(alert)}'),
                                 content: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -377,6 +418,29 @@ class _MaintenanceAlertsPageState extends State<MaintenanceAlertsPage> {
                                   TextButton(
                                     onPressed: () => Navigator.pop(context),
                                     child: const Text('Cerrar'),
+                                  ),
+                                  ElevatedButton.icon(
+                                    onPressed: () {
+                                      Navigator.pop(context);
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => MaintenanceFormPage(
+                                            preSelectedVehicleId: alert.vehicleId,
+                                            preSelectedServiceType: alert.serviceType,
+                                            preSelectedTirePosition: alert.tirePosition,
+                                          ),
+                                        ),
+                                      ).then((_) {
+                                        _loadAlerts();
+                                      });
+                                    },
+                                    icon: const Icon(Icons.refresh),
+                                    label: const Text('Renovar'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.paiOrange,
+                                      foregroundColor: Colors.white,
+                                    ),
                                   ),
                                 ],
                               ),

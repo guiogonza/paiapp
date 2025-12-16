@@ -5,6 +5,7 @@ class RouteEntity {
   final String endLocation; // Destino
   final String? driverName; // Conductor
   final String? clientName; // Cliente
+  final double? revenueAmount; // Importe a cobrar
   final DateTime? createdAt; // Fecha de creación
 
   const RouteEntity({
@@ -14,6 +15,7 @@ class RouteEntity {
     required this.endLocation,
     this.driverName,
     this.clientName,
+    this.revenueAmount,
     this.createdAt,
   });
 
@@ -24,6 +26,7 @@ class RouteEntity {
     String? endLocation,
     String? driverName,
     String? clientName,
+    double? revenueAmount,
     DateTime? createdAt,
   }) {
     return RouteEntity(
@@ -33,6 +36,7 @@ class RouteEntity {
       endLocation: endLocation ?? this.endLocation,
       driverName: driverName ?? this.driverName,
       clientName: clientName ?? this.clientName,
+      revenueAmount: revenueAmount ?? this.revenueAmount,
       createdAt: createdAt ?? this.createdAt,
     );
   }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart' as gmaps;
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' as latlng;
+import 'package:intl/intl.dart';
 import 'package:pai_app/core/theme/app_colors.dart';
 import 'package:pai_app/data/repositories/auth_repository_impl.dart';
 import 'package:pai_app/data/services/vehicle_location_service.dart';
@@ -24,6 +25,7 @@ import 'package:pai_app/data/repositories/trip_repository_impl.dart';
 import 'package:pai_app/data/repositories/expense_repository_impl.dart';
 import 'package:pai_app/data/repositories/remittance_repository_impl.dart';
 import 'package:pai_app/presentation/pages/fleet_monitoring/fleet_monitoring_page.dart';
+import 'package:pai_app/data/repositories/document_repository_impl.dart';
 
 class OwnerDashboardPage extends StatefulWidget {
   const OwnerDashboardPage({super.key});
@@ -41,9 +43,11 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
   List<VehicleLocationEntity> _vehicleLocations = [];
   int _activeAlertsCount = 0; // Contador de alertas activas
   double _currentMonthRevenue = 0.0;
-  double _currentMonthExpenses = 0.0;
+  double _currentMonthExpenses = 0.0; // Gastos de viajes
+  double _currentMonthMaintenanceExpenses = 0.0; // Gastos de mantenimiento
   int _activeTripsCount = 0; // Viajes activos (en ruta)
   int _pendingRemittancesCount = 0; // Remisiones pendientes de cobro
+  int _expiredDocumentsCount = 0; // Documentos vencidos
   
   // Controllers para mapas
   gmaps.GoogleMapController? _mapController;
@@ -65,6 +69,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
     _checkActiveAlerts(); // Verificar alertas al iniciar
     _loadFinancialKpi(); // Cargar KPI financiero
     _loadOperationalKpis(); // Cargar KPIs operativos
+    _loadDocumentAlerts(); // Cargar alertas de documentos
   }
 
   /// Carga los KPIs operativos (viajes activos y remisiones pendientes)
@@ -96,8 +101,8 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
         },
       );
 
-      // Obtener remisiones pendientes
-      final remittancesResult = await remittanceRepository.getPendingRemittances();
+      // Obtener remisiones pendientes (todas las que no están cobradas)
+      final remittancesResult = await remittanceRepository.getPendingRemittancesWithRoutes();
       remittancesResult.fold(
         (failure) => debugPrint('Error al cargar remisiones: ${failure.message}'),
         (remittances) {
@@ -110,6 +115,58 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
       );
     } catch (e) {
       debugPrint('Error al cargar KPIs operativos: $e');
+    }
+  }
+
+  /// Carga las alertas de documentos vencidos
+  Future<void> _loadDocumentAlerts() async {
+    try {
+      final documentRepository = DocumentRepositoryImpl();
+      final documentsResult = await documentRepository.getDocuments();
+      
+      documentsResult.fold(
+        (failure) {
+          debugPrint('Error al cargar documentos: ${failure.message}');
+          if (mounted) {
+            setState(() {
+              _expiredDocumentsCount = 0;
+            });
+          }
+        },
+        (documents) {
+          final now = DateTime.now();
+          // Normalizar la fecha actual para comparar solo fechas (sin hora)
+          final today = DateTime(now.year, now.month, now.day);
+          
+          int expiredCount = 0;
+          for (var document in documents) {
+            // Normalizar la fecha de expiración para comparar solo fechas
+            final expirationDate = DateTime(
+              document.expirationDate.year,
+              document.expirationDate.month,
+              document.expirationDate.day,
+            );
+            
+            // Un documento está vencido si su fecha de expiración es anterior a hoy
+            if (expirationDate.isBefore(today)) {
+              expiredCount++;
+            }
+          }
+          
+          if (mounted) {
+            setState(() {
+              _expiredDocumentsCount = expiredCount;
+            });
+          }
+        },
+      );
+    } catch (e) {
+      debugPrint('Error al cargar alertas de documentos: $e');
+      if (mounted) {
+        setState(() {
+          _expiredDocumentsCount = 0;
+        });
+      }
     }
   }
 
@@ -130,9 +187,15 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
         (trips) {
           double revenue = 0.0;
           for (var trip in trips) {
-            // Asumir que el ingreso está en routes o se calcula de otra forma
-            // Por ahora, usar un valor por defecto o calcular según la lógica de negocio
-            // TODO: Ajustar según cómo se almacena el ingreso del viaje
+            // Obtener el revenueAmount directamente del trip
+            if (trip.revenueAmount > 0) {
+              final tripDate = trip.startDate;
+              if (tripDate != null &&
+                  tripDate.isAfter(firstDayOfMonth) &&
+                  tripDate.isBefore(lastDayOfMonth)) {
+                revenue += trip.revenueAmount;
+              }
+            }
           }
           if (mounted) {
             setState(() {
@@ -142,7 +205,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
         },
       );
 
-      // Obtener gastos del mes
+      // Obtener gastos de viajes del mes
       final expensesResult = await expenseRepository.getExpenses();
       expensesResult.fold(
         (failure) => debugPrint('Error al cargar gastos: ${failure.message}'),
@@ -157,6 +220,27 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
           if (mounted) {
             setState(() {
               _currentMonthExpenses = totalExpenses;
+            });
+          }
+        },
+      );
+
+      // Obtener gastos de mantenimiento del mes
+      final maintenanceResult = await _maintenanceRepository.getAllMaintenance();
+      maintenanceResult.fold(
+        (failure) => debugPrint('Error al cargar mantenimientos: ${failure.message}'),
+        (maintenanceList) {
+          double totalMaintenanceExpenses = 0.0;
+          for (var maintenance in maintenanceList) {
+            // Filtrar por fecha de servicio del mes actual
+            if (maintenance.serviceDate.isAfter(firstDayOfMonth) &&
+                maintenance.serviceDate.isBefore(lastDayOfMonth)) {
+              totalMaintenanceExpenses += maintenance.cost;
+            }
+          }
+          if (mounted) {
+            setState(() {
+              _currentMonthMaintenanceExpenses = totalMaintenanceExpenses;
             });
           }
         },
@@ -582,7 +666,11 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
     final baseTheme = Theme.of(context);
     final textTheme = GoogleFonts.poppinsTextTheme(baseTheme.textTheme);
 
-    final balance = _currentMonthRevenue - _currentMonthExpenses;
+    final totalExpenses = _currentMonthExpenses + _currentMonthMaintenanceExpenses;
+    final balance = _currentMonthRevenue - totalExpenses;
+    
+    // Formateador de números con separador de miles (punto)
+    final numberFormat = NumberFormat('#,###', 'es_CO');
 
     return Theme(
       data: baseTheme.copyWith(textTheme: textTheme),
@@ -684,6 +772,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
                                 _checkActiveAlerts();
                                 _loadFinancialKpi();
                                 _loadOperationalKpis();
+                                _loadDocumentAlerts();
                               },
                               tooltip: 'Actualizar',
                             ),
@@ -806,7 +895,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  '\$${balance.toStringAsFixed(0)}',
+                                  '\$${numberFormat.format(balance.round())}',
                                   style: textTheme.titleLarge?.copyWith(
                                     color: balance >= 0 ? AppColors.paiOrange : Colors.red,
                                     fontWeight: FontWeight.bold,
@@ -822,7 +911,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
                                     Icon(Icons.trending_up, size: 14, color: Colors.green),
                                     const SizedBox(width: 4),
                                     Text(
-                                      'Ingresos: \$${_currentMonthRevenue.toStringAsFixed(0)}',
+                                      'Ingresos: \$${numberFormat.format(_currentMonthRevenue.round())}',
                                       style: textTheme.bodySmall?.copyWith(
                                         color: Colors.green,
                                         fontWeight: FontWeight.w600,
@@ -837,9 +926,24 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
                                     Icon(Icons.trending_down, size: 14, color: Colors.red),
                                     const SizedBox(width: 4),
                                     Text(
-                                      'Gastos: \$${_currentMonthExpenses.toStringAsFixed(0)}',
+                                      'Gastos viajes: \$${numberFormat.format(_currentMonthExpenses.round())}',
                                       style: textTheme.bodySmall?.copyWith(
                                         color: Colors.red,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 2),
+                                Row(
+                                  children: [
+                                    Icon(Icons.build, size: 14, color: Colors.orange),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Gastos mantenimiento: \$${numberFormat.format(_currentMonthMaintenanceExpenses.round())}',
+                                      style: textTheme.bodySmall?.copyWith(
+                                        color: Colors.orange,
                                         fontWeight: FontWeight.w600,
                                         fontSize: 11,
                                       ),
@@ -861,7 +965,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
                               _buildStatusChip(
                                 color: Colors.redAccent,
                                 label: 'Documentos vencidos',
-                                value: '0',
+                                value: '$_expiredDocumentsCount',
                               ),
                               const SizedBox(width: 8),
                               _buildStatusChip(
