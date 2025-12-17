@@ -49,7 +49,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
 
   // Tipos de gasto (columna type en Supabase)
   static const List<String> _expenseTypes = [
-    'Gasolina',
+    'Combustible',
     'Comida',
     'Peajes',
     'Hoteles',

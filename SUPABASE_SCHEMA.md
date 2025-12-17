@@ -99,8 +99,11 @@ Tabla de perfiles de usuarios.
 | `id` | uuid | Clave primaria (coincide con auth.users.id) |
 | `email` | text | Email del usuario |
 | `full_name` | text | Nombre completo (nullable) |
+| `phone` | text | Teléfono del usuario (nullable) |
 | `role` | text | Rol del usuario ('owner' o 'driver') |
+| `assigned_vehicle_id` | uuid | ID del vehículo asignado al conductor (nullable, FK a vehicles.id) |
 | `created_at` | timestamp with time zone | Fecha de creación |
+| `updated_at` | timestamp with time zone | Fecha de actualización (nullable) |
 
 **Notas:**
 - `id` es la clave primaria y coincide con `auth.users.id`

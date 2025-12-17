@@ -9,8 +9,10 @@ import 'package:pai_app/core/theme/app_colors.dart';
 import 'package:pai_app/data/repositories/profile_repository_impl.dart';
 import 'package:pai_app/data/repositories/trip_repository_impl.dart';
 import 'package:pai_app/data/repositories/expense_repository_impl.dart';
+import 'package:pai_app/data/repositories/vehicle_repository_impl.dart';
 import 'package:pai_app/domain/entities/trip_entity.dart';
 import 'package:pai_app/domain/entities/expense_entity.dart';
+import 'package:pai_app/domain/entities/vehicle_entity.dart';
 import 'package:pai_app/presentation/pages/expenses/expense_form_page.dart';
 
 /// Página para seleccionar un viaje antes de crear un gasto
@@ -28,6 +30,7 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
   final _tripRepository = TripRepositoryImpl();
   final _profileRepository = ProfileRepositoryImpl();
   final _expenseRepository = ExpenseRepositoryImpl();
+  final _vehicleRepository = VehicleRepositoryImpl();
   
   List<TripEntity> _trips = [];
   List<TripEntity> _filteredTrips = [];
@@ -36,6 +39,7 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
   bool _isLoading = true;
   String? _userRole;
   String? _userEmail;
+  Map<String, VehicleEntity> _vehiclesById = {};
 
   @override
   void initState() {
@@ -83,7 +87,7 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
             );
           }
         },
-        (trips) {
+        (trips) async {
           // Filtrar viajes según el rol
           if (_userRole == 'driver') {
             // Driver: Solo viajes asignados a él o sin asignar
@@ -98,7 +102,9 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
           }
           
           _filteredTrips = _trips;
-          
+
+          // Cargar vehículos para mostrar placa
+          await _loadVehicles();
           // Cargar gastos para cada viaje
           _loadExpensesForTrips(_filteredTrips);
         },
@@ -169,6 +175,24 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
         // Ignorar errores
       }
     }
+  }
+
+  Future<void> _loadVehicles() async {
+    final result = await _vehicleRepository.getVehicles();
+    result.fold(
+      (failure) {
+        _vehiclesById = {};
+      },
+      (vehicles) {
+        final map = <String, VehicleEntity>{};
+        for (final vehicle in vehicles) {
+          if (vehicle.id != null) {
+            map[vehicle.id!] = vehicle;
+          }
+        }
+        _vehiclesById = map;
+      },
+    );
   }
 
   Future<void> _loadDriverNamesForTrip(String tripId, List<ExpenseEntity> expenses) async {
@@ -264,6 +288,14 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
       // Recargar gastos después de registrar uno nuevo
       _loadExpensesForTrips(_filteredTrips);
     });
+  }
+
+  String _buildVehicleLabel(String vehicleId) {
+    final vehicle = _vehiclesById[vehicleId];
+    if (vehicle == null) {
+      return '-';
+    }
+    return vehicle.placa;
   }
 
   @override
@@ -380,6 +412,7 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
   Widget _buildTripCard(TripEntity trip) {
     final dateFormat = DateFormat('dd/MM/yyyy');
     final isAssigned = trip.driverName.isNotEmpty;
+    final vehicleLabel = _buildVehicleLabel(trip.vehicleId);
     
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -452,6 +485,23 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
                         color: isAssigned ? Colors.grey[700] : Colors.grey[500],
                         fontStyle: isAssigned ? FontStyle.normal : FontStyle.italic,
                       ),
+                    ),
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: 4),
+              
+              // Vehículo
+              Row(
+                children: [
+                  Icon(Icons.directions_car, size: 16, color: Colors.grey[600]),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Vehículo: $vehicleLabel',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey[700],
                     ),
                   ),
                 ],

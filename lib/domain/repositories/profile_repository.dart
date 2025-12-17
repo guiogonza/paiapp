@@ -15,6 +15,20 @@ abstract class ProfileRepository {
   
   /// Crea un nuevo conductor (usuario con role 'driver')
   /// Crea el usuario en auth.users y luego crea el perfil en profiles con role='driver'
-  Future<Either<ProfileFailure, ProfileEntity>> createDriver(String email, String password, {String? fullName});
+  Future<Either<ProfileFailure, ProfileEntity>> createDriver(
+    String email,
+    String password, {
+    String? fullName,
+    String? assignedVehicleId,
+  });
+
+  /// Actualiza el vehículo asignado a un conductor (profiles.assigned_vehicle_id)
+  Future<Either<ProfileFailure, Unit>> updateAssignedVehicle({
+    required String driverId,
+    String? vehicleId,
+  });
+
+  /// Obtiene todos los conductores con su vehículo asignado (si existe)
+  Future<Either<ProfileFailure, List<ProfileEntity>>> getDriversWithAssignedVehicle();
 }
 

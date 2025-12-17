@@ -3,8 +3,11 @@ import 'package:intl/intl.dart';
 import 'package:pai_app/core/theme/app_colors.dart';
 import 'package:pai_app/data/repositories/trip_repository_impl.dart';
 import 'package:pai_app/data/repositories/expense_repository_impl.dart';
+import 'package:pai_app/data/repositories/vehicle_repository_impl.dart';
+import 'package:pai_app/data/repositories/profile_repository_impl.dart';
 import 'package:pai_app/domain/entities/trip_entity.dart';
 import 'package:pai_app/domain/entities/expense_entity.dart';
+import 'package:pai_app/domain/entities/vehicle_entity.dart';
 import 'package:pai_app/domain/failures/trip_failure.dart';
 import 'package:pai_app/presentation/pages/trips/trip_form_page.dart';
 import 'package:pai_app/presentation/pages/trips/trip_detail_page.dart';
@@ -19,10 +22,15 @@ class TripsListPage extends StatefulWidget {
 class _TripsListPageState extends State<TripsListPage> {
   final _repository = TripRepositoryImpl();
   final _expenseRepository = ExpenseRepositoryImpl();
+  final _vehicleRepository = VehicleRepositoryImpl();
+  final _profileRepository = ProfileRepositoryImpl();
   List<TripEntity> _trips = [];
   Map<String, List<ExpenseEntity>> _expensesByTrip = {}; // tripId -> expenses
   bool _isLoading = true;
   TripFailure? _error;
+  Map<String, VehicleEntity> _vehiclesById = {};
+  bool _isCurrentUserDriver = false;
+  String? _currentUserEmail;
 
   @override
   void initState() {
@@ -36,6 +44,8 @@ class _TripsListPageState extends State<TripsListPage> {
       _error = null;
     });
 
+    await _loadCurrentUserRole();
+
     final result = await _repository.getTrips();
 
     result.fold(
@@ -45,14 +55,66 @@ class _TripsListPageState extends State<TripsListPage> {
           _isLoading = false;
         });
       },
-      (trips) {
-        setState(() {
-          _trips = trips;
-          _isLoading = false;
-          _error = null;
-        });
-        // Cargar gastos para todos los viajes
-        _loadExpensesForTrips(trips);
+      (trips) async {
+        // Si el usuario es conductor, filtrar solo sus viajes
+        List<TripEntity> filteredTrips = trips;
+        if (_isCurrentUserDriver && _currentUserEmail != null) {
+          filteredTrips = trips
+              .where((trip) => trip.driverName == _currentUserEmail)
+              .toList();
+        }
+
+        // Cargar vehículos una sola vez
+        await _loadVehicles();
+
+        if (mounted) {
+          setState(() {
+            _trips = filteredTrips;
+            _isLoading = false;
+            _error = null;
+          });
+        }
+
+        // Cargar gastos para todos los viajes visibles
+        _loadExpensesForTrips(filteredTrips);
+      },
+    );
+  }
+
+  Future<void> _loadCurrentUserRole() async {
+    try {
+      final profileResult = await _profileRepository.getCurrentUserProfile();
+      profileResult.fold(
+        (failure) {
+          _isCurrentUserDriver = false;
+          _currentUserEmail = null;
+        },
+        (profile) {
+          _isCurrentUserDriver = profile.role == 'driver';
+          _currentUserEmail = profile.email;
+        },
+      );
+    } catch (_) {
+      _isCurrentUserDriver = false;
+      _currentUserEmail = null;
+    }
+  }
+
+  Future<void> _loadVehicles() async {
+    final result = await _vehicleRepository.getVehicles();
+    result.fold(
+      (failure) {
+        // No bloquear por error de vehículos, solo no mostrar placa
+        _vehiclesById = {};
+      },
+      (vehicles) {
+        final map = <String, VehicleEntity>{};
+        for (final vehicle in vehicles) {
+          if (vehicle.id != null) {
+            map[vehicle.id!] = vehicle;
+          }
+        }
+        _vehiclesById = map;
       },
     );
   }
@@ -127,6 +189,14 @@ class _TripsListPageState extends State<TripsListPage> {
         // Ignorar errores
       }
     }
+  }
+
+  String _buildVehicleLabel(String vehicleId) {
+    final vehicle = _vehiclesById[vehicleId];
+    if (vehicle == null) {
+      return '-';
+    }
+    return '${vehicle.placa}';
   }
 
   double _getTotalExpenses(String? tripId) {
@@ -260,6 +330,7 @@ class _TripsListPageState extends State<TripsListPage> {
       itemCount: _trips.length,
       itemBuilder: (context, index) {
         final trip = _trips[index];
+        final vehicleLabel = _buildVehicleLabel(trip.vehicleId);
         return Card(
           margin: const EdgeInsets.only(bottom: 12),
           child: ListTile(
@@ -279,16 +350,26 @@ class _TripsListPageState extends State<TripsListPage> {
                   color: AppColors.accent,
                 ),
               ),
-              title: Text(
-                trip.driverName,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                ),
+            title: Text(
+              trip.driverName,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
               ),
+            ),
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                const SizedBox(height: 4),
+                // Vehículo
+                Text(
+                  'Vehículo: $vehicleLabel',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
                 const SizedBox(height: 4),
                 // Origen - Destino
                 Text(

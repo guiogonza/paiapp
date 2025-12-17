@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:pai_app/core/theme/app_colors.dart';
 import 'package:pai_app/data/repositories/profile_repository_impl.dart';
+import 'package:pai_app/data/repositories/vehicle_repository_impl.dart';
+import 'package:pai_app/domain/entities/vehicle_entity.dart';
 
 class DriversManagementPage extends StatefulWidget {
   const DriversManagementPage({super.key});
@@ -12,20 +14,26 @@ class DriversManagementPage extends StatefulWidget {
 
 class _DriversManagementPageState extends State<DriversManagementPage> {
   final _profileRepository = ProfileRepositoryImpl();
+  final _vehicleRepository = VehicleRepositoryImpl();
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _fullNameController = TextEditingController();
 
   Map<String, String> _drivers = {}; // id -> email/name
+  final Map<String, String?> _assignedVehicleByDriver = {}; // id -> vehicleId (nullable)
+  List<VehicleEntity> _vehicles = [];
   bool _isLoading = true;
+  bool _isLoadingVehicles = true;
   bool _isCreating = false;
   Timer? _rateLimitTimer;
   int _rateLimitSeconds = 0;
+  String? _selectedVehicleIdForNewDriver;
 
   @override
   void initState() {
     super.initState();
+    _loadVehicles();
     _loadDrivers();
   }
 
@@ -36,6 +44,40 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
     _fullNameController.dispose();
     _rateLimitTimer?.cancel();
     super.dispose();
+  }
+
+  Future<void> _loadVehicles() async {
+    setState(() {
+      _isLoadingVehicles = true;
+    });
+
+    final result = await _vehicleRepository.getVehicles();
+    result.fold(
+      (failure) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error al cargar vehículos: ${failure.message}'),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
+      },
+      (vehicles) {
+        if (mounted) {
+          setState(() {
+            _vehicles = vehicles;
+          });
+        }
+      },
+    );
+
+    if (mounted) {
+      setState(() {
+        _isLoadingVehicles = false;
+      });
+    }
   }
 
   Future<void> _loadDrivers() async {
@@ -76,6 +118,26 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
       },
     );
 
+    // Cargar asignación de vehículos para cada conductor
+    final driversWithVehicleResult =
+        await _profileRepository.getDriversWithAssignedVehicle();
+
+    driversWithVehicleResult.fold(
+      (failure) {
+        print('❌ Error al cargar vehículos asignados a conductores: ${failure.message}');
+      },
+      (profiles) {
+        if (mounted) {
+          setState(() {
+            _assignedVehicleByDriver.clear();
+            for (final profile in profiles) {
+              _assignedVehicleByDriver[profile.id] = profile.assignedVehicleId;
+            }
+          });
+        }
+      },
+    );
+
     if (mounted) {
       setState(() {
         _isLoading = false;
@@ -105,8 +167,196 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
     });
   }
 
+  String _getAssignedVehicleLabel(String driverId) {
+    final vehicleId = _assignedVehicleByDriver[driverId];
+    if (vehicleId == null || vehicleId.isEmpty) {
+      return 'Vehículo asignado: -';
+    }
+
+    VehicleEntity? vehicle;
+    for (final v in _vehicles) {
+      if (v.id == vehicleId) {
+        vehicle = v;
+        break;
+      }
+    }
+
+    if (vehicle == null) {
+      return 'Vehículo asignado: -';
+    }
+
+    return 'Vehículo asignado: ${vehicle.placa}';
+  }
+
+  Future<void> _showAssignVehicleDialog(
+    String driverId,
+    String displayName,
+  ) async {
+    String? selectedVehicleId = _assignedVehicleByDriver[driverId] ?? '';
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            return AlertDialog(
+              title: Text('Asignar vehículo a\n$displayName'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<String>(
+                    value: selectedVehicleId,
+                    decoration: const InputDecoration(
+                      labelText: 'Vehículo asignado',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: [
+                      const DropdownMenuItem<String>(
+                        value: '',
+                        child: Text('Sin vehículo asignado'),
+                      ),
+                      ..._vehicles.map(
+                        (vehicle) => DropdownMenuItem<String>(
+                          value: vehicle.id,
+                          child: Text(
+                            '${vehicle.placa} - ${vehicle.marca} ${vehicle.modelo}',
+                          ),
+                        ),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      setStateDialog(() {
+                        selectedVehicleId = value;
+                      });
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(context).pop(selectedVehicleId);
+                  },
+                  child: const Text('Guardar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (result == null) return;
+
+    final normalizedVehicleId =
+        (result.isEmpty) ? null : result; // '' → null (sin vehículo)
+
+    // Validar que el vehículo no esté asignado ya a otro conductor
+    if (normalizedVehicleId != null) {
+      String? conflictingDriverId;
+      _assignedVehicleByDriver.forEach((otherDriverId, vehicleId) {
+        if (otherDriverId != driverId && vehicleId == normalizedVehicleId && conflictingDriverId == null) {
+          conflictingDriverId = otherDriverId;
+        }
+      });
+
+      if (conflictingDriverId != null) {
+        final assignedDriverName =
+            _drivers[conflictingDriverId!] ?? 'otro conductor';
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'El vehículo seleccionado ya está asignado a $assignedDriverName. '
+                'Desasígnalo primero o elige otro vehículo.',
+              ),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 5),
+            ),
+          );
+        }
+
+        return; // No continuar con la actualización en BD
+      }
+    }
+
+    final updateResult = await _profileRepository.updateAssignedVehicle(
+      driverId: driverId,
+      vehicleId: normalizedVehicleId,
+    );
+
+    updateResult.fold(
+      (failure) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error al actualizar vehículo: ${failure.message}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      },
+      (_) {
+        if (mounted) {
+          setState(() {
+            _assignedVehicleByDriver[driverId] = normalizedVehicleId;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Vehículo asignado actualizado'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      },
+    );
+  }
+
   Future<bool> _handleCreateDriver() async {
     if (!_formKey.currentState!.validate()) {
+      return false;
+    }
+
+    if (_selectedVehicleIdForNewDriver == null ||
+        _selectedVehicleIdForNewDriver!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Debes asignar un vehículo al conductor'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 3),
+        ),
+      );
+      return false;
+    }
+
+    // Validar si el vehículo ya está asignado a otro conductor
+    final selectedVehicleId = _selectedVehicleIdForNewDriver!;
+    String? conflictingDriverId;
+    _assignedVehicleByDriver.forEach((driverId, vehicleId) {
+      if (vehicleId == selectedVehicleId && conflictingDriverId == null) {
+        conflictingDriverId = driverId;
+      }
+    });
+
+    if (conflictingDriverId != null) {
+      final assignedDriverName =
+          _drivers[conflictingDriverId!] ?? 'otro conductor';
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'El vehículo seleccionado ya está asignado a $assignedDriverName. '
+              'Desasígnalo primero o elige otro vehículo.',
+            ),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
       return false;
     }
 
@@ -120,6 +370,7 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
       fullName: _fullNameController.text.trim().isEmpty 
           ? null 
           : _fullNameController.text.trim(),
+      assignedVehicleId: _selectedVehicleIdForNewDriver,
     );
 
     bool success = false;
@@ -230,6 +481,10 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
                             )
                           else
                             ..._drivers.entries.map((entry) {
+                              final driverId = entry.key;
+                              final displayName = entry.value;
+                              final vehicleLabel = _getAssignedVehicleLabel(driverId);
+
                               return Card(
                                 margin: const EdgeInsets.only(bottom: 8),
                                 elevation: 1,
@@ -237,16 +492,32 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
                                   leading: CircleAvatar(
                                     backgroundColor: AppColors.primary,
                                     child: Text(
-                                      entry.value.substring(0, 1).toUpperCase(),
+                                      displayName.substring(0, 1).toUpperCase(),
                                       style: const TextStyle(color: Colors.white),
                                     ),
                                   ),
                                   title: Text(
-                                    entry.value,
+                                    displayName,
                                     style: const TextStyle(fontWeight: FontWeight.bold),
                                   ),
-                                  subtitle: Text('ID: ${entry.key.substring(0, 8)}...'),
-                                  trailing: Icon(Icons.check_circle, color: Colors.green),
+                                  subtitle: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text('ID: ${driverId.substring(0, 8)}...'),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        vehicleLabel,
+                                        style: const TextStyle(fontWeight: FontWeight.w500),
+                                      ),
+                                    ],
+                                  ),
+                                  trailing: IconButton(
+                                    icon: const Icon(Icons.edit, color: AppColors.primary),
+                                    tooltip: 'Cambiar vehículo asignado',
+                                    onPressed: () {
+                                      _showAssignVehicleDialog(driverId, displayName);
+                                    },
+                                  ),
                                 ),
                               );
                             }),
@@ -316,6 +587,49 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
+                ),
+                const SizedBox(height: 16),
+
+                // Vehículo asignado (obligatorio)
+                DropdownButtonFormField<String>(
+                  value: _selectedVehicleIdForNewDriver,
+                  decoration: InputDecoration(
+                    labelText: 'Vehículo asignado *',
+                    hintText: _isLoadingVehicles
+                        ? 'Cargando vehículos...'
+                        : 'Selecciona un vehículo',
+                    prefixIcon: const Icon(Icons.directions_car),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  items: _isLoadingVehicles
+                      ? const [
+                          DropdownMenuItem<String>(
+                            value: null,
+                            child: Text('Cargando vehículos...'),
+                          ),
+                        ]
+                      : _vehicles.map((vehicle) {
+                          return DropdownMenuItem<String>(
+                            value: vehicle.id,
+                            child: Text(
+                              '${vehicle.placa} - ${vehicle.marca} ${vehicle.modelo}',
+                            ),
+                          );
+                        }).toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedVehicleIdForNewDriver = value;
+                    });
+                  },
+                  validator: (value) {
+                    if (!_isLoadingVehicles &&
+                        (value == null || value.isEmpty)) {
+                      return 'Debes asignar un vehículo';
+                    }
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 16),
 

@@ -5,8 +5,10 @@ import 'package:pai_app/core/theme/app_colors.dart';
 import 'package:pai_app/core/utils/validators.dart';
 import 'package:pai_app/data/repositories/trip_repository_impl.dart';
 import 'package:pai_app/data/repositories/vehicle_repository_impl.dart';
+import 'package:pai_app/data/repositories/profile_repository_impl.dart';
 import 'package:pai_app/domain/entities/trip_entity.dart';
 import 'package:pai_app/domain/entities/vehicle_entity.dart';
+import 'package:pai_app/domain/entities/profile_entity.dart';
 
 class TripFormPage extends StatefulWidget {
   final TripEntity? trip;
@@ -27,18 +29,23 @@ class _TripFormPageState extends State<TripFormPage> {
   final _budgetAmountController = TextEditingController();
   final _tripRepository = TripRepositoryImpl();
   final _vehicleRepository = VehicleRepositoryImpl();
+  final _profileRepository = ProfileRepositoryImpl();
 
   String? _selectedVehicleId;
+  String? _selectedDriverId;
   List<VehicleEntity> _vehicles = [];
-  bool _isLoadingVehicles = true;
+  bool _isLoadingDrivers = true;
   DateTime? _startDate;
   DateTime? _endDate;
   bool _isLoading = false;
   bool _isFormValid = false;
+  bool _isCurrentUserDriver = false;
+  List<ProfileEntity> _drivers = [];
 
   @override
   void initState() {
     super.initState();
+    _startDate = widget.trip?.startDate ?? DateTime.now(); // Por defecto hoy
     _loadVehicles();
     if (widget.trip != null) {
       _selectedVehicleId = widget.trip!.vehicleId;
@@ -48,9 +55,9 @@ class _TripFormPageState extends State<TripFormPage> {
       _destinationController.text = widget.trip!.destination;
       _revenueAmountController.text = widget.trip!.revenueAmount.toStringAsFixed(0);
       _budgetAmountController.text = widget.trip!.budgetAmount.toStringAsFixed(0);
-      _startDate = widget.trip!.startDate;
       _endDate = widget.trip!.endDate;
     }
+    _loadUserAndDrivers();
 
     // Validar formulario inicialmente
     _validateForm();
@@ -75,11 +82,125 @@ class _TripFormPageState extends State<TripFormPage> {
     super.dispose();
   }
 
-  Future<void> _loadVehicles() async {
-    setState(() {
-      _isLoadingVehicles = true;
-    });
+  Future<void> _loadUserAndDrivers() async {
+    try {
+      final profileResult = await _profileRepository.getCurrentUserProfile();
+      profileResult.fold(
+        (failure) {
+          // Si falla, asumimos owner para no bloquear el formulario
+          _isCurrentUserDriver = false;
+        },
+        (profile) {
+          _isCurrentUserDriver = profile.role == 'driver';
 
+          if (widget.trip == null && _isCurrentUserDriver) {
+            // Conductor: fijar su propio email y vehículo asignado
+            _selectedDriverId = profile.id;
+            _driverNameController.text = profile.email ?? '';
+            final assignedVehicleId = profile.assignedVehicleId;
+            if (assignedVehicleId != null && assignedVehicleId.isNotEmpty) {
+              _selectedVehicleId = assignedVehicleId;
+              // Cargar los datos completos del vehículo asignado
+              _loadVehicleForCurrentDriver(assignedVehicleId);
+            } else {
+              _selectedVehicleId = null;
+            }
+          }
+        },
+      );
+
+      if (!_isCurrentUserDriver) {
+        // Owner: cargar lista de conductores con vehículo asignado
+        final driversResult =
+            await _profileRepository.getDriversWithAssignedVehicle();
+        driversResult.fold(
+          (failure) {
+            if (mounted) {
+              setState(() {
+                _drivers = [];
+                _isLoadingDrivers = false;
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                      'Error al cargar conductores: ${failure.message}'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+          },
+          (drivers) {
+            if (mounted) {
+              setState(() {
+                _drivers = drivers;
+                _isLoadingDrivers = false;
+              });
+            }
+          },
+        );
+      } else {
+        if (mounted) {
+          setState(() {
+            _isLoadingDrivers = false;
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingDrivers = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al cargar datos de usuario: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Carga el vehículo asignado al conductor actual (por id) y
+  /// lo agrega a la lista local para poder mostrar la placa.
+  Future<void> _loadVehicleForCurrentDriver(String vehicleId) async {
+    final result = await _vehicleRepository.getVehicleById(vehicleId);
+
+    result.fold(
+      (failure) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'No se pudo cargar el vehículo asignado: ${failure.message}',
+              ),
+              backgroundColor: Colors.red,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      },
+      (vehicle) {
+        if (!mounted) return;
+        setState(() {
+          // Actualizar o agregar el vehículo a la lista local
+          final index =
+              _vehicles.indexWhere((v) => v.id != null && v.id == vehicle.id);
+          if (index >= 0) {
+            _vehicles[index] = vehicle;
+          } else {
+            _vehicles.add(vehicle);
+          }
+          // Asegurar que el id seleccionado coincida
+          if (vehicle.id != null) {
+            _selectedVehicleId = vehicle.id;
+          }
+        });
+        _validateForm();
+      },
+    );
+  }
+
+  Future<void> _loadVehicles() async {
     final result = await _vehicleRepository.getVehicles();
 
     result.fold(
@@ -92,16 +213,12 @@ class _TripFormPageState extends State<TripFormPage> {
               behavior: SnackBarBehavior.floating,
             ),
           );
-          setState(() {
-            _isLoadingVehicles = false;
-          });
         }
       },
       (vehicles) {
         if (mounted) {
           setState(() {
             _vehicles = vehicles;
-            _isLoadingVehicles = false;
           });
           _validateForm();
         }
@@ -111,7 +228,8 @@ class _TripFormPageState extends State<TripFormPage> {
 
   void _validateForm() {
     final formValid = _formKey.currentState?.validate() ?? false;
-    final vehicleSelected = _selectedVehicleId != null && _selectedVehicleId!.isNotEmpty;
+    final vehicleSelected =
+        _selectedVehicleId != null && _selectedVehicleId!.isNotEmpty;
     final isValid = formValid && vehicleSelected;
     if (_isFormValid != isValid) {
       setState(() {
@@ -232,7 +350,8 @@ class _TripFormPageState extends State<TripFormPage> {
 
       final budgetAmount = double.tryParse(_budgetAmountController.text.trim());
       if (budgetAmount == null || budgetAmount <= 0) {
-        throw Exception('El presupuesto de gastos debe ser un número válido mayor a 0');
+        throw Exception(
+            'El anticipo de viaje debe ser un número válido mayor a 0');
       }
 
       final trip = TripEntity(
@@ -305,6 +424,23 @@ class _TripFormPageState extends State<TripFormPage> {
     return DateFormat('dd/MM/yyyy').format(date);
   }
 
+  String _buildSelectedVehicleLabel() {
+    if (_selectedVehicleId == null || _selectedVehicleId!.isEmpty) {
+      return 'Sin vehículo asignado';
+    }
+    VehicleEntity? vehicle;
+    for (final v in _vehicles) {
+      if (v.id == _selectedVehicleId) {
+        vehicle = v;
+        break;
+      }
+    }
+    if (vehicle == null) {
+      return 'Vehículo no encontrado';
+    }
+    return '${vehicle.placa} - ${vehicle.marca} ${vehicle.modelo}';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -319,69 +455,99 @@ class _TripFormPageState extends State<TripFormPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Selector de Vehículo (Dropdown) - Obligatorio
-              DropdownButtonFormField<String>(
-                value: _selectedVehicleId,
+              // Conductor y vehículo asignado
+              if (_isCurrentUserDriver)
+                TextFormField(
+                  controller: _driverNameController,
+                  readOnly: true,
+                  decoration: InputDecoration(
+                    labelText: 'Conductor',
+                    prefixIcon: const Icon(Icons.person),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    helperText:
+                        'Conductor actual (solo puede crear viajes para sí mismo)',
+                  ),
+                )
+              else
+                DropdownButtonFormField<String>(
+                  value: _selectedDriverId,
+                  decoration: InputDecoration(
+                    labelText: 'Conductor *',
+                    hintText: _isLoadingDrivers
+                        ? 'Cargando conductores...'
+                        : 'Selecciona un conductor',
+                    prefixIcon: const Icon(Icons.person),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  items: _isLoadingDrivers
+                      ? const [
+                          DropdownMenuItem<String>(
+                            value: null,
+                            child: Text('Cargando conductores...'),
+                          ),
+                        ]
+                      : _drivers.map((driver) {
+                          final email = driver.email ?? '';
+                          final fullName = driver.fullName ?? '';
+                          final hasName = fullName.trim().isNotEmpty;
+                          final label =
+                              hasName ? '$fullName ($email)' : email;
+                          return DropdownMenuItem<String>(
+                            value: driver.id,
+                            child: Text(label),
+                          );
+                        }).toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedDriverId = value;
+                      final selected = _drivers.firstWhere(
+                        (d) => d.id == value,
+                        orElse: () => _drivers.first,
+                      );
+                      _driverNameController.text = selected.email ?? '';
+                      _selectedVehicleId = selected.assignedVehicleId;
+                    });
+                    _validateForm();
+                  },
+                  validator: (value) {
+                    if (_isCurrentUserDriver) {
+                      return null;
+                    }
+                    if (value == null || value.isEmpty) {
+                      return 'Debes seleccionar un conductor';
+                    }
+                    final selected = _drivers.firstWhere(
+                      (d) => d.id == value,
+                      orElse: () => _drivers.first,
+                    );
+                    if ((selected.assignedVehicleId ?? '').isEmpty) {
+                      return 'Este conductor no tiene vehículo asignado';
+                    }
+                    return null;
+                  },
+                ),
+              const SizedBox(height: 12),
+              // Mostrar el vehículo asociado (solo informativo)
+              InputDecorator(
                 decoration: InputDecoration(
-                  labelText: 'Vehículo *',
-                  hintText: 'Selecciona un vehículo',
+                  labelText: 'Vehículo (asignado automáticamente)',
                   prefixIcon: const Icon(Icons.directions_car),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                items: _isLoadingVehicles
-                    ? [
-                        const DropdownMenuItem<String>(
-                          value: null,
-                          child: Text('Cargando vehículos...'),
-                        )
-                      ]
-                    : _vehicles.map((vehicle) {
-                        return DropdownMenuItem<String>(
-                          value: vehicle.id,
-                          child: Text('${vehicle.placa} - ${vehicle.marca} ${vehicle.modelo}'),
-                        );
-                      }).toList(),
-                onChanged: (value) {
-                  setState(() {
-                    _selectedVehicleId = value;
-                  });
-                  _validateForm();
-                },
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Debes seleccionar un vehículo';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 20),
-
-              // Driver Name (Conductor) - Obligatorio
-              // IMPORTANTE: Debe ser el EMAIL del conductor, no el nombre
-              TextFormField(
-                controller: _driverNameController,
-                keyboardType: TextInputType.emailAddress,
-                decoration: InputDecoration(
-                  labelText: 'Conductor (Email) *',
-                  hintText: 'pepe@pai.com',
-                  prefixIcon: const Icon(Icons.email),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                child: Text(
+                  _buildSelectedVehicleLabel(),
+                  style: TextStyle(
+                    color: _selectedVehicleId != null
+                        ? AppColors.textPrimary
+                        : AppColors.textSecondary,
                   ),
-                  helperText: 'Ingresa el email del conductor',
                 ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'El email del conductor es requerido';
-                  }
-                  if (!value.contains('@') || !value.contains('.')) {
-                    return 'Ingresa un email válido';
-                  }
-                  return null;
-                },
-                textInputAction: TextInputAction.next,
               ),
               const SizedBox(height: 20),
 
@@ -472,7 +638,7 @@ class _TripFormPageState extends State<TripFormPage> {
               TextFormField(
                 controller: _budgetAmountController,
                 decoration: InputDecoration(
-                  labelText: 'Presupuesto de Gastos *',
+                  labelText: 'Anticipo de viaje *',
                   hintText: '0',
                   prefixIcon: const Icon(Icons.account_balance_wallet),
                   border: OutlineInputBorder(
@@ -485,14 +651,14 @@ class _TripFormPageState extends State<TripFormPage> {
                 ],
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
-                    return 'El presupuesto de gastos es requerido';
+                    return 'El anticipo de viaje es requerido';
                   }
                   final amount = double.tryParse(value.trim());
                   if (amount == null) {
-                    return 'Ingresa un presupuesto válido';
+                    return 'Ingresa un anticipo válido';
                   }
                   if (amount <= 0) {
-                    return 'El presupuesto debe ser mayor a 0';
+                    return 'El anticipo debe ser mayor a 0';
                   }
                   return null;
                 },

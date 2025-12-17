@@ -7,8 +7,10 @@ class ProfileModel extends ProfileEntity {
     required super.id,
     required super.userId,
     required super.role,
+    super.email,
     super.fullName,
     super.phone,
+    super.assignedVehicleId,
     super.createdAt,
     super.updatedAt,
   });
@@ -22,8 +24,10 @@ class ProfileModel extends ProfileEntity {
       id: profileId,
       userId: profileId, // En profiles, id y userId son el mismo (id = auth.uid())
       role: json['role'] as String, // Mapeo estricto: role
+      email: json['email'] as String?,
       fullName: json['full_name'] as String?, // Mapeo estricto: full_name
       phone: json['phone'] as String?,
+      assignedVehicleId: json['assigned_vehicle_id'] as String?,
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'] as String)
           : null, // Mapeo estricto: created_at
@@ -39,8 +43,10 @@ class ProfileModel extends ProfileEntity {
     return {
       'id': id, // id es la clave primaria que coincide con auth.uid()
       'role': role,
+      if (email != null) 'email': email,
       if (fullName != null) 'full_name': fullName,
       if (phone != null) 'phone': phone,
+      if (assignedVehicleId != null) 'assigned_vehicle_id': assignedVehicleId,
       if (createdAt != null) 'created_at': createdAt!.toIso8601String(),
       if (updatedAt != null) 'updated_at': updatedAt!.toIso8601String(),
     };
@@ -52,8 +58,10 @@ class ProfileModel extends ProfileEntity {
       id: entity.id,
       userId: entity.userId,
       role: entity.role,
+      email: entity.email,
       fullName: entity.fullName,
       phone: entity.phone,
+      assignedVehicleId: entity.assignedVehicleId,
       createdAt: entity.createdAt,
       updatedAt: entity.updatedAt,
     );
@@ -65,8 +73,10 @@ class ProfileModel extends ProfileEntity {
       id: id,
       userId: userId,
       role: role,
+      email: email,
       fullName: fullName,
       phone: phone,
+      assignedVehicleId: assignedVehicleId,
       createdAt: createdAt,
       updatedAt: updatedAt,
     );

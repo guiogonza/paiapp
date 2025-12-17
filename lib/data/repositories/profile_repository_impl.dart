@@ -30,6 +30,53 @@ class ProfileRepositoryImpl implements ProfileRepository {
   }
 
   @override
+  Future<Either<ProfileFailure, Unit>> updateAssignedVehicle({
+    required String driverId,
+    String? vehicleId,
+  }) async {
+    try {
+      final updateData = <String, dynamic>{
+        'assigned_vehicle_id': vehicleId,
+      };
+
+      await _supabase.from(_tableName).update(updateData).eq('id', driverId);
+
+      return const Right(unit);
+    } on PostgrestException catch (e) {
+      return Left(DatabaseFailure(_mapPostgrestError(e)));
+    } on SocketException catch (_) {
+      return const Left(NetworkFailure());
+    } catch (e) {
+      return Left(UnknownFailure(_mapGenericError(e)));
+    }
+  }
+
+  @override
+  Future<Either<ProfileFailure, List<ProfileEntity>>>
+      getDriversWithAssignedVehicle() async {
+    try {
+      final response = await _supabase
+          .from(_tableName)
+          .select('*')
+          .eq('role', 'driver')
+          .order('email', ascending: true);
+
+      final profilesList = (response as List)
+          .map((json) => ProfileModel.fromJson(json as Map<String, dynamic>))
+          .map((model) => model.toEntity())
+          .toList();
+
+      return Right(profilesList);
+    } on PostgrestException catch (e) {
+      return Left(DatabaseFailure(_mapPostgrestError(e)));
+    } on SocketException catch (_) {
+      return const Left(NetworkFailure());
+    } catch (e) {
+      return Left(UnknownFailure(_mapGenericError(e)));
+    }
+  }
+
+  @override
   Future<Either<ProfileFailure, ProfileEntity>> getProfileByUserId(
       String userId) async {
     try {
@@ -214,6 +261,7 @@ class ProfileRepositoryImpl implements ProfileRepository {
     String email,
     String password, {
     String? fullName,
+    String? assignedVehicleId,
   }) async {
     try {
       print('🔨 Creando nuevo conductor: email=$email');
@@ -246,6 +294,7 @@ class ProfileRepositoryImpl implements ProfileRepository {
           'role': 'driver',
           'email': email, // CRÍTICO: Guardar email en profiles para facilitar consultas
           'full_name': fullName ?? '', // CRÍTICO: Guardar full_name (vacío si no se proporciona)
+          if (assignedVehicleId != null) 'assigned_vehicle_id': assignedVehicleId,
           'created_at': DateTime.now().toIso8601String(),
         };
 

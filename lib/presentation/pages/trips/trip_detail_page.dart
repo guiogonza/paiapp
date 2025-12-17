@@ -12,6 +12,8 @@ import 'package:pai_app/data/repositories/remittance_repository_impl.dart';
 import 'package:pai_app/domain/entities/trip_entity.dart';
 import 'package:pai_app/domain/entities/expense_entity.dart';
 import 'package:pai_app/domain/entities/remittance_entity.dart';
+import 'package:pai_app/domain/entities/vehicle_entity.dart';
+import 'package:pai_app/data/repositories/vehicle_repository_impl.dart';
 import 'package:pai_app/presentation/pages/expenses/expense_form_page.dart';
 
 /// Vista de detalle del viaje para el Owner
@@ -32,12 +34,14 @@ class _TripDetailPageState extends State<TripDetailPage> {
   final _tripRepository = TripRepositoryImpl();
   final _expenseRepository = ExpenseRepositoryImpl();
   final _remittanceRepository = RemittanceRepositoryImpl();
+  final _vehicleRepository = VehicleRepositoryImpl();
   
   TripEntity? _trip;
   RemittanceEntity? _remittance;
   List<ExpenseEntity> _allExpenses = [];
   Map<String, String> _driverNames = {}; // Map driver_id -> email/name
   bool _isLoading = true;
+  VehicleEntity? _vehicle;
 
   @override
   void initState() {
@@ -64,8 +68,20 @@ class _TripDetailPageState extends State<TripDetailPage> {
             );
           }
         },
-        (trip) {
+        (trip) async {
           _trip = trip;
+
+          // Cargar vehículo asociado para mostrar placa
+          final vehicleResult =
+              await _vehicleRepository.getVehicleById(trip.vehicleId);
+          vehicleResult.fold(
+            (failure) {
+              _vehicle = null;
+            },
+            (vehicle) {
+              _vehicle = vehicle;
+            },
+          );
         },
       );
 
@@ -226,11 +242,21 @@ class _TripDetailPageState extends State<TripDetailPage> {
                             ),
                       ),
                       const SizedBox(height: 12),
-                      _buildInfoRow('Ruta', '${_trip!.origin} → ${_trip!.destination}'),
+                      _buildInfoRow(
+                          'Ruta', '${_trip!.origin} → ${_trip!.destination}'),
                       const SizedBox(height: 8),
                       _buildInfoRow('Cliente', _trip!.clientName),
                       const SizedBox(height: 8),
-                      _buildInfoRow('Conductor', _trip!.driverName.isNotEmpty ? _trip!.driverName : 'Sin asignar'),
+                      _buildInfoRow(
+                          'Conductor',
+                          _trip!.driverName.isNotEmpty
+                              ? _trip!.driverName
+                              : 'Sin asignar'),
+                      const SizedBox(height: 8),
+                      _buildInfoRow(
+                        'Vehículo',
+                        _vehicle != null ? _vehicle!.placa : 'Sin información',
+                      ),
                       if (_trip!.startDate != null) ...[
                         const SizedBox(height: 8),
                         _buildInfoRow('Fecha de Inicio', dateFormat.format(_trip!.startDate!)),

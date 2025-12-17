@@ -4,7 +4,9 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:intl/intl.dart';
 import 'package:pai_app/core/theme/app_colors.dart';
 import 'package:pai_app/data/repositories/remittance_repository_impl.dart';
+import 'package:pai_app/data/repositories/vehicle_repository_impl.dart';
 import 'package:pai_app/domain/entities/remittance_with_route_entity.dart';
+import 'package:pai_app/domain/entities/vehicle_entity.dart';
 
 class BillingDashboardPage extends StatefulWidget {
   const BillingDashboardPage({super.key});
@@ -17,6 +19,8 @@ class _BillingDashboardPageState extends State<BillingDashboardPage> {
   final _remittanceRepository = RemittanceRepositoryImpl();
   List<RemittanceWithRouteEntity> _pendingRemittances = [];
   bool _isLoading = true;
+  final _vehicleRepository = VehicleRepositoryImpl();
+  Map<String, VehicleEntity> _vehiclesById = {};
 
   @override
   void initState() {
@@ -47,11 +51,31 @@ class _BillingDashboardPageState extends State<BillingDashboardPage> {
           _isLoading = false;
         });
       },
-      (remittances) {
+      (remittances) async {
+        // Cargar vehículos una sola vez
+        await _loadVehicles();
         setState(() {
           _pendingRemittances = remittances;
           _isLoading = false;
         });
+      },
+    );
+  }
+
+  Future<void> _loadVehicles() async {
+    final result = await _vehicleRepository.getVehicles();
+    result.fold(
+      (failure) {
+        _vehiclesById = {};
+      },
+      (vehicles) {
+        final map = <String, VehicleEntity>{};
+        for (final vehicle in vehicles) {
+          if (vehicle.id != null) {
+            map[vehicle.id!] = vehicle;
+          }
+        }
+        _vehiclesById = map;
       },
     );
   }
@@ -187,6 +211,7 @@ class _BillingDashboardPageState extends State<BillingDashboardPage> {
     final createdAt = remittance.createdAt;
     final dateStr = createdAt != null ? dateFormat.format(createdAt) : 'N/A';
     final timeStr = createdAt != null ? timeFormat.format(createdAt) : '';
+    final vehicleLabel = _buildVehicleLabel(remittance.vehicleId);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -306,6 +331,22 @@ class _BillingDashboardPageState extends State<BillingDashboardPage> {
                       ),
                     ],
                   ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            // Vehículo
+            Row(
+              children: [
+                const Icon(
+                  Icons.directions_car,
+                  size: 20,
+                  color: AppColors.textSecondary,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Vehículo: $vehicleLabel',
+                  style: Theme.of(context).textTheme.bodyMedium,
                 ),
               ],
             ),
@@ -462,6 +503,14 @@ class _BillingDashboardPageState extends State<BillingDashboardPage> {
         ),
       );
     }
+  }
+
+  String _buildVehicleLabel(String vehicleId) {
+    final vehicle = _vehiclesById[vehicleId];
+    if (vehicle == null) {
+      return '-';
+    }
+    return vehicle.placa;
   }
 }
 

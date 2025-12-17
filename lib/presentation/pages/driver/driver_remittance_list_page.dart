@@ -4,7 +4,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:pai_app/core/theme/app_colors.dart';
 import 'package:pai_app/data/repositories/profile_repository_impl.dart';
 import 'package:pai_app/data/repositories/remittance_repository_impl.dart';
+import 'package:pai_app/data/repositories/vehicle_repository_impl.dart';
 import 'package:pai_app/domain/entities/remittance_with_route_entity.dart';
+import 'package:pai_app/domain/entities/vehicle_entity.dart';
 import 'package:pai_app/presentation/pages/driver/remittance_signing_page.dart';
 
 class DriverRemittanceListPage extends StatefulWidget {
@@ -17,8 +19,10 @@ class DriverRemittanceListPage extends StatefulWidget {
 class _DriverRemittanceListPageState extends State<DriverRemittanceListPage> {
   final RemittanceRepositoryImpl _remittanceRepository = RemittanceRepositoryImpl();
   final ProfileRepositoryImpl _profileRepository = ProfileRepositoryImpl();
+  final VehicleRepositoryImpl _vehicleRepository = VehicleRepositoryImpl();
   List<RemittanceWithRouteEntity> _pendingRemittances = [];
   bool _isLoading = true;
+  Map<String, VehicleEntity> _vehiclesById = {};
   String? _driverName;
 
   @override
@@ -76,14 +80,16 @@ class _DriverRemittanceListPageState extends State<DriverRemittanceListPage> {
 
         // Obtener remisiones pendientes del conductor
         // Buscar tanto por email como por nombre completo
-        final result = await _remittanceRepository.getDriverPendingRemittances(_driverName!);
+        final result =
+            await _remittanceRepository.getDriverPendingRemittances(_driverName!);
 
-        result.fold(
-          (failure) {
+        await result.fold(
+          (failure) async {
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('Error al cargar remisiones: ${failure.message}'),
+                  content:
+                      Text('Error al cargar remisiones: ${failure.message}'),
                   backgroundColor: Colors.red,
                   behavior: SnackBarBehavior.floating,
                 ),
@@ -94,13 +100,33 @@ class _DriverRemittanceListPageState extends State<DriverRemittanceListPage> {
               _isLoading = false;
             });
           },
-          (remittances) {
+          (remittances) async {
+            // Cargar vehículos una sola vez para mostrar placa
+            await _loadVehicles();
             setState(() {
               _pendingRemittances = remittances;
               _isLoading = false;
             });
           },
         );
+      },
+    );
+  }
+
+  Future<void> _loadVehicles() async {
+    final result = await _vehicleRepository.getVehicles();
+    result.fold(
+      (failure) {
+        _vehiclesById = {};
+      },
+      (vehicles) {
+        final map = <String, VehicleEntity>{};
+        for (final vehicle in vehicles) {
+          if (vehicle.id != null) {
+            map[vehicle.id!] = vehicle;
+          }
+        }
+        _vehiclesById = map;
       },
     );
   }
@@ -202,6 +228,13 @@ class _DriverRemittanceListPageState extends State<DriverRemittanceListPage> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
+                                  'Vehículo: ${_buildVehicleLabel(remittance.vehicleId)}',
+                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                        color: AppColors.textSecondary,
+                                      ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
                                   'Fecha: ${remittance.createdAt != null ? DateFormat('dd/MM/yyyy').format(remittance.createdAt!) : 'N/A'}',
                                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                         color: AppColors.textSecondary,
@@ -240,6 +273,14 @@ class _DriverRemittanceListPageState extends State<DriverRemittanceListPage> {
                   ),
                 ),
     );
+  }
+
+  String _buildVehicleLabel(String vehicleId) {
+    final vehicle = _vehiclesById[vehicleId];
+    if (vehicle == null) {
+      return '-';
+    }
+    return vehicle.placa;
   }
 }
 

@@ -323,7 +323,7 @@ class _ExpensesListPageState extends State<ExpensesListPage> {
 
   IconData _getCategoryIcon(String category) {
     switch (category) {
-      case 'Gasolina':
+      case 'Combustible':
         return Icons.local_gas_station;
       case 'Comida':
         return Icons.restaurant;
