@@ -13,11 +13,9 @@ import 'package:pai_app/presentation/pages/vehicle_history/vehicle_history_page.
 import 'package:pai_app/presentation/pages/billing/billing_dashboard_page.dart';
 import 'package:pai_app/presentation/pages/trips/trips_list_page.dart';
 import 'package:pai_app/presentation/pages/expenses/expenses_page.dart';
-import 'package:pai_app/presentation/pages/vehicles/vehicles_list_page.dart';
 import 'package:pai_app/presentation/pages/documents/documents_management_page.dart';
 import 'package:pai_app/presentation/pages/drivers/drivers_management_page.dart';
 import 'package:pai_app/presentation/pages/maintenance/maintenance_page.dart';
-import 'package:pai_app/data/services/fleet_sync_service.dart';
 import 'package:pai_app/data/repositories/maintenance_repository_impl.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -36,10 +34,7 @@ class OwnerDashboardPage extends StatefulWidget {
 
 class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
   final _locationService = VehicleLocationService();
-  final _fleetSyncService = FleetSyncService();
   final _maintenanceRepository = MaintenanceRepositoryImpl();
-  bool _isSyncing = false;
-  
   List<VehicleLocationEntity> _vehicleLocations = [];
   int _activeAlertsCount = 0; // Contador de alertas activas
   double _currentMonthRevenue = 0.0;
@@ -486,94 +481,6 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
   }
 
 
-  Future<void> _handleSyncFleet() async {
-    setState(() {
-      _isSyncing = true;
-    });
-
-    final result = await _fleetSyncService.syncFleetLimited();
-
-    if (mounted) {
-      setState(() {
-        _isSyncing = false;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(result['message'] ?? 'Sincronización completada'),
-          backgroundColor: result['success'] == true ? Colors.green : Colors.red,
-          duration: const Duration(seconds: 4),
-        ),
-      );
-
-      // Si se sincronizaron vehículos, recargar ubicaciones
-      if (result['success'] == true && result['synced'] > 0) {
-        _loadVehicleLocations();
-      }
-    }
-  }
-
-  /// Construye una tarjeta de módulo con diseño moderno tipo mockups
-  Widget _buildModuleCard(
-    BuildContext context, {
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.08),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  icon,
-                  color: color,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
-                ),
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-
   /// Construye el isotipo PAI (logo geométrico)
   Widget _buildPaiIsotype() {
     return Container(
@@ -616,39 +523,43 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
     required Color color,
     required String label,
     required String value,
+    bool compact = false,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 8 : 12,
+        vertical: compact ? 6 : 8,
+      ),
       decoration: BoxDecoration(
         color: color.withOpacity(0.1),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color, width: 1.5),
+        border: Border.all(color: color, width: compact ? 1.0 : 1.5),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 8,
-            height: 8,
+            width: compact ? 6 : 8,
+            height: compact ? 6 : 8,
             decoration: BoxDecoration(
               color: color,
               shape: BoxShape.circle,
             ),
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: compact ? 6 : 8),
           Text(
             label,
             style: TextStyle(
-              fontSize: 12,
+              fontSize: compact ? 10 : 12,
               fontWeight: FontWeight.w600,
               color: AppColors.textPrimary,
             ),
           ),
-          const SizedBox(width: 4),
+          SizedBox(width: compact ? 3 : 4),
           Text(
             value,
             style: TextStyle(
-              fontSize: 12,
+              fontSize: compact ? 10 : 12,
               fontWeight: FontWeight.bold,
               color: color,
             ),
@@ -853,11 +764,11 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
                           ),
                   ),
                 ),
-                // 3. PANEL DE RESUMEN PAI (Fijo en la Base)
+                // 3. PANEL DE RESUMEN PAI (Fijo en la Base - Compacto)
                 Container(
-                  height: 200,
+                  height: 150,
                   width: double.infinity,
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: AppColors.white,
                     boxShadow: [
@@ -872,91 +783,80 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // KPI de Rentabilidad
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: AppColors.background,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Column(
+                      // KPI de Rentabilidad (compacto)
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Balance global mes actual',
+                                  'Balance mes actual',
                                   style: textTheme.bodySmall?.copyWith(
                                     color: AppColors.textSecondary,
-                                    fontSize: 11,
+                                    fontSize: 10,
                                   ),
                                 ),
-                                const SizedBox(height: 4),
+                                const SizedBox(height: 2),
                                 Text(
                                   '\$${numberFormat.format(balance.round())}',
-                                  style: textTheme.titleLarge?.copyWith(
+                                  style: textTheme.titleMedium?.copyWith(
                                     color: balance >= 0 ? AppColors.paiOrange : Colors.red,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
                               ],
                             ),
-                            Column(
+                          ),
+                          Expanded(
+                            child: Column(
                               crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
                                 Row(
+                                  mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Icon(Icons.trending_up, size: 14, color: Colors.green),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      'Ingresos: \$${numberFormat.format(_currentMonthRevenue.round())}',
-                                      style: textTheme.bodySmall?.copyWith(
-                                        color: Colors.green,
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 11,
+                                    Icon(Icons.trending_up, size: 12, color: Colors.green),
+                                    const SizedBox(width: 2),
+                                    Flexible(
+                                      child: Text(
+                                        'Ing: \$${numberFormat.format(_currentMonthRevenue.round())}',
+                                        style: textTheme.bodySmall?.copyWith(
+                                          color: Colors.green,
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 9,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 2),
+                                const SizedBox(height: 1),
                                 Row(
+                                  mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Icon(Icons.trending_down, size: 14, color: Colors.red),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      'Gastos viajes: \$${numberFormat.format(_currentMonthExpenses.round())}',
-                                      style: textTheme.bodySmall?.copyWith(
-                                        color: Colors.red,
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 11,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 2),
-                                Row(
-                                  children: [
-                                    Icon(Icons.build, size: 14, color: Colors.orange),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      'Gastos mantenimiento: \$${numberFormat.format(_currentMonthMaintenanceExpenses.round())}',
-                                      style: textTheme.bodySmall?.copyWith(
-                                        color: Colors.orange,
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 11,
+                                    Icon(Icons.trending_down, size: 12, color: Colors.red),
+                                    const SizedBox(width: 2),
+                                    Flexible(
+                                      child: Text(
+                                        'Gastos: \$${numberFormat.format((_currentMonthExpenses + _currentMonthMaintenanceExpenses).round())}',
+                                        style: textTheme.bodySmall?.copyWith(
+                                          color: Colors.red,
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 9,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
                                   ],
                                 ),
                               ],
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 12),
-                      // 5 Chips de Alerta
+                      const SizedBox(height: 8),
+                      // 5 Chips de Alerta (compactos)
                       Expanded(
                         child: SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
@@ -964,32 +864,37 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
                             children: [
                               _buildStatusChip(
                                 color: Colors.redAccent,
-                                label: 'Documentos vencidos',
+                                label: 'Docs vencidos',
                                 value: '$_expiredDocumentsCount',
+                                compact: true,
                               ),
-                              const SizedBox(width: 8),
+                              const SizedBox(width: 6),
                               _buildStatusChip(
                                 color: Colors.orangeAccent,
                                 label: 'Mantenimiento',
                                 value: '$_activeAlertsCount',
+                                compact: true,
                               ),
-                              const SizedBox(width: 8),
+                              const SizedBox(width: 6),
                               _buildStatusChip(
                                 color: Colors.green,
-                                label: 'Flota operativa',
+                                label: 'Flota',
                                 value: '${_vehicleLocations.length}',
+                                compact: true,
                               ),
-                              const SizedBox(width: 8),
+                              const SizedBox(width: 6),
                               _buildStatusChip(
                                 color: Colors.blue,
-                                label: 'Viajes activos',
+                                label: 'Viajes',
                                 value: '$_activeTripsCount',
+                                compact: true,
                               ),
-                              const SizedBox(width: 8),
+                              const SizedBox(width: 6),
                               _buildStatusChip(
                                 color: Colors.orange,
-                                label: 'Remisiones pendientes',
+                                label: 'Remisiones',
                                 value: '$_pendingRemittancesCount',
+                                compact: true,
                               ),
                             ],
                           ),

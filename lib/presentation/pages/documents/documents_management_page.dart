@@ -320,9 +320,9 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
     }
   }
 
-  Future<void> _handleSave() async {
+  Future<bool> _handleSave() async {
     if (!_formKey.currentState!.validate()) {
-      return;
+      return false;
     }
 
     if (_selectedAssociationType == null) {
@@ -332,7 +332,7 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
           backgroundColor: Colors.red,
         ),
       );
-      return;
+      return false;
     }
 
     if (_selectedAssociationType == 'Vehículo' && _selectedVehicleId == null) {
@@ -342,7 +342,7 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
           backgroundColor: Colors.red,
         ),
       );
-      return;
+      return false;
     }
 
     if (_selectedAssociationType == 'Conductor' && _selectedDriverId == null) {
@@ -352,7 +352,7 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
           backgroundColor: Colors.red,
         ),
       );
-      return;
+      return false;
     }
 
     if (_selectedExpirationDate == null) {
@@ -362,7 +362,7 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
           backgroundColor: Colors.red,
         ),
       );
-      return;
+      return false;
     }
 
     setState(() {
@@ -425,6 +425,7 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
 
       final result = await _documentRepository.createDocument(document);
       
+      bool success = false;
       result.fold(
         (failure) {
           if (mounted) {
@@ -437,6 +438,7 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
           }
         },
         (_) {
+          success = true;
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
@@ -444,20 +446,12 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
                 backgroundColor: Colors.green,
               ),
             );
-            // Limpiar formulario
-            _formKey.currentState!.reset();
-            _selectedAssociationType = null;
-            _selectedVehicleId = null;
-            _selectedDriverId = null;
-            _selectedExpirationDate = null;
-            _selectedImage = null;
-            _selectedXFile = null;
-            _existingImageUrl = null;
             // Recargar datos
             _loadData();
           }
         },
       );
+      return success;
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -467,6 +461,7 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
           ),
         );
       }
+      return false;
     } finally {
       if (mounted) {
         setState(() {
@@ -474,6 +469,18 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
         });
       }
     }
+  }
+
+  void _resetForm() {
+    _formKey.currentState?.reset();
+    _selectedAssociationType = null;
+    _selectedVehicleId = null;
+    _selectedDriverId = null;
+    _selectedExpirationDate = null;
+    _selectedImage = null;
+    _selectedXFile = null;
+    _existingImageUrl = null;
+    _documentTypeController.clear();
   }
 
   Future<void> _selectExpirationDate() async {
@@ -608,37 +615,58 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
                 ),
               ),
             ),
-            const SizedBox(height: 24),
+          ],
+        ),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          // Mostrar diálogo de creación en lugar de navegar a otra página
+          showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            builder: (context) => _buildDocumentFormSheet(),
+          );
+        },
+        icon: const Icon(Icons.add),
+        label: const Text('Crear Documento'),
+      ),
+    );
+  }
 
-            // Sección de Registro
-            Card(
-              elevation: 2,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.add_circle, color: AppColors.primary),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Registrar Nuevo Documento',
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
+  Widget _buildDocumentFormSheet() {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.95,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      builder: (context, scrollController) {
+        return SingleChildScrollView(
+          controller: scrollController,
+          padding: const EdgeInsets.all(16.0),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.add_circle, color: AppColors.primary),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Registrar Nuevo Documento',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-
-                      // Tipo de Asociación
-                      DropdownButtonFormField<String>(
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                // Tipo de Asociación
+                DropdownButtonFormField<String>(
                         initialValue: _selectedAssociationType,
                         decoration: InputDecoration(
                           labelText: 'Asociar a *',
@@ -660,35 +688,35 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
                             _selectedDriverId = null;
                           });
                         },
+                ),
+                const SizedBox(height: 16),
+
+                // Selector de Vehículo
+                if (_selectedAssociationType == 'Vehículo')
+                  DropdownButtonFormField<String>(
+                    initialValue: _selectedVehicleId,
+                    decoration: InputDecoration(
+                      labelText: 'Vehículo *',
+                      prefixIcon: const Icon(Icons.directions_car),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      const SizedBox(height: 16),
+                    ),
+                    items: _vehicles.map((vehicle) {
+                      return DropdownMenuItem(
+                        value: vehicle.id,
+                        child: Text('${vehicle.placa} - ${vehicle.marca} ${vehicle.modelo}'),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedVehicleId = value;
+                      });
+                    },
+                  ),
 
-                      // Selector de Vehículo
-                      if (_selectedAssociationType == 'Vehículo')
-                        DropdownButtonFormField<String>(
-                          initialValue: _selectedVehicleId,
-                          decoration: InputDecoration(
-                            labelText: 'Vehículo *',
-                            prefixIcon: const Icon(Icons.directions_car),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          items: _vehicles.map((vehicle) {
-                            return DropdownMenuItem(
-                              value: vehicle.id,
-                              child: Text('${vehicle.placa} - ${vehicle.marca} ${vehicle.modelo}'),
-                            );
-                          }).toList(),
-                          onChanged: (value) {
-                            setState(() {
-                              _selectedVehicleId = value;
-                            });
-                          },
-                        ),
-
-                      // Selector de Conductor
-                      if (_selectedAssociationType == 'Conductor')
+                // Selector de Conductor
+                if (_selectedAssociationType == 'Conductor')
                         _driverNames.isEmpty
                             ? Container(
                                 padding: const EdgeInsets.all(16),
@@ -713,41 +741,41 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
                                   ],
                                 ),
                               )
-                            : DropdownButtonFormField<String>(
-                                initialValue: _selectedDriverId,
-                                decoration: InputDecoration(
-                                  labelText: 'Conductor *',
-                                  prefixIcon: const Icon(Icons.person),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  helperText: _driverNames.isEmpty
-                                      ? 'No hay conductores disponibles'
-                                      : '${_driverNames.length} conductor(es) disponible(s)',
-                                ),
-                                items: _driverNames.entries.map((entry) {
-                                  return DropdownMenuItem(
-                                    value: entry.key,
-                                    child: Text(entry.value),
-                                  );
-                                }).toList(),
-                                onChanged: (value) {
-                                  setState(() {
-                                    _selectedDriverId = value;
-                                  });
-                                },
-                                validator: (value) {
-                                  if (_selectedAssociationType == 'Conductor' && (value == null || value.isEmpty)) {
-                                    return 'Debes seleccionar un conductor';
-                                  }
-                                  return null;
-                                },
-                              ),
+                  : DropdownButtonFormField<String>(
+                      initialValue: _selectedDriverId,
+                      decoration: InputDecoration(
+                        labelText: 'Conductor *',
+                        prefixIcon: const Icon(Icons.person),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        helperText: _driverNames.isEmpty
+                            ? 'No hay conductores disponibles'
+                            : '${_driverNames.length} conductor(es) disponible(s)',
+                      ),
+                      items: _driverNames.entries.map((entry) {
+                        return DropdownMenuItem(
+                          value: entry.key,
+                          child: Text(entry.value),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedDriverId = value;
+                        });
+                      },
+                      validator: (value) {
+                        if (_selectedAssociationType == 'Conductor' && (value == null || value.isEmpty)) {
+                          return 'Debes seleccionar un conductor';
+                        }
+                        return null;
+                      },
+                    ),
 
-                      if (_selectedAssociationType != null) const SizedBox(height: 16),
+                if (_selectedAssociationType != null) const SizedBox(height: 16),
 
-                      // Tipo de Documento
-                      TextFormField(
+                // Tipo de Documento
+                TextFormField(
                         controller: _documentTypeController,
                         decoration: InputDecoration(
                           labelText: 'Tipo de Documento *',
@@ -777,125 +805,130 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
                           }
                           return null;
                         },
-                      ),
-                      const SizedBox(height: 16),
+                ),
+                const SizedBox(height: 16),
 
-                      // Fecha de Expiración
-                      InkWell(
-                        onTap: _selectExpirationDate,
-                        child: InputDecorator(
-                          decoration: InputDecoration(
-                            labelText: 'Fecha de Expiración *',
-                            prefixIcon: const Icon(Icons.calendar_today),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: Text(
-                            _selectedExpirationDate != null
-                                ? DateFormat('dd/MM/yyyy').format(_selectedExpirationDate!)
-                                : 'Selecciona la fecha',
-                            style: TextStyle(
-                              color: _selectedExpirationDate != null
-                                  ? AppColors.textPrimary
-                                  : Colors.grey[600],
-                            ),
-                          ),
-                        ),
+                // Fecha de Expiración
+                InkWell(
+                  onTap: _selectExpirationDate,
+                  child: InputDecorator(
+                    decoration: InputDecoration(
+                      labelText: 'Fecha de Expiración *',
+                      prefixIcon: const Icon(Icons.calendar_today),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      const SizedBox(height: 16),
-
-                      // Imagen del Documento (Opcional)
-                      Text(
-                        'Imagen del Documento (Opcional)',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
+                    ),
+                    child: Text(
+                      _selectedExpirationDate != null
+                          ? DateFormat('dd/MM/yyyy').format(_selectedExpirationDate!)
+                          : 'Selecciona la fecha',
+                      style: TextStyle(
+                        color: _selectedExpirationDate != null
+                            ? AppColors.textPrimary
+                            : Colors.grey[600],
                       ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: _pickImageFromGallery,
-                              icon: const Icon(Icons.photo_library),
-                              label: const Text('Seleccionar de Galería'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.primary,
-                                foregroundColor: Colors.white,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: _pickImage,
-                              icon: const Icon(Icons.camera_alt),
-                              label: const Text('Tomar Foto'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.accent,
-                                foregroundColor: Colors.white,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (_selectedXFile != null || _selectedImage != null || _existingImageUrl != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: Row(
-                            children: [
-                              Icon(Icons.check_circle, color: Colors.green, size: 20),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Imagen seleccionada',
-                                style: TextStyle(color: Colors.green),
-                              ),
-                              const Spacer(),
-                              TextButton(
-                                onPressed: () {
-                                  setState(() {
-                                    _selectedImage = null;
-                                    _selectedXFile = null;
-                                    _existingImageUrl = null;
-                                  });
-                                },
-                                child: const Text('Eliminar'),
-                              ),
-                            ],
-                          ),
-                        ),
-                      const SizedBox(height: 24),
-
-                      // Botón Guardar
-                      SizedBox(
-                        width: double.infinity,
-                        height: 50,
-                        child: ElevatedButton(
-                          onPressed: _isSaving ? null : _handleSave,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.white,
-                          ),
-                          child: _isSaving
-                              ? const CircularProgressIndicator(color: Colors.white)
-                              : const Text(
-                                  'GUARDAR DOCUMENTO',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
-              ),
+                const SizedBox(height: 16),
+
+                // Imagen del Documento (Opcional)
+                Text(
+                  'Imagen del Documento (Opcional)',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _pickImageFromGallery,
+                        icon: const Icon(Icons.photo_library),
+                        label: const Text('Seleccionar de Galería'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _pickImage,
+                        icon: const Icon(Icons.camera_alt),
+                        label: const Text('Tomar Foto'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.accent,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                if (_selectedXFile != null || _selectedImage != null || _existingImageUrl != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Row(
+                      children: [
+                        Icon(Icons.check_circle, color: Colors.green, size: 20),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Imagen seleccionada',
+                          style: TextStyle(color: Colors.green),
+                        ),
+                        const Spacer(),
+                        TextButton(
+                          onPressed: () {
+                            setState(() {
+                              _selectedImage = null;
+                              _selectedXFile = null;
+                              _existingImageUrl = null;
+                            });
+                          },
+                          child: const Text('Eliminar'),
+                        ),
+                      ],
+                    ),
+                  ),
+                const SizedBox(height: 24),
+
+                // Botón Guardar
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: _isSaving
+                        ? null
+                        : () async {
+                            final success = await _handleSave();
+                            if (mounted && success) {
+                              Navigator.of(context).pop(); // Cerrar modal
+                              _resetForm(); // Resetear formulario
+                            }
+                          },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: _isSaving
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text(
+                            'GUARDAR DOCUMENTO',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 

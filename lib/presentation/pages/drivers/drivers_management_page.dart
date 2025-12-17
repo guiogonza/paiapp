@@ -105,9 +105,9 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
     });
   }
 
-  Future<void> _handleCreateDriver() async {
+  Future<bool> _handleCreateDriver() async {
     if (!_formKey.currentState!.validate()) {
-      return;
+      return false;
     }
 
     setState(() {
@@ -122,6 +122,7 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
           : _fullNameController.text.trim(),
     );
 
+    bool success = false;
     result.fold(
       (failure) {
         if (mounted) {
@@ -142,6 +143,7 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
         }
       },
       (profile) {
+        success = true;
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -149,11 +151,6 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
               backgroundColor: Colors.green,
             ),
           );
-          // Limpiar formulario
-          _formKey.currentState!.reset();
-          _emailController.clear();
-          _passwordController.clear();
-          _fullNameController.clear();
           // Recargar lista
           _loadDrivers();
         }
@@ -165,6 +162,7 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
         _isCreating = false;
       });
     }
+    return success;
   }
 
   @override
@@ -256,136 +254,162 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 24),
-
-                  // Formulario de creación
-                  Card(
-                    elevation: 2,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Form(
-                        key: _formKey,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(Icons.person_add, color: AppColors.primary),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Crear Nuevo Conductor',
-                                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 24),
-
-                            // Nombre completo (opcional - NO se guarda en profiles, solo en auth.users metadata)
-                            TextFormField(
-                              controller: _fullNameController,
-                              decoration: InputDecoration(
-                                labelText: 'Nombre Completo (Opcional)',
-                                hintText: 'Este campo es completamente opcional',
-                                prefixIcon: const Icon(Icons.badge),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              // No validación - completamente opcional
-                            ),
-                            const SizedBox(height: 16),
-
-                            // Email
-                            TextFormField(
-                              controller: _emailController,
-                              keyboardType: TextInputType.emailAddress,
-                              decoration: InputDecoration(
-                                labelText: 'Email *',
-                                prefixIcon: const Icon(Icons.email),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              validator: (value) {
-                                if (value == null || value.trim().isEmpty) {
-                                  return 'El email es requerido';
-                                }
-                                if (!value.contains('@') || !value.contains('.')) {
-                                  return 'Ingresa un email válido';
-                                }
-                                return null;
-                              },
-                            ),
-                            const SizedBox(height: 16),
-
-                            // Contraseña
-                            TextFormField(
-                              controller: _passwordController,
-                              obscureText: true,
-                              decoration: InputDecoration(
-                                labelText: 'Contraseña *',
-                                prefixIcon: const Icon(Icons.lock),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                helperText: 'Mínimo 6 caracteres',
-                              ),
-                              validator: (value) {
-                                if (value == null || value.isEmpty) {
-                                  return 'La contraseña es requerida';
-                                }
-                                if (value.length < 6) {
-                                  return 'La contraseña debe tener al menos 6 caracteres';
-                                }
-                                return null;
-                              },
-                            ),
-                            const SizedBox(height: 24),
-
-                            // Botón crear
-                            SizedBox(
-                              width: double.infinity,
-                              height: 50,
-                              child: ElevatedButton(
-                                onPressed: (_isCreating || _rateLimitSeconds > 0) 
-                                    ? null 
-                                    : _handleCreateDriver,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.primary,
-                                  foregroundColor: Colors.white,
-                                ),
-                                child: _isCreating
-                                    ? const CircularProgressIndicator(color: Colors.white)
-                                    : _rateLimitSeconds > 0
-                                        ? Text(
-                                            'ESPERAR $_rateLimitSeconds SEGUNDOS',
-                                            style: const TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          )
-                                        : const Text(
-                                            'CREAR CONDUCTOR',
-                                            style: TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
                 ],
               ),
             ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          // Mostrar diálogo de creación
+          showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            builder: (context) => _buildDriverFormSheet(),
+          );
+        },
+        icon: const Icon(Icons.add),
+        label: const Text('Crear Conductor'),
+      ),
+    );
+  }
+
+  Widget _buildDriverFormSheet() {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.7,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      builder: (context, scrollController) {
+        return SingleChildScrollView(
+          controller: scrollController,
+          padding: const EdgeInsets.all(16.0),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.person_add, color: AppColors.primary),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Crear Nuevo Conductor',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+
+                // Nombre completo (opcional)
+                TextFormField(
+                  controller: _fullNameController,
+                  decoration: InputDecoration(
+                    labelText: 'Nombre Completo (Opcional)',
+                    hintText: 'Este campo es completamente opcional',
+                    prefixIcon: const Icon(Icons.badge),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Email
+                TextFormField(
+                  controller: _emailController,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: InputDecoration(
+                    labelText: 'Email *',
+                    prefixIcon: const Icon(Icons.email),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'El email es requerido';
+                    }
+                    if (!value.contains('@') || !value.contains('.')) {
+                      return 'Ingresa un email válido';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // Contraseña
+                TextFormField(
+                  controller: _passwordController,
+                  obscureText: true,
+                  decoration: InputDecoration(
+                    labelText: 'Contraseña *',
+                    prefixIcon: const Icon(Icons.lock),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    helperText: 'Mínimo 6 caracteres',
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'La contraseña es requerida';
+                    }
+                    if (value.length < 6) {
+                      return 'La contraseña debe tener al menos 6 caracteres';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 24),
+
+                // Botón crear
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: (_isCreating || _rateLimitSeconds > 0)
+                        ? null
+                        : () async {
+                            final success = await _handleCreateDriver();
+                            if (mounted && success) {
+                              Navigator.of(context).pop(); // Cerrar modal
+                              _emailController.clear();
+                              _passwordController.clear();
+                              _fullNameController.clear();
+                            }
+                          },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: _isCreating
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : _rateLimitSeconds > 0
+                            ? Text(
+                                'ESPERAR $_rateLimitSeconds SEGUNDOS',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              )
+                            : const Text(
+                                'CREAR CONDUCTOR',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

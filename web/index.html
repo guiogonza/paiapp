@@ -19,10 +19,14 @@
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="A new Flutter project.">
+  
+  <!-- Viewport para móviles - CRÍTICO para iOS -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="pai_app">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
@@ -33,6 +37,49 @@
   <link rel="manifest" href="manifest.json">
 </head>
 <body>
+  <script>
+    // Manejo de errores para debugging en móviles
+    window.addEventListener('error', function(e) {
+      console.error('❌ Window Error:', e.error, e.message, e.filename, e.lineno);
+      console.error('Error stack:', e.error?.stack);
+      // NO usar alert() - puede causar problemas en iOS
+    }, true);
+    
+    window.addEventListener('unhandledrejection', function(e) {
+      console.error('❌ Unhandled promise rejection:', e.reason);
+      console.error('Rejection stack:', e.reason?.stack);
+      // NO usar alert() - puede causar problemas en iOS
+    });
+    
+    // Log cuando la página se carga
+    window.addEventListener('load', function() {
+      console.log('✅ Page loaded successfully');
+      
+      // Verificar si Flutter está listo después de un delay
+      setTimeout(function() {
+        console.log('🔍 Checking for Flutter object...');
+        console.log('window.flutter:', typeof window.flutter);
+        console.log('window.flutter_bootstrap:', typeof window.flutter_bootstrap);
+        console.log('document readyState:', document.readyState);
+        
+        if (typeof window.flutter !== 'undefined' || typeof window.flutter_bootstrap !== 'undefined') {
+          console.log('✅ Flutter object found');
+        } else {
+          console.warn('⚠️ Flutter object not found after 5 seconds');
+        }
+      }, 5000);
+    });
+    
+    // Log cuando Flutter se inicializa
+    document.addEventListener('flutter-first-frame', function() {
+      console.log('✅ Flutter first frame rendered');
+    });
+    
+    // Capturar errores de Flutter específicamente
+    window.addEventListener('flutter-error', function(e) {
+      console.error('❌ Flutter Error:', e.detail);
+    });
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
