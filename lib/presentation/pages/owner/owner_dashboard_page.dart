@@ -856,48 +856,71 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
                         ],
                       ),
                       const SizedBox(height: 8),
-                      // 5 Chips de Alerta (compactos)
+                      // 5 Chips de Alerta (2 filas para evitar scroll)
                       Expanded(
-                        child: SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: [
-                              _buildStatusChip(
-                                color: Colors.redAccent,
-                                label: 'Docs vencidos',
-                                value: '$_expiredDocumentsCount',
-                                compact: true,
-                              ),
-                              const SizedBox(width: 6),
-                              _buildStatusChip(
-                                color: Colors.orangeAccent,
-                                label: 'Mantenimiento',
-                                value: '$_activeAlertsCount',
-                                compact: true,
-                              ),
-                              const SizedBox(width: 6),
-                              _buildStatusChip(
-                                color: Colors.green,
-                                label: 'Flota',
-                                value: '${_vehicleLocations.length}',
-                                compact: true,
-                              ),
-                              const SizedBox(width: 6),
-                              _buildStatusChip(
-                                color: Colors.blue,
-                                label: 'Viajes',
-                                value: '$_activeTripsCount',
-                                compact: true,
-                              ),
-                              const SizedBox(width: 6),
-                              _buildStatusChip(
-                                color: Colors.orange,
-                                label: 'Remisiones',
-                                value: '$_pendingRemittancesCount',
-                                compact: true,
-                              ),
-                            ],
-                          ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Primera fila: Docs, Mantenimiento, Flota
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                              children: [
+                                Expanded(
+                                  child: _buildStatusChip(
+                                    color: Colors.redAccent,
+                                    label: 'Docs vencidos',
+                                    value: '$_expiredDocumentsCount',
+                                    compact: true,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: _buildStatusChip(
+                                    color: Colors.orangeAccent,
+                                    label: 'Mantenimiento',
+                                    value: '$_activeAlertsCount',
+                                    compact: true,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: _buildStatusChip(
+                                    color: Colors.green,
+                                    label: 'Flota',
+                                    value: '${_vehicleLocations.length}',
+                                    compact: true,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            // Segunda fila: Viajes, Remisiones
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                              children: [
+                                Expanded(
+                                  child: _buildStatusChip(
+                                    color: Colors.blue,
+                                    label: 'Viajes',
+                                    value: '$_activeTripsCount',
+                                    compact: true,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: _buildStatusChip(
+                                    color: Colors.orange,
+                                    label: 'Remisiones',
+                                    value: '$_pendingRemittancesCount',
+                                    compact: true,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                // Espacio vacío para mantener el layout balanceado
+                                const Expanded(child: SizedBox()),
+                              ],
+                            ),
+                          ],
                         ),
                       ),
                     ],
