@@ -17,9 +17,16 @@ class AuthRepositoryImpl implements AuthRepository {
       
       try {
         print('🔐 Intentando login en Supabase...');
+        print('   Email: $email');
+        
         final supabaseResponse = await _supabase.auth.signInWithPassword(
           email: email,
           password: password,
+        ).timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            throw Exception('Timeout: No se pudo conectar con Supabase. Verifica tu conexión a internet.');
+          },
         );
         
         if (supabaseResponse.user != null) {

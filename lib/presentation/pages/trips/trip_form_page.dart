@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:pai_app/core/theme/app_colors.dart';
 import 'package:pai_app/core/utils/validators.dart';
+import 'package:pai_app/core/services/municipalities_service.dart';
 import 'package:pai_app/data/repositories/trip_repository_impl.dart';
 import 'package:pai_app/data/repositories/vehicle_repository_impl.dart';
 import 'package:pai_app/data/repositories/profile_repository_impl.dart';
@@ -41,6 +42,7 @@ class _TripFormPageState extends State<TripFormPage> {
   bool _isFormValid = false;
   bool _isCurrentUserDriver = false;
   List<ProfileEntity> _drivers = [];
+  final _municipalitiesService = MunicipalitiesService.instance;
 
   @override
   void initState() {
@@ -568,37 +570,211 @@ class _TripFormPageState extends State<TripFormPage> {
               ),
               const SizedBox(height: 20),
 
-              // Origen - Obligatorio
-              TextFormField(
-                controller: _originController,
-                decoration: InputDecoration(
-                  labelText: 'Origen *',
-                  hintText: 'Ciudad o lugar de origen',
-                  prefixIcon: const Icon(Icons.place),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                validator: (value) =>
-                    Validators.validateRequired(value, 'Origen'),
-                textInputAction: TextInputAction.next,
+              // Origen - Obligatorio con Autocomplete
+              Autocomplete<String>(
+                optionsBuilder: (TextEditingValue textEditingValue) async {
+                  final query = textEditingValue.text.trim();
+                  if (query.isEmpty || query.length < 2) {
+                    // No mostrar sugerencias hasta que haya al menos 2 caracteres
+                    return const Iterable<String>.empty();
+                  }
+                  try {
+                    final suggestions = await _municipalitiesService
+                        .searchMunicipalities(query);
+                    return suggestions;
+                  } catch (e) {
+                    print('❌ Error al buscar municipios: $e');
+                    return const Iterable<String>.empty();
+                  }
+                },
+                onSelected: (String selection) {
+                  _originController.text = selection;
+                  _validateForm();
+                },
+                fieldViewBuilder: (
+                  BuildContext context,
+                  TextEditingController textEditingController,
+                  FocusNode focusNode,
+                  VoidCallback onFieldSubmitted,
+                ) {
+                  // Sincronizar el controller externo con el interno del Autocomplete
+                  if (textEditingController.text != _originController.text) {
+                    textEditingController.text = _originController.text;
+                  }
+                  _originController.addListener(() {
+                    if (textEditingController.text != _originController.text) {
+                      textEditingController.text = _originController.text;
+                    }
+                  });
+                  
+                  return TextFormField(
+                    controller: textEditingController,
+                    focusNode: focusNode,
+                    decoration: InputDecoration(
+                      labelText: 'Origen *',
+                      hintText: 'Escribe el municipio de origen',
+                      prefixIcon: const Icon(Icons.place),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      helperText: 'Se mostrarán sugerencias mientras escribes',
+                    ),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'El origen es requerido';
+                      }
+                      // Validar que el municipio existe (opcional, puede ser más flexible)
+                      return null;
+                    },
+                    textInputAction: TextInputAction.next,
+                    onChanged: (value) {
+                      _originController.text = value;
+                      _validateForm();
+                    },
+                  );
+                },
+                optionsViewBuilder: (context, onSelected, options) {
+                  return Align(
+                    alignment: Alignment.topLeft,
+                    child: Material(
+                      elevation: 4.0,
+                      borderRadius: BorderRadius.circular(12),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxHeight: 200),
+                        child: options.isEmpty
+                            ? Padding(
+                                padding: const EdgeInsets.all(16.0),
+                                child: Text(
+                                  'No se encontraron municipios con "${_originController.text}"',
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              )
+                            : ListView.builder(
+                                shrinkWrap: true,
+                                padding: EdgeInsets.zero,
+                                itemCount: options.length,
+                                itemBuilder: (context, index) {
+                                  final option = options.elementAt(index);
+                                  return ListTile(
+                                    leading: const Icon(Icons.location_city, size: 20),
+                                    title: Text(option),
+                                    onTap: () {
+                                      onSelected(option);
+                                    },
+                                  );
+                                },
+                              ),
+                      ),
+                    ),
+                  );
+                },
               ),
               const SizedBox(height: 20),
 
-              // Destino - Obligatorio
-              TextFormField(
-                controller: _destinationController,
-                decoration: InputDecoration(
-                  labelText: 'Destino *',
-                  hintText: 'Ciudad o lugar de destino',
-                  prefixIcon: const Icon(Icons.location_on),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                validator: (value) =>
-                    Validators.validateRequired(value, 'Destino'),
-                textInputAction: TextInputAction.next,
+              // Destino - Obligatorio con Autocomplete
+              Autocomplete<String>(
+                optionsBuilder: (TextEditingValue textEditingValue) async {
+                  final query = textEditingValue.text.trim();
+                  if (query.isEmpty || query.length < 2) {
+                    // No mostrar sugerencias hasta que haya al menos 2 caracteres
+                    return const Iterable<String>.empty();
+                  }
+                  try {
+                    final suggestions = await _municipalitiesService
+                        .searchMunicipalities(query);
+                    return suggestions;
+                  } catch (e) {
+                    print('❌ Error al buscar municipios: $e');
+                    return const Iterable<String>.empty();
+                  }
+                },
+                onSelected: (String selection) {
+                  _destinationController.text = selection;
+                  _validateForm();
+                },
+                fieldViewBuilder: (
+                  BuildContext context,
+                  TextEditingController textEditingController,
+                  FocusNode focusNode,
+                  VoidCallback onFieldSubmitted,
+                ) {
+                  // Sincronizar el controller externo con el interno del Autocomplete
+                  if (textEditingController.text != _destinationController.text) {
+                    textEditingController.text = _destinationController.text;
+                  }
+                  _destinationController.addListener(() {
+                    if (textEditingController.text != _destinationController.text) {
+                      textEditingController.text = _destinationController.text;
+                    }
+                  });
+                  
+                  return TextFormField(
+                    controller: textEditingController,
+                    focusNode: focusNode,
+                    decoration: InputDecoration(
+                      labelText: 'Destino *',
+                      hintText: 'Escribe el municipio de destino',
+                      prefixIcon: const Icon(Icons.location_on),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      helperText: 'Se mostrarán sugerencias mientras escribes',
+                    ),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'El destino es requerido';
+                      }
+                      // Validar que el municipio existe (opcional, puede ser más flexible)
+                      return null;
+                    },
+                    textInputAction: TextInputAction.next,
+                    onChanged: (value) {
+                      _destinationController.text = value;
+                      _validateForm();
+                    },
+                  );
+                },
+                optionsViewBuilder: (context, onSelected, options) {
+                  return Align(
+                    alignment: Alignment.topLeft,
+                    child: Material(
+                      elevation: 4.0,
+                      borderRadius: BorderRadius.circular(12),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxHeight: 200),
+                        child: options.isEmpty
+                            ? Padding(
+                                padding: const EdgeInsets.all(16.0),
+                                child: Text(
+                                  'No se encontraron municipios con "${_destinationController.text}"',
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              )
+                            : ListView.builder(
+                                shrinkWrap: true,
+                                padding: EdgeInsets.zero,
+                                itemCount: options.length,
+                                itemBuilder: (context, index) {
+                                  final option = options.elementAt(index);
+                                  return ListTile(
+                                    leading: const Icon(Icons.location_city, size: 20),
+                                    title: Text(option),
+                                    onTap: () {
+                                      onSelected(option);
+                                    },
+                                  );
+                                },
+                              ),
+                      ),
+                    ),
+                  );
+                },
               ),
               const SizedBox(height: 20),
 

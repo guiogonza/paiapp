@@ -70,11 +70,27 @@ class _LoginPageState extends State<LoginPage> {
       }
     } catch (e) {
       if (mounted) {
+        String errorMessage = e.toString().replaceFirst('Exception: ', '');
+        
+        // Mensajes más amigables para errores comunes
+        if (errorMessage.contains('ERR_NAME_NOT_RESOLVED') || 
+            errorMessage.contains('Failed to load resource') ||
+            errorMessage.contains('network') ||
+            errorMessage.contains('connection')) {
+          errorMessage = 'Error de conexión. Verifica tu internet y que puedas acceder a Supabase.';
+        } else if (errorMessage.contains('Invalid login credentials') ||
+                   errorMessage.contains('Credenciales inválidas')) {
+          errorMessage = 'Email o contraseña incorrectos. Verifica tus credenciales.';
+        } else if (errorMessage.contains('User not found')) {
+          errorMessage = 'Usuario no encontrado. Verifica tu email o regístrate primero.';
+        }
+        
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(e.toString().replaceFirst('Exception: ', '')),
+            content: Text(errorMessage),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 5),
           ),
         );
       }
