@@ -12,6 +12,7 @@ class VehicleModel extends VehicleEntity {
     super.gpsDeviceId,
     super.ownerId,
     super.currentMileage,
+    super.vehicleType,
   });
 
   /// Crea un VehicleModel desde un Map (JSON de Supabase)
@@ -28,6 +29,7 @@ class VehicleModel extends VehicleEntity {
       currentMileage: json['current_mileage'] != null 
           ? (json['current_mileage'] as num).toDouble() 
           : null, // Mapeo: current_mileage → currentMileage
+      vehicleType: json['vehicle_type'] as String?, // Mapeo: vehicle_type → vehicleType
     );
   }
 
@@ -43,6 +45,7 @@ class VehicleModel extends VehicleEntity {
       if (gpsDeviceId != null) 'gps_device_id': gpsDeviceId, // Mapeo: gpsDeviceId → gps_device_id
       if (ownerId != null) 'owner_id': ownerId, // Mapeo: ownerId → owner_id
       if (currentMileage != null) 'current_mileage': currentMileage, // Mapeo: currentMileage → current_mileage
+      if (vehicleType != null) 'vehicle_type': vehicleType, // Mapeo: vehicleType → vehicle_type
     };
   }
 
@@ -58,6 +61,7 @@ class VehicleModel extends VehicleEntity {
       gpsDeviceId: entity.gpsDeviceId,
       ownerId: entity.ownerId,
       currentMileage: entity.currentMileage,
+      vehicleType: entity.vehicleType,
     );
   }
 
@@ -73,6 +77,7 @@ class VehicleModel extends VehicleEntity {
       gpsDeviceId: gpsDeviceId, // CRÍTICO: Incluir gpsDeviceId
       ownerId: ownerId, // CRÍTICO: Incluir ownerId
       currentMileage: currentMileage, // CRÍTICO: Incluir currentMileage
+      vehicleType: vehicleType, // CRÍTICO: Incluir vehicleType
     );
   }
 }

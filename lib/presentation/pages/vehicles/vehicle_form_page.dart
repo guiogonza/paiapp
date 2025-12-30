@@ -23,8 +23,18 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
   final _conductorController = TextEditingController();
   final _repository = VehicleRepositoryImpl();
 
+  String? _selectedVehicleType; // Tipo de vehículo
+
   bool _isLoading = false;
   bool _isFormValid = false;
+
+  // Opciones de tipo de vehículo
+  static const Map<String, String> _vehicleTypeOptions = {
+    'turbo_sencillo': 'Turbo / Sencillo',
+    'doble_troque': 'Doble Troque',
+    'mini_mula_18': 'Mini Mula (18)',
+    'mula_22': 'Mula (22)',
+  };
 
   @override
   void initState() {
@@ -35,6 +45,7 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
       _modeloController.text = widget.vehicle!.modelo;
       _anoController.text = widget.vehicle!.ano.toString();
       _conductorController.text = widget.vehicle!.conductor ?? '';
+      _selectedVehicleType = widget.vehicle!.vehicleType;
     }
 
     // Validar formulario inicialmente
@@ -89,6 +100,7 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
         conductor: _conductorController.text.trim().isEmpty
             ? null
             : _conductorController.text.trim(),
+        vehicleType: _selectedVehicleType,
       );
 
       final result = widget.vehicle == null
@@ -230,6 +242,38 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
                 ],
                 validator: Validators.validateAno,
                 textInputAction: TextInputAction.next,
+              ),
+              const SizedBox(height: 20),
+
+              // Tipo de Vehículo (Obligatorio)
+              DropdownButtonFormField<String>(
+                value: _selectedVehicleType,
+                decoration: InputDecoration(
+                  labelText: 'Tipo de Vehículo *',
+                  hintText: 'Selecciona el tipo',
+                  prefixIcon: const Icon(Icons.category),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                items: _vehicleTypeOptions.entries.map((entry) {
+                  return DropdownMenuItem<String>(
+                    value: entry.key,
+                    child: Text(entry.value),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  setState(() {
+                    _selectedVehicleType = value;
+                  });
+                  _validateForm();
+                },
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'El tipo de vehículo es requerido';
+                  }
+                  return null;
+                },
               ),
               const SizedBox(height: 20),
 

@@ -24,6 +24,8 @@ import 'package:pai_app/data/repositories/expense_repository_impl.dart';
 import 'package:pai_app/data/repositories/remittance_repository_impl.dart';
 import 'package:pai_app/presentation/pages/fleet_monitoring/fleet_monitoring_page.dart';
 import 'package:pai_app/data/repositories/document_repository_impl.dart';
+import 'package:pai_app/data/repositories/profile_repository_impl.dart';
+import 'package:pai_app/presentation/pages/super_admin/super_admin_dashboard_page.dart';
 
 class OwnerDashboardPage extends StatefulWidget {
   const OwnerDashboardPage({super.key});
@@ -35,6 +37,7 @@ class OwnerDashboardPage extends StatefulWidget {
 class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
   final _locationService = VehicleLocationService();
   final _maintenanceRepository = MaintenanceRepositoryImpl();
+  final _profileRepository = ProfileRepositoryImpl();
   List<VehicleLocationEntity> _vehicleLocations = [];
   int _activeAlertsCount = 0; // Contador de alertas activas
   double _currentMonthRevenue = 0.0;
@@ -43,6 +46,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
   int _activeTripsCount = 0; // Viajes activos (en ruta)
   int _pendingRemittancesCount = 0; // Remisiones pendientes de cobro
   int _expiredDocumentsCount = 0; // Documentos vencidos
+  String? _currentUserRole; // Rol del usuario actual
   
   // Controllers para mapas
   gmaps.GoogleMapController? _mapController;
@@ -60,11 +64,34 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
     if (kIsWeb) {
       _flutterMapController = MapController();
     }
+    _loadUserRole(); // Cargar rol del usuario
     _loadVehicleLocations();
     _checkActiveAlerts(); // Verificar alertas al iniciar
     _loadFinancialKpi(); // Cargar KPI financiero
     _loadOperationalKpis(); // Cargar KPIs operativos
     _loadDocumentAlerts(); // Cargar alertas de documentos
+  }
+
+  /// Carga el rol del usuario actual
+  Future<void> _loadUserRole() async {
+    final profileResult = await _profileRepository.getCurrentUserProfile();
+    profileResult.fold(
+      (failure) {
+        debugPrint('❌ Error al cargar perfil: ${failure.message}');
+        debugPrint('⚠️ No se puede verificar rol de super_admin');
+      },
+      (profile) {
+        debugPrint('🔐 Rol del usuario actual: ${profile.role}');
+        debugPrint('🔐 Email del usuario: ${profile.email ?? 'N/A'}');
+        debugPrint('🔐 Es super_admin? ${profile.role == 'super_admin'}');
+        if (mounted) {
+          setState(() {
+            _currentUserRole = profile.role;
+          });
+          debugPrint('✅ Estado actualizado. _currentUserRole = $_currentUserRole');
+        }
+      },
+    );
   }
 
   /// Carga los KPIs operativos (viajes activos y remisiones pendientes)
@@ -635,6 +662,31 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
+                            // Botón Super Admin (solo visible para super_admin)
+                            // DEBUG: Mostrar siempre para verificar, luego comentar
+                            Builder(
+                              builder: (context) {
+                                // Verificar rol en tiempo real
+                                final isSuperAdmin = _currentUserRole == 'super_admin';
+                                debugPrint('🔐 Verificando rol para botón Super Admin: $_currentUserRole, isSuperAdmin: $isSuperAdmin');
+                                
+                                if (isSuperAdmin) {
+                                  return IconButton(
+                                    icon: const Icon(Icons.security, color: Colors.red, size: 20),
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => const SuperAdminDashboardPage(),
+                                        ),
+                                      );
+                                    },
+                                    tooltip: 'Métricas MVP (Confidencial)',
+                                  );
+                                }
+                                return const SizedBox.shrink();
+                              },
+                            ),
                             if (_activeAlertsCount > 0)
                               Stack(
                                 children: [

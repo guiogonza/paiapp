@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:pai_app/core/theme/app_colors.dart';
+import 'package:pai_app/core/services/logger_service.dart';
 import 'package:pai_app/data/repositories/remittance_repository_impl.dart';
 import 'package:pai_app/data/repositories/expense_repository_impl.dart';
 import 'package:pai_app/domain/entities/remittance_with_route_entity.dart';
@@ -265,7 +266,12 @@ class _RemittanceSigningPageState extends State<RemittanceSigningPage> {
             _isLoading = false;
           });
         },
-        (_) {
+        (_) async {
+          // Registrar creación de memorando/remisión
+          await LoggerService.logAction(
+            'create_memo',
+            details: 'Remittance ID: ${updatedRemittance.id}, Trip ID: ${updatedRemittance.tripId}, Status: pendiente_cobrar',
+          );
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(

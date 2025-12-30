@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:pai_app/core/theme/app_colors.dart';
 import 'package:pai_app/core/utils/validators.dart';
+import 'package:pai_app/core/services/logger_service.dart';
 import 'package:pai_app/core/services/municipalities_service.dart';
 import 'package:pai_app/data/repositories/trip_repository_impl.dart';
 import 'package:pai_app/data/repositories/vehicle_repository_impl.dart';
@@ -385,7 +386,14 @@ class _TripFormPageState extends State<TripFormPage> {
             );
           }
         },
-        (savedTrip) {
+        (savedTrip) async {
+          // Registrar creación/actualización de viaje
+          if (widget.trip == null) {
+            await LoggerService.logAction(
+              'create_trip',
+              details: 'Trip ID: ${savedTrip.id}, Vehicle: ${savedTrip.vehicleId}, Origin: ${savedTrip.origin} → ${savedTrip.destination}',
+            );
+          }
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
