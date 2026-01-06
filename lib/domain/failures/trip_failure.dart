@@ -28,3 +28,4 @@ class UnknownFailure extends TripFailure {
       : super(message ?? 'Error desconocido. Intenta más tarde.');
 }
 
+

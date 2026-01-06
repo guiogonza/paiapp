@@ -20,3 +20,4 @@ class UnknownFailure extends VehicleHistoryFailure {
   const UnknownFailure(String message) : super(message);
 }
 
+

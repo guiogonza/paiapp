@@ -23,3 +23,4 @@ class UnknownFailure extends ProfileFailure {
       : super(message ?? 'Error desconocido.');
 }
 
+

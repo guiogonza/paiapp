@@ -6,7 +6,7 @@ import 'package:flutter/foundation.dart';
 
 /// Servicio que obtiene el historial de ubicaciones de vehículos desde la API de GPS
 class VehicleHistoryService {
-  static const String _historyUrl = 'http://178.63.27.106/api/get_history';
+  static const String _historyUrl = 'https://plataforma.sistemagps.online/api/get_history';
   final GPSAuthService _authService = GPSAuthService();
 
   /// Obtiene el historial de un vehículo específico

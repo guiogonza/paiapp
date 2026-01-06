@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:pai_app/core/theme/app_colors.dart';
-import 'package:pai_app/core/services/logger_service.dart';
 import 'package:pai_app/data/repositories/auth_repository_impl.dart';
 import 'package:pai_app/data/repositories/profile_repository_impl.dart';
 import 'package:pai_app/presentation/pages/owner/owner_dashboard_page.dart';
@@ -65,9 +64,6 @@ class _LoginPageState extends State<LoginPage> {
         _emailController.text.trim(),
         _passwordController.text,
       );
-
-      // Registrar login exitoso
-      await LoggerService.logAction('login', details: 'Email: ${_emailController.text.trim()}');
 
       if (mounted) {
         _navigateToDashboard();

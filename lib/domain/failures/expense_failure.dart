@@ -33,3 +33,4 @@ class UnknownFailure extends ExpenseFailure {
       : super(message ?? 'Error desconocido. Intenta más tarde.');
 }
 
+

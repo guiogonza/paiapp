@@ -191,3 +191,4 @@ class TripRepositoryImpl implements TripRepository {
   }
 }
 
+

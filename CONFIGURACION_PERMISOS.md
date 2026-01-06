@@ -127,3 +127,4 @@ Después de configurar la API Key, verifica que:
 - **Producción:** Se recomienda usar API Keys separadas y restringirlas
 - **Testing:** Asegúrate de probar en dispositivos reales para verificar los permisos
 
+

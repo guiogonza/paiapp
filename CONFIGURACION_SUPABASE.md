@@ -62,3 +62,4 @@ El código ahora crea automáticamente el usuario en Supabase cuando se valida e
 
 - **Usuario de Pruebas:** El usuario `luisr@rastrear.com.co` con contraseña `2023` se creará automáticamente la primera vez que hagas login exitoso contra el API de GPS.
 
+

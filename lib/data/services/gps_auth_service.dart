@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 /// Servicio de autenticación para la API de GPS
 class GPSAuthService {
-  static const String _loginUrl = 'http://178.63.27.106/api/login';
+  static const String _loginUrl = 'https://plataforma.sistemagps.online/api/login';
   static const String _apiKeyStorageKey = 'gps_api_key';
 
   /// Realiza login y guarda el API key

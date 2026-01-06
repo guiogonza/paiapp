@@ -12,3 +12,4 @@ abstract class VehicleRepository {
   Future<Either<VehicleFailure, void>> deleteVehicle(String id);
 }
 
+

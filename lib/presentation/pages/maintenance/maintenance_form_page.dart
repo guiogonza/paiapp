@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:pai_app/core/theme/app_colors.dart';
 import 'package:pai_app/core/constants/maintenance_rules.dart';
-import 'package:pai_app/core/services/logger_service.dart';
 import 'package:pai_app/data/repositories/maintenance_repository_impl.dart';
 import 'package:pai_app/data/repositories/vehicle_repository_impl.dart';
 import 'package:pai_app/domain/entities/maintenance_entity.dart';
@@ -389,12 +388,7 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
           });
         }
       },
-      (createdMaintenance) async {
-        // Registrar mantenimiento
-        await LoggerService.logAction(
-          'add_maintenance',
-          details: 'Maintenance ID: ${createdMaintenance.id}, Vehicle ID: ${createdMaintenance.vehicleId}, Type: ${createdMaintenance.serviceType}, Cost: ${createdMaintenance.cost}',
-        );
+      (createdMaintenance) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -610,59 +604,122 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
 
               // Selector de Posición solo para "Llantas"
               if (_selectedType == 'Llantas') ...[
-                const Text(
-                  'Posición de la Llanta *',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                if (_selectedVehicle?.vehicleType != null && _selectedVehicle!.vehicleType!.isNotEmpty)
-                  TireSelector(
-                    vehicleType: _selectedVehicle!.vehicleType!,
-                    selectedTirePosition: _selectedTirePosition,
-                    onTireSelected: (position) {
-                      setState(() {
-                        _selectedTirePosition = position;
-                      });
-                    },
-                  )
-                else
+                // Mostrar dibujo del camión con TireSelector si hay vehículo seleccionado y tiene tipo
+                if (_selectedVehicle != null && _selectedVehicle!.vehicleType != null) ...[
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.orange.withOpacity(0.1),
+                      color: AppColors.lightGray,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                      border: Border.all(color: AppColors.primary.withOpacity(0.3)),
                     ),
-                    child: Row(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.warning_amber_rounded, color: Colors.orange),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            'Este vehículo no tiene un tipo definido. Por favor, edita el vehículo y selecciona un tipo (Turbo/Sencillo, Doble Troque, etc.) para poder seleccionar la posición de la llanta.',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.orange[900],
-                            ),
+                        Text(
+                          'Selecciona la posición de la llanta:',
+                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                        ),
+                        const SizedBox(height: 16),
+                        Center(
+                          child: TireSelector(
+                            vehicleType: _selectedVehicle!.vehicleType!,
+                            selectedTirePosition: _selectedTirePosition,
+                            onTireSelected: (position) {
+                              setState(() {
+                                _selectedTirePosition = position;
+                              });
+                            },
                           ),
                         ),
                       ],
                     ),
                   ),
-                if (_selectedVehicle?.vehicleType == null || _selectedVehicle!.vehicleType!.isEmpty)
-                  const SizedBox(height: 8),
-                // Validación oculta para el formulario
-                if (_selectedType == 'Llantas' && _selectedTirePosition == null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Text(
-                      'Debes seleccionar la posición de la llanta',
-                      style: TextStyle(
-                        color: Colors.red[700],
-                        fontSize: 12,
-                      ),
+                  const SizedBox(height: 16),
+                ] else if (_selectedVehicle == null) ...[
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.orange),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.info_outline, color: Colors.orange),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Selecciona un vehículo para ver el dibujo del camión',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: Colors.orange[900],
+                                ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
+                  const SizedBox(height: 16),
+                  // Fallback: Dropdown simple si no hay tipo de vehículo
+                  DropdownButtonFormField<int>(
+                    value: _selectedTirePosition,
+                    decoration: InputDecoration(
+                      labelText: 'Posición de Llanta *',
+                      prefixIcon: const Icon(Icons.location_on),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    items: List.generate(22, (index) => index + 1)
+                        .map((position) => DropdownMenuItem(
+                              value: position,
+                              child: Text('Posición $position'),
+                            ))
+                        .toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedTirePosition = value;
+                      });
+                    },
+                    validator: (value) {
+                      if (_selectedType == 'Llantas' && value == null) {
+                        return 'Selecciona la posición de la llanta';
+                      }
+                      return null;
+                    },
+                  ),
+                ] else ...[
+                  // Fallback: Dropdown simple si el vehículo no tiene tipo
+                  DropdownButtonFormField<int>(
+                    value: _selectedTirePosition,
+                    decoration: InputDecoration(
+                      labelText: 'Posición de Llanta *',
+                      prefixIcon: const Icon(Icons.location_on),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    items: List.generate(22, (index) => index + 1)
+                        .map((position) => DropdownMenuItem(
+                              value: position,
+                              child: Text('Posición $position'),
+                            ))
+                        .toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedTirePosition = value;
+                      });
+                    },
+                    validator: (value) {
+                      if (_selectedType == 'Llantas' && value == null) {
+                        return 'Selecciona la posición de la llanta';
+                      }
+                      return null;
+                    },
+                  ),
+                ],
                 const SizedBox(height: 16),
               ],
               

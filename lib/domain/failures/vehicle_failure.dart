@@ -28,3 +28,4 @@ class UnknownFailure extends VehicleFailure {
       : super(message ?? 'Error desconocido. Intenta más tarde.');
 }
 
+

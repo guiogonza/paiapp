@@ -7,7 +7,6 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:pai_app/core/theme/app_colors.dart';
-import 'package:pai_app/core/services/logger_service.dart';
 import 'package:pai_app/data/repositories/expense_repository_impl.dart';
 import 'package:pai_app/data/repositories/trip_repository_impl.dart';
 import 'package:pai_app/domain/entities/expense_entity.dart';
@@ -427,13 +426,6 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
           }
         },
         (savedExpense) async {
-          // Registrar creación/actualización de gasto
-          if (widget.expense == null) {
-            await LoggerService.logAction(
-              'add_expense',
-              details: 'Expense ID: ${savedExpense.id}, Trip ID: ${savedExpense.tripId}, Type: ${savedExpense.type}, Amount: ${savedExpense.amount}',
-            );
-          }
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(

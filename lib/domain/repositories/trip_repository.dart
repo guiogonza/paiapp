@@ -10,3 +10,4 @@ abstract class TripRepository {
   Future<Either<TripFailure, void>> deleteTrip(String id);
 }
 
+

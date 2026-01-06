@@ -39,6 +39,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
   final _maintenanceRepository = MaintenanceRepositoryImpl();
   final _profileRepository = ProfileRepositoryImpl();
   List<VehicleLocationEntity> _vehicleLocations = [];
+  String? _userRole; // Role del usuario actual
   int _activeAlertsCount = 0; // Contador de alertas activas
   double _currentMonthRevenue = 0.0;
   double _currentMonthExpenses = 0.0; // Gastos de viajes
@@ -46,7 +47,6 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
   int _activeTripsCount = 0; // Viajes activos (en ruta)
   int _pendingRemittancesCount = 0; // Remisiones pendientes de cobro
   int _expiredDocumentsCount = 0; // Documentos vencidos
-  String? _currentUserRole; // Rol del usuario actual
   
   // Controllers para mapas
   gmaps.GoogleMapController? _mapController;
@@ -64,7 +64,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
     if (kIsWeb) {
       _flutterMapController = MapController();
     }
-    _loadUserRole(); // Cargar rol del usuario
+    _loadUserRole(); // Cargar role del usuario
     _loadVehicleLocations();
     _checkActiveAlerts(); // Verificar alertas al iniciar
     _loadFinancialKpi(); // Cargar KPI financiero
@@ -72,23 +72,16 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
     _loadDocumentAlerts(); // Cargar alertas de documentos
   }
 
-  /// Carga el rol del usuario actual
+  /// Carga el role del usuario actual
   Future<void> _loadUserRole() async {
-    final profileResult = await _profileRepository.getCurrentUserProfile();
-    profileResult.fold(
-      (failure) {
-        debugPrint('❌ Error al cargar perfil: ${failure.message}');
-        debugPrint('⚠️ No se puede verificar rol de super_admin');
-      },
+    final result = await _profileRepository.getCurrentUserProfile();
+    result.fold(
+      (failure) => debugPrint('Error al cargar perfil: ${failure.message}'),
       (profile) {
-        debugPrint('🔐 Rol del usuario actual: ${profile.role}');
-        debugPrint('🔐 Email del usuario: ${profile.email ?? 'N/A'}');
-        debugPrint('🔐 Es super_admin? ${profile.role == 'super_admin'}');
         if (mounted) {
           setState(() {
-            _currentUserRole = profile.role;
+            _userRole = profile.role;
           });
-          debugPrint('✅ Estado actualizado. _currentUserRole = $_currentUserRole');
         }
       },
     );
@@ -662,31 +655,6 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            // Botón Super Admin (solo visible para super_admin)
-                            // DEBUG: Mostrar siempre para verificar, luego comentar
-                            Builder(
-                              builder: (context) {
-                                // Verificar rol en tiempo real
-                                final isSuperAdmin = _currentUserRole == 'super_admin';
-                                debugPrint('🔐 Verificando rol para botón Super Admin: $_currentUserRole, isSuperAdmin: $isSuperAdmin');
-                                
-                                if (isSuperAdmin) {
-                                  return IconButton(
-                                    icon: const Icon(Icons.security, color: Colors.red, size: 20),
-                                    onPressed: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (_) => const SuperAdminDashboardPage(),
-                                        ),
-                                      );
-                                    },
-                                    tooltip: 'Métricas MVP (Confidencial)',
-                                  );
-                                }
-                                return const SizedBox.shrink();
-                              },
-                            ),
                             if (_activeAlertsCount > 0)
                               Stack(
                                 children: [
@@ -727,6 +695,19 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
                                     ),
                                   ),
                                 ],
+                              ),
+                            // Botón Super Admin (solo visible para super_admin)
+                            if (_userRole == 'super_admin')
+                              IconButton(
+                                icon: const Icon(Icons.admin_panel_settings, color: Colors.white, size: 20),
+                                onPressed: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => const SuperAdminDashboardPage(),
+                                    ),
+                                  );
+                                },
+                                tooltip: 'Super Admin',
                               ),
                             IconButton(
                               icon: const Icon(Icons.refresh, color: Colors.white, size: 20),
