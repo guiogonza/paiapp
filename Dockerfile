@@ -1,11 +1,30 @@
-# Dockerfile para Flutter Web
+# Multi-stage build para Flutter Web
+# Stage 1: Build
+FROM ghcr.io/cirruslabs/flutter:stable AS build
+
+WORKDIR /app
+
+# Copiar archivos de configuración
+COPY pubspec.yaml pubspec.lock ./
+RUN flutter pub get
+
+# Copiar código fuente
+COPY . .
+
+# Construir la aplicación web
+RUN flutter build web --release --web-renderer canvaskit
+
+# Stage 2: Production
 FROM nginx:alpine
 
-# Copiar los archivos compilados de Flutter web
-COPY build/web /usr/share/nginx/html
+# Copiar los archivos compilados
+COPY --from=build /app/build/web /usr/share/nginx/html
+
+# Copiar configuración personalizada de nginx
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Exponer el puerto 80
 EXPOSE 80
 
-# Nginx ya está configurado por defecto para servir /usr/share/nginx/html
-
+# Comando por defecto de nginx
+CMD ["nginx", "-g", "daemon off;"]

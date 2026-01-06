@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  pai-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pai-app
+    ports:
+      - "80:80"
+      - "443:443"  # Para HTTPS si configuras SSL
+    restart: unless-stopped
+    networks:
+      - pai-network
+    # Volúmenes opcionales para logs
+    volumes:
+      - ./logs:/var/log/nginx
+    # Healthcheck
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  pai-network:
+    driver: bridge
+

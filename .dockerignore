@@ -1,18 +1,75 @@
-.git
-.gitignore
-.dart_tool
-.idea
-.vscode
-*.iml
-*.log
-build/*
-!build/web
-ios/
+# Flutter
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+flutter_*.png
+linked_*.ds
+unlinked.ds
+unlinked_spec.ds
+
+# Android
 android/
+*.apk
+*.aab
+*.keystore
+
+# iOS
+ios/
+*.ipa
+*.app.dSYM.zip
+*.app.dSYM
+
+# macOS
 macos/
+
+# Windows
 windows/
+
+# Linux
 linux/
-test/
+
+# Web
+web/*.dart.js
+web/*.dart.js.map
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Documentation
 *.md
 !README.md
 
+# Scripts SQL (no necesarios en producción)
+*.sql
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test
+test/
+coverage/
