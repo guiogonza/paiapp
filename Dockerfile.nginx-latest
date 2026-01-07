@@ -1,6 +1,6 @@
+# Dockerfile alternativo usando nginx:latest en lugar de alpine
 # Multi-stage build para Flutter Web
 # Stage 1: Build
-# Forzar arquitectura amd64 explícitamente
 FROM --platform=linux/amd64 ghcr.io/cirruslabs/flutter:stable AS build
 
 WORKDIR /app
@@ -16,7 +16,7 @@ COPY . .
 RUN flutter build web --release
 
 # Stage 2: Production
-# Usar nginx:latest (más compatible que alpine)
+# Usar nginx:latest en lugar de alpine
 FROM --platform=linux/amd64 nginx:latest
 
 # Copiar los archivos compilados
@@ -30,3 +30,4 @@ EXPOSE 80
 
 # Comando por defecto de nginx
 CMD ["nginx", "-g", "daemon off;"]
+

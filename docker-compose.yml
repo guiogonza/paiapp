@@ -1,10 +1,8 @@
-version: '3.8'
+# Docker Compose v2 (compatible con 'docker compose' y 'docker-compose')
 
 services:
   pai-app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: pai-app:latest
     container_name: pai-app
     ports:
       - "80:80"
@@ -15,9 +13,9 @@ services:
     # Volúmenes opcionales para logs
     volumes:
       - ./logs:/var/log/nginx
-    # Healthcheck
+    # Healthcheck (usar curl que está disponible en nginx:latest)
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
+      test: ["CMD", "curl", "-f", "http://localhost/"]
       interval: 30s
       timeout: 10s
       retries: 3
