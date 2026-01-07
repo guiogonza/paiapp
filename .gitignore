@@ -43,3 +43,8 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Docker build artifacts (imágenes comprimidas)
+pai-app-*.tar.gz
+*.tar.gz
+!pai-app-source.tar.gz  # Mantener el source para deployment
