@@ -119,7 +119,8 @@ class _LoginPageState extends State<LoginPage> {
           (profile) {
             // Redirigir según el role
             Widget targetPage;
-            if (profile.role == 'owner') {
+            if (profile.role == 'owner' || profile.role == 'super_admin') {
+              // super_admin tiene acceso completo como owner
               targetPage = const OwnerDashboardPage();
             } else if (profile.role == 'driver') {
               targetPage = const DriverDashboardPage();
