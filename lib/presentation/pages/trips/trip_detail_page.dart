@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 // Import condicional para web
-import 'dart:html' as html show AnchorElement;
+import 'dart:html' as html;
+import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:pai_app/core/theme/app_colors.dart';
@@ -842,7 +843,7 @@ class _TripDetailPageState extends State<TripDetailPage> {
     );
   }
 
-  void _downloadRemittanceImage(RemittanceEntity remittance) {
+  Future<void> _downloadRemittanceImage(RemittanceEntity remittance) async {
     if (remittance.receiptUrl == null || remittance.receiptUrl!.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -854,24 +855,70 @@ class _TripDetailPageState extends State<TripDetailPage> {
     }
 
     if (kIsWeb) {
-      final dateStr = remittance.createdAt != null
-          ? DateFormat('yyyy-MM-dd').format(remittance.createdAt!)
-          : 'remision';
-      final fileName = 'remision_$dateStr.jpg';
-      html.AnchorElement(href: remittance.receiptUrl!)
-        ..setAttribute('download', fileName)
-        ..click();
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Descarga iniciada'),
-          backgroundColor: Colors.green,
-          duration: Duration(seconds: 2),
-        ),
-      );
+      try {
+        // Mostrar indicador de carga
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white)),
+                ),
+                SizedBox(width: 16),
+                Text('Descargando imagen...'),
+              ],
+            ),
+            duration: Duration(seconds: 5),
+          ),
+        );
+
+        // Descargar la imagen usando http
+        final response = await http.get(Uri.parse(remittance.receiptUrl!));
+        if (response.statusCode == 200) {
+          // Crear un Blob con los bytes
+          final blob = html.Blob([response.bodyBytes]);
+          final url = html.Url.createObjectUrlFromBlob(blob);
+          
+          // Crear un elemento anchor y descargar
+          final dateStr = remittance.createdAt != null
+              ? DateFormat('yyyy-MM-dd').format(remittance.createdAt!)
+              : 'remision';
+          final fileName = 'remision_$dateStr.jpg';
+          html.AnchorElement(href: url)
+            ..setAttribute('download', fileName)
+            ..click();
+          
+          // Limpiar la URL del objeto
+          html.Url.revokeObjectUrl(url);
+          
+          if (mounted) {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Descarga completada'),
+                backgroundColor: Colors.green,
+                duration: Duration(seconds: 2),
+              ),
+            );
+          }
+        } else {
+          throw Exception('Error al descargar: ${response.statusCode}');
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error al descargar: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
     } else {
       // Para móvil, abrir la URL en el navegador
-      // Puedes usar url_launcher si lo prefieres
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Abre: ${remittance.receiptUrl}'),

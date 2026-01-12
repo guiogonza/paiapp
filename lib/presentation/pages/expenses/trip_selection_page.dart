@@ -40,11 +40,107 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
   String? _userRole;
   String? _userEmail;
   Map<String, VehicleEntity> _vehiclesById = {};
+  
+  // Controladores de búsqueda
+  final TextEditingController _searchController = TextEditingController();
+  String _searchType = 'Todos'; // 'Todos', 'Origen', 'Destino', 'Cliente', 'Conductor'
+  String? _selectedDriverFilter; // Para filtro por conductor (dropdown)
+  List<String> _availableDrivers = []; // Lista de conductores con historial
 
   @override
   void initState() {
     super.initState();
+    _searchController.addListener(_applySearch);
     _loadUserProfileAndTrips();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _updateAvailableDrivers(List<TripEntity> trips) {
+    final driversSet = <String>{};
+    for (var trip in trips) {
+      if (trip.driverName.isNotEmpty) {
+        driversSet.add(trip.driverName);
+      }
+    }
+    setState(() {
+      _availableDrivers = driversSet.toList()..sort();
+    });
+  }
+
+  void _applySearch() {
+    List<TripEntity> filtered = List.from(_trips);
+
+    switch (_searchType) {
+      case 'Origen':
+        final query = _searchController.text.toLowerCase().trim();
+        if (query.isNotEmpty) {
+          filtered = filtered.where((trip) => 
+            trip.origin.toLowerCase().contains(query)
+          ).toList();
+        }
+        break;
+      case 'Destino':
+        final query = _searchController.text.toLowerCase().trim();
+        if (query.isNotEmpty) {
+          filtered = filtered.where((trip) => 
+            trip.destination.toLowerCase().contains(query)
+          ).toList();
+        }
+        break;
+      case 'Cliente':
+        final query = _searchController.text.toLowerCase().trim();
+        if (query.isNotEmpty) {
+          filtered = filtered.where((trip) => 
+            trip.clientName.toLowerCase().contains(query)
+          ).toList();
+        }
+        break;
+      case 'Conductor':
+        // Usar el dropdown seleccionado
+        if (_selectedDriverFilter != null && _selectedDriverFilter!.isNotEmpty) {
+          filtered = filtered.where((trip) => 
+            trip.driverName == _selectedDriverFilter
+          ).toList();
+        }
+        break;
+      case 'Todos':
+      default:
+        final query = _searchController.text.toLowerCase().trim();
+        if (query.isNotEmpty) {
+          filtered = filtered.where((trip) => 
+            trip.origin.toLowerCase().contains(query) ||
+            trip.destination.toLowerCase().contains(query) ||
+            trip.clientName.toLowerCase().contains(query) ||
+            trip.driverName.toLowerCase().contains(query)
+          ).toList();
+        }
+        break;
+    }
+
+    setState(() {
+      _filteredTrips = filtered;
+    });
+  }
+
+  String _getSearchHint() {
+    switch (_searchType) {
+      case 'Origen':
+        return 'Buscar por origen...';
+      case 'Destino':
+        return 'Buscar por destino...';
+      case 'Cliente':
+        return 'Buscar por cliente...';
+      case 'Conductor':
+        return 'Buscar por conductor...';
+      case 'Todos':
+      default:
+        return 'Buscar en origen, destino, cliente o conductor...';
+    }
   }
 
   Future<void> _loadUserProfileAndTrips() async {
@@ -105,6 +201,8 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
 
           // Cargar vehículos para mostrar placa
           await _loadVehicles();
+          // Obtener lista de conductores únicos de los viajes
+          _updateAvailableDrivers(_trips);
           // Cargar gastos para cada viaje
           _loadExpensesForTrips(_filteredTrips);
         },
@@ -127,21 +225,6 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
     }
   }
 
-  void _filterTrips(String query) {
-    setState(() {
-      if (query.isEmpty) {
-        _filteredTrips = _trips;
-      } else {
-        final queryLower = query.toLowerCase();
-        _filteredTrips = _trips.where((trip) {
-          return trip.origin.toLowerCase().contains(queryLower) ||
-                 trip.destination.toLowerCase().contains(queryLower) ||
-                 trip.clientName.toLowerCase().contains(queryLower) ||
-                 trip.driverName.toLowerCase().contains(queryLower);
-        }).toList();
-      }
-    });
-  }
 
   Future<void> _loadExpensesForTrips(List<TripEntity> trips) async {
     final currentUserId = Supabase.instance.client.auth.currentUser?.id;
@@ -314,19 +397,95 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
       body: Column(
         children: [
           // Barra de búsqueda
-          Padding(
+          Container(
             padding: const EdgeInsets.all(16.0),
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: 'Buscar por origen, destino, cliente o conductor...',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+            color: AppColors.background,
+            child: Column(
+              children: [
+                // Selector de tipo de búsqueda
+                DropdownButtonFormField<String>(
+                  value: _searchType,
+                  decoration: InputDecoration(
+                    labelText: 'Buscar por',
+                    prefixIcon: const Icon(Icons.search),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'Todos', child: Text('Todos los campos')),
+                    DropdownMenuItem(value: 'Origen', child: Text('Origen')),
+                    DropdownMenuItem(value: 'Destino', child: Text('Destino')),
+                    DropdownMenuItem(value: 'Cliente', child: Text('Cliente')),
+                    DropdownMenuItem(value: 'Conductor', child: Text('Conductor')),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() {
+                        _searchType = value;
+                        if (value != 'Conductor') {
+                          _selectedDriverFilter = null;
+                        }
+                      });
+                      _applySearch();
+                    }
+                  },
                 ),
-                filled: true,
-                fillColor: Colors.grey[100],
-              ),
-              onChanged: _filterTrips,
+                const SizedBox(height: 12),
+                // Campo de búsqueda o dropdown de conductores
+                _searchType == 'Conductor'
+                    ? DropdownButtonFormField<String>(
+                        value: _selectedDriverFilter,
+                        decoration: InputDecoration(
+                          labelText: 'Seleccionar conductor',
+                          prefixIcon: const Icon(Icons.person),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        ),
+                        items: [
+                          const DropdownMenuItem(
+                            value: null,
+                            child: Text('Todos los conductores'),
+                          ),
+                          ..._availableDrivers.map((driver) {
+                            return DropdownMenuItem(
+                              value: driver,
+                              child: Text(driver),
+                            );
+                          }),
+                        ],
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedDriverFilter = value;
+                          });
+                          _applySearch();
+                        },
+                      )
+                    : TextField(
+                        controller: _searchController,
+                        decoration: InputDecoration(
+                          hintText: _getSearchHint(),
+                          prefixIcon: const Icon(Icons.search),
+                          suffixIcon: _searchController.text.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear),
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    _applySearch();
+                                  },
+                                )
+                              : null,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        ),
+                        onChanged: (_) => _applySearch(),
+                      ),
+              ],
             ),
           ),
           

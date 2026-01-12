@@ -27,12 +27,18 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
   final _profileRepository = ProfileRepositoryImpl();
   final _imagePicker = ImagePicker();
 
-  List<DocumentEntity> _documents = [];
+  List<DocumentEntity> _allDocuments = []; // Todos los documentos cargados
+  List<DocumentEntity> _documents = []; // Documentos filtrados
   List<VehicleEntity> _vehicles = [];
   Map<String, String> _driverNames = {}; // driver_id -> email/name
   bool _isLoading = true;
   bool _isLoadingDrivers = false;
   bool _isLoadingVehicles = false;
+  
+  // Filtros de búsqueda
+  String? _selectedVehicleFilter; // null = todos
+  String? _selectedDriverFilter; // null = todos
+  String? _selectedDocumentTypeFilter; // null = todos
 
   // Formulario
   final _formKey = GlobalKey<FormState>();
@@ -89,7 +95,8 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
           }
         },
         (documents) {
-          _documents = documents;
+          _allDocuments = documents;
+          _applyFilters();
         },
       );
 
@@ -122,6 +129,35 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
         });
       }
     }
+  }
+
+  void _applyFilters() {
+    List<DocumentEntity> filtered = List.from(_allDocuments);
+    
+    // Filtrar por vehículo
+    if (_selectedVehicleFilter != null && _selectedVehicleFilter!.isNotEmpty) {
+      filtered = filtered.where((doc) => 
+        doc.vehicleId == _selectedVehicleFilter
+      ).toList();
+    }
+    
+    // Filtrar por conductor
+    if (_selectedDriverFilter != null && _selectedDriverFilter!.isNotEmpty) {
+      filtered = filtered.where((doc) => 
+        doc.driverId == _selectedDriverFilter
+      ).toList();
+    }
+    
+    // Filtrar por tipo de documento
+    if (_selectedDocumentTypeFilter != null && _selectedDocumentTypeFilter != 'Todos') {
+      filtered = filtered.where((doc) => 
+        doc.documentType == _selectedDocumentTypeFilter
+      ).toList();
+    }
+    
+    setState(() {
+      _documents = filtered;
+    });
   }
 
   Future<void> _loadDrivers() async {
@@ -630,12 +666,128 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Sección de Alertas
+      body: Column(
+        children: [
+          // Filtros de búsqueda
+          Container(
+            padding: const EdgeInsets.all(16.0),
+            color: AppColors.background,
+            child: Column(
+              children: [
+                // Filtro por vehículo
+                DropdownButtonFormField<String>(
+                  value: _selectedVehicleFilter,
+                  decoration: InputDecoration(
+                    labelText: 'Filtrar por Vehículo',
+                    prefixIcon: const Icon(Icons.directions_car),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    helperText: 'Opcional: Selecciona un vehículo',
+                  ),
+                  items: [
+                    const DropdownMenuItem<String>(
+                      value: null,
+                      child: Text('Todos los vehículos'),
+                    ),
+                    ..._vehicles.map((vehicle) {
+                      return DropdownMenuItem<String>(
+                        value: vehicle.id,
+                        child: Text(vehicle.placa),
+                      );
+                    }),
+                  ],
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedVehicleFilter = value;
+                    });
+                    _applyFilters();
+                  },
+                ),
+                const SizedBox(height: 12),
+                // Filtro por conductor
+                DropdownButtonFormField<String>(
+                  value: _selectedDriverFilter,
+                  decoration: InputDecoration(
+                    labelText: 'Filtrar por Conductor',
+                    prefixIcon: const Icon(Icons.person),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    helperText: 'Opcional: Selecciona un conductor',
+                  ),
+                  items: [
+                    const DropdownMenuItem<String>(
+                      value: null,
+                      child: Text('Todos los conductores'),
+                    ),
+                    ..._driverNames.entries.map((entry) {
+                      return DropdownMenuItem<String>(
+                        value: entry.key,
+                        child: Text(entry.value),
+                      );
+                    }),
+                  ],
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedDriverFilter = value;
+                    });
+                    _applyFilters();
+                  },
+                ),
+                const SizedBox(height: 12),
+                // Filtro por tipo de documento
+                DropdownButtonFormField<String>(
+                  value: _selectedDocumentTypeFilter ?? 'Todos',
+                  decoration: InputDecoration(
+                    labelText: 'Filtrar por Tipo de Documento',
+                    prefixIcon: const Icon(Icons.description),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    helperText: 'Opcional: Selecciona un tipo de documento',
+                  ),
+                  items: [
+                    const DropdownMenuItem<String>(
+                      value: 'Todos',
+                      child: Text('Todos los tipos'),
+                    ),
+                    ..._commonDocumentTypes.map((type) {
+                      return DropdownMenuItem<String>(
+                        value: type,
+                        child: Text(type),
+                      );
+                    }),
+                    // Agregar tipos únicos de documentos existentes que no están en _commonDocumentTypes
+                    ..._allDocuments
+                        .map((doc) => doc.documentType)
+                        .where((type) => !_commonDocumentTypes.contains(type))
+                        .toSet()
+                        .map((type) {
+                      return DropdownMenuItem<String>(
+                        value: type,
+                        child: Text(type),
+                      );
+                    }),
+                  ],
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedDocumentTypeFilter = value == 'Todos' ? null : value;
+                    });
+                    _applyFilters();
+                  },
+                ),
+              ],
+            ),
+          ),
+          // Lista de documentos
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Sección de Alertas
             Card(
               elevation: 2,
               shape: RoundedRectangleBorder(
@@ -684,8 +836,11 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
                 ),
               ),
             ),
-          ],
-        ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {

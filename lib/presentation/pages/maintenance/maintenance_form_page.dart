@@ -840,47 +840,25 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
                 },
                 child: InputDecorator(
                   decoration: InputDecoration(
-                    labelText: isOtherType ? 'Fecha de Aviso *' : 'Fecha de Aviso (Opcional)',
+                    labelText: 'Fecha de Aviso (Opcional)',
                     prefixIcon: const Icon(Icons.notifications),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    helperText: isOtherType 
-                        ? 'Define cuándo quieres que te avisemos'
-                        : 'Opcional: Si no defines fecha, se usará la regla automática',
+                    helperText: 'Opcional: Define cuándo quieres que te avisemos',
                   ),
                   child: Text(
                     _alertDate != null
                         ? DateFormat('dd/MM/yyyy').format(_alertDate!)
-                        : isOtherType
-                            ? 'Selecciona una fecha *'
-                            : 'Opcional: Selecciona una fecha',
+                        : 'Opcional: Selecciona una fecha',
                     style: TextStyle(
                       color: _alertDate != null 
                           ? AppColors.textPrimary 
-                          : (isOtherType ? Colors.red : AppColors.textSecondary),
+                          : AppColors.textSecondary,
                     ),
                   ),
                 ),
               ),
-              if (isOtherType)
-                Builder(
-                  builder: (context) {
-                    if (_alertDate == null) {
-                      return Padding(
-                        padding: const EdgeInsets.only(top: 4.0),
-                        child: Text(
-                          'La fecha de aviso es obligatoria para servicios personalizados',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.red[700],
-                          ),
-                        ),
-                      );
-                    }
-                    return const SizedBox.shrink();
-                  },
-                ),
               const SizedBox(height: 24),
 
               // Botón guardar

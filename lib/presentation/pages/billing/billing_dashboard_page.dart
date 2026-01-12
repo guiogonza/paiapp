@@ -1,6 +1,7 @@
 import 'dart:html' as html;
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:pai_app/core/theme/app_colors.dart';
 import 'package:pai_app/data/repositories/remittance_repository_impl.dart';
@@ -18,14 +19,28 @@ class BillingDashboardPage extends StatefulWidget {
 class _BillingDashboardPageState extends State<BillingDashboardPage> {
   final _remittanceRepository = RemittanceRepositoryImpl();
   List<RemittanceWithRouteEntity> _pendingRemittances = [];
+  List<RemittanceWithRouteEntity> _filteredRemittances = [];
   bool _isLoading = true;
   final _vehicleRepository = VehicleRepositoryImpl();
   Map<String, VehicleEntity> _vehiclesById = {};
-
+  
+  // Controladores de búsqueda
+  final TextEditingController _searchController = TextEditingController();
+  String _searchType = 'Todos'; // 'Todos', 'Origen', 'Destino', 'Cliente', 'Conductor'
+  String? _selectedDriverFilter; // Para filtro por conductor (dropdown)
+  List<String> _availableDrivers = []; // Lista de conductores con historial
+  
   @override
   void initState() {
     super.initState();
+    _searchController.addListener(_applySearch);
     _loadPendingRemittances();
+  }
+  
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadPendingRemittances() async {
@@ -56,10 +71,100 @@ class _BillingDashboardPageState extends State<BillingDashboardPage> {
         await _loadVehicles();
         setState(() {
           _pendingRemittances = remittances;
+          _filteredRemittances = remittances;
           _isLoading = false;
         });
+        // Obtener lista de conductores únicos de las remisiones
+        _updateAvailableDrivers(remittances);
+        _applySearch();
       },
     );
+  }
+
+  void _updateAvailableDrivers(List<RemittanceWithRouteEntity> remittances) {
+    final driversSet = <String>{};
+    for (var remittance in remittances) {
+      final driverName = remittance.driverName;
+      if (driverName != null && driverName.isNotEmpty) {
+        driversSet.add(driverName);
+      }
+    }
+    setState(() {
+      _availableDrivers = driversSet.toList()..sort();
+    });
+  }
+
+  void _applySearch() {
+    List<RemittanceWithRouteEntity> filtered = List.from(_pendingRemittances);
+
+    switch (_searchType) {
+      case 'Origen':
+        final query = _searchController.text.toLowerCase().trim();
+        if (query.isNotEmpty) {
+          filtered = filtered.where((remittance) => 
+            remittance.startLocation.toLowerCase().contains(query)
+          ).toList();
+        }
+        break;
+      case 'Destino':
+        final query = _searchController.text.toLowerCase().trim();
+        if (query.isNotEmpty) {
+          filtered = filtered.where((remittance) => 
+            remittance.endLocation.toLowerCase().contains(query)
+          ).toList();
+        }
+        break;
+      case 'Cliente':
+        final query = _searchController.text.toLowerCase().trim();
+        if (query.isNotEmpty) {
+          filtered = filtered.where((remittance) {
+            final clientName = remittance.clientName ?? remittance.receiverName;
+            return clientName.toLowerCase().contains(query);
+          }).toList();
+        }
+        break;
+      case 'Conductor':
+        // Usar el dropdown seleccionado
+        if (_selectedDriverFilter != null && _selectedDriverFilter!.isNotEmpty) {
+          filtered = filtered.where((remittance) => 
+            remittance.driverName == _selectedDriverFilter
+          ).toList();
+        }
+        break;
+      case 'Todos':
+      default:
+        final query = _searchController.text.toLowerCase().trim();
+        if (query.isNotEmpty) {
+          filtered = filtered.where((remittance) {
+            final clientName = remittance.clientName ?? remittance.receiverName;
+            return remittance.startLocation.toLowerCase().contains(query) ||
+                   remittance.endLocation.toLowerCase().contains(query) ||
+                   clientName.toLowerCase().contains(query) ||
+                   (remittance.driverName?.toLowerCase().contains(query) ?? false);
+          }).toList();
+        }
+        break;
+    }
+
+    setState(() {
+      _filteredRemittances = filtered;
+    });
+  }
+
+  String _getSearchHint() {
+    switch (_searchType) {
+      case 'Origen':
+        return 'Buscar por origen...';
+      case 'Destino':
+        return 'Buscar por destino...';
+      case 'Cliente':
+        return 'Buscar por cliente...';
+      case 'Conductor':
+        return 'Buscar por conductor...';
+      case 'Todos':
+      default:
+        return 'Buscar en origen, destino, cliente o conductor...';
+    }
   }
 
   Future<void> _loadVehicles() async {
@@ -163,45 +268,166 @@ class _BillingDashboardPageState extends State<BillingDashboardPage> {
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _pendingRemittances.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.check_circle_outline,
-                        size: 64,
-                        color: AppColors.textSecondary.withValues(alpha: 0.5),
+      body: Column(
+        children: [
+          // Barra de búsqueda
+          if (!_isLoading && _pendingRemittances.isNotEmpty)
+            Container(
+              padding: const EdgeInsets.all(16.0),
+              color: AppColors.background,
+              child: Column(
+                children: [
+                  // Selector de tipo de búsqueda
+                  DropdownButtonFormField<String>(
+                    value: _searchType,
+                    decoration: InputDecoration(
+                      labelText: 'Buscar por',
+                      prefixIcon: const Icon(Icons.search),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'No hay remisiones pendientes',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Todas las remisiones han sido cobradas',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: AppColors.textSecondary,
-                            ),
-                        textAlign: TextAlign.center,
-                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'Todos', child: Text('Todos los campos')),
+                      DropdownMenuItem(value: 'Origen', child: Text('Origen')),
+                      DropdownMenuItem(value: 'Destino', child: Text('Destino')),
+                      DropdownMenuItem(value: 'Cliente', child: Text('Cliente')),
+                      DropdownMenuItem(value: 'Conductor', child: Text('Conductor')),
                     ],
-                  ),
-                )
-              : RefreshIndicator(
-                  onRefresh: _loadPendingRemittances,
-                  child: ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: _pendingRemittances.length,
-                    itemBuilder: (context, index) {
-                      final remittance = _pendingRemittances[index];
-                      return _buildRemittanceCard(remittance);
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() {
+                          _searchType = value;
+                          if (value != 'Conductor') {
+                            _selectedDriverFilter = null;
+                          }
+                        });
+                        _applySearch();
+                      }
                     },
                   ),
-                ),
+                  const SizedBox(height: 12),
+                  // Campo de búsqueda o dropdown de conductores
+                  _searchType == 'Conductor'
+                      ? DropdownButtonFormField<String>(
+                          value: _selectedDriverFilter,
+                          decoration: InputDecoration(
+                            labelText: 'Seleccionar conductor',
+                            prefixIcon: const Icon(Icons.person),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          ),
+                          items: [
+                            const DropdownMenuItem(
+                              value: null,
+                              child: Text('Todos los conductores'),
+                            ),
+                            ..._availableDrivers.map((driver) {
+                              return DropdownMenuItem(
+                                value: driver,
+                                child: Text(driver),
+                              );
+                            }),
+                          ],
+                          onChanged: (value) {
+                            setState(() {
+                              _selectedDriverFilter = value;
+                            });
+                            _applySearch();
+                          },
+                        )
+                      : TextField(
+                          controller: _searchController,
+                          decoration: InputDecoration(
+                            hintText: _getSearchHint(),
+                            prefixIcon: const Icon(Icons.search),
+                            suffixIcon: _searchController.text.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(Icons.clear),
+                                    onPressed: () {
+                                      _searchController.clear();
+                                      _applySearch();
+                                    },
+                                  )
+                                : null,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          ),
+                          onChanged: (_) => _applySearch(),
+                        ),
+                ],
+              ),
+            ),
+          // Contenido principal
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _pendingRemittances.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.check_circle_outline,
+                              size: 64,
+                              color: AppColors.textSecondary.withValues(alpha: 0.5),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'No hay remisiones pendientes',
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Todas las remisiones han sido cobradas',
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: AppColors.textSecondary,
+                                  ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      )
+                    : RefreshIndicator(
+                        onRefresh: _loadPendingRemittances,
+                        child: _filteredRemittances.isEmpty
+                            ? Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.search_off,
+                                      size: 64,
+                                      color: Colors.grey[400],
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      'No se encontraron remisiones',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : ListView.builder(
+                                padding: const EdgeInsets.all(16),
+                                itemCount: _filteredRemittances.length,
+                                itemBuilder: (context, index) {
+                                  final remittance = _filteredRemittances[index];
+                                  return _buildRemittanceCard(remittance);
+                                },
+                              ),
+                      ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -568,7 +794,7 @@ class _BillingDashboardPageState extends State<BillingDashboardPage> {
     );
   }
 
-  void _downloadRemittanceImage(RemittanceWithRouteEntity remittance) {
+  Future<void> _downloadRemittanceImage(RemittanceWithRouteEntity remittance) async {
     if (remittance.receiptUrl == null || remittance.receiptUrl!.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -580,24 +806,70 @@ class _BillingDashboardPageState extends State<BillingDashboardPage> {
     }
 
     if (kIsWeb) {
-      final dateStr = remittance.createdAt != null
-          ? DateFormat('yyyy-MM-dd').format(remittance.createdAt!)
-          : 'remision';
-      final fileName = 'remision_${remittance.clientName ?? remittance.receiverName}_$dateStr.jpg';
-      html.AnchorElement(href: remittance.receiptUrl!)
-        ..setAttribute('download', fileName)
-        ..click();
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Descarga iniciada'),
-          backgroundColor: Colors.green,
-          duration: Duration(seconds: 2),
-        ),
-      );
+      try {
+        // Mostrar indicador de carga
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white)),
+                ),
+                SizedBox(width: 16),
+                Text('Descargando imagen...'),
+              ],
+            ),
+            duration: Duration(seconds: 5),
+          ),
+        );
+
+        // Descargar la imagen usando http
+        final response = await http.get(Uri.parse(remittance.receiptUrl!));
+        if (response.statusCode == 200) {
+          // Crear un Blob con los bytes
+          final blob = html.Blob([response.bodyBytes]);
+          final url = html.Url.createObjectUrlFromBlob(blob);
+          
+          // Crear un elemento anchor y descargar
+          final dateStr = remittance.createdAt != null
+              ? DateFormat('yyyy-MM-dd').format(remittance.createdAt!)
+              : 'remision';
+          final fileName = 'remision_${remittance.clientName ?? remittance.receiverName}_$dateStr.jpg';
+          html.AnchorElement(href: url)
+            ..setAttribute('download', fileName)
+            ..click();
+          
+          // Limpiar la URL del objeto
+          html.Url.revokeObjectUrl(url);
+          
+          if (mounted) {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Descarga completada'),
+                backgroundColor: Colors.green,
+                duration: Duration(seconds: 2),
+              ),
+            );
+          }
+        } else {
+          throw Exception('Error al descargar: ${response.statusCode}');
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error al descargar: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
     } else {
       // Para móvil, abrir la URL en el navegador
-      // Puedes usar url_launcher si lo prefieres
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Abre: ${remittance.receiptUrl}'),
