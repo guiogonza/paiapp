@@ -14,7 +14,7 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
+  final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   final _authRepository = AuthRepositoryImpl();
   bool _isLoading = false;
@@ -22,7 +22,7 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _usernameController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -61,7 +61,7 @@ class _LoginPageState extends State<LoginPage> {
 
     try {
       await _authRepository.login(
-        _emailController.text.trim(),
+        _usernameController.text.trim(),
         _passwordController.text,
       );
 
@@ -80,9 +80,9 @@ class _LoginPageState extends State<LoginPage> {
           errorMessage = 'Error de conexión. Verifica tu internet y que puedas acceder a Supabase.';
         } else if (errorMessage.contains('Invalid login credentials') ||
                    errorMessage.contains('Credenciales inválidas')) {
-          errorMessage = 'Email o contraseña incorrectos. Verifica tus credenciales.';
+          errorMessage = 'Usuario o contraseña incorrectos. Verifica tus credenciales.';
         } else if (errorMessage.contains('User not found')) {
-          errorMessage = 'Usuario no encontrado. Verifica tu email o regístrate primero.';
+          errorMessage = 'Usuario no encontrado. Verifica tu usuario o regístrate primero.';
         }
         
         ScaffoldMessenger.of(context).showSnackBar(
@@ -156,14 +156,14 @@ class _LoginPageState extends State<LoginPage> {
 
     try {
       await _authRepository.register(
-        _emailController.text.trim(),
+        _usernameController.text.trim(),
         _passwordController.text,
       );
 
       // Después del registro, intentar hacer login automáticamente
       try {
         await _authRepository.login(
-          _emailController.text.trim(),
+          _usernameController.text.trim(),
           _passwordController.text,
         );
 
@@ -235,24 +235,22 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   ),
                   const SizedBox(height: 32),
-                  // Email Field
+                  // Usuario Field
                   TextFormField(
-                    controller: _emailController,
-                    keyboardType: TextInputType.emailAddress,
+                    controller: _usernameController,
+                    keyboardType: TextInputType.text,
                     textInputAction: TextInputAction.next,
                     decoration: InputDecoration(
-                      labelText: 'Email',
-                      prefixIcon: const Icon(Icons.email_outlined),
+                      labelText: 'Usuario',
+                      prefixIcon: const Icon(Icons.person_outlined),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
+                      helperText: 'Puede ser cualquier texto (email, nombre, etc.)',
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Por favor ingresa tu email';
-                      }
-                      if (!value.contains('@')) {
-                        return 'Ingresa un email válido';
+                        return 'Por favor ingresa tu usuario';
                       }
                       return null;
                     },

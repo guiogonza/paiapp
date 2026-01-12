@@ -26,6 +26,7 @@ import 'package:pai_app/presentation/pages/fleet_monitoring/fleet_monitoring_pag
 import 'package:pai_app/data/repositories/document_repository_impl.dart';
 import 'package:pai_app/data/repositories/profile_repository_impl.dart';
 import 'package:pai_app/presentation/pages/super_admin/super_admin_dashboard_page.dart';
+import 'package:pai_app/presentation/pages/profitability/profitability_main_page.dart';
 
 class OwnerDashboardPage extends StatefulWidget {
   const OwnerDashboardPage({super.key});
@@ -799,9 +800,12 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
                 ),
                 // 3. PANEL DE RESUMEN PAI (Fijo en la Base - Compacto)
                 Container(
-                  height: 150,
+                  constraints: const BoxConstraints(
+                    minHeight: 180,
+                    maxHeight: 200,
+                  ),
                   width: double.infinity,
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   decoration: BoxDecoration(
                     color: AppColors.white,
                     boxShadow: [
@@ -816,145 +820,135 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // KPI de Rentabilidad (compacto)
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      // KPI de Rentabilidad (compacto) - Balance del mes actual
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Balance mes actual',
-                                  style: textTheme.bodySmall?.copyWith(
-                                    color: AppColors.textSecondary,
-                                    fontSize: 10,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  '\$${numberFormat.format(balance.round())}',
-                                  style: textTheme.titleMedium?.copyWith(
-                                    color: balance >= 0 ? AppColors.paiOrange : Colors.red,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
+                          Text(
+                            'Balance mes actual',
+                            style: textTheme.bodySmall?.copyWith(
+                              color: AppColors.textSecondary,
+                              fontSize: 10,
                             ),
                           ),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.trending_up, size: 12, color: Colors.green),
-                                    const SizedBox(width: 2),
-                                    Flexible(
-                                      child: Text(
-                                        'Ing: \$${numberFormat.format(_currentMonthRevenue.round())}',
-                                        style: textTheme.bodySmall?.copyWith(
-                                          color: Colors.green,
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 9,
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 1),
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.trending_down, size: 12, color: Colors.red),
-                                    const SizedBox(width: 2),
-                                    Flexible(
-                                      child: Text(
-                                        'Gastos: \$${numberFormat.format((_currentMonthExpenses + _currentMonthMaintenanceExpenses).round())}',
-                                        style: textTheme.bodySmall?.copyWith(
-                                          color: Colors.red,
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 9,
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
+                          const SizedBox(height: 2),
+                          Text(
+                            '\$${numberFormat.format(balance.round())}',
+                            style: textTheme.titleMedium?.copyWith(
+                              color: balance >= 0 ? AppColors.paiOrange : Colors.red,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
                             ),
+                          ),
+                          const SizedBox(height: 6),
+                          // Desglose: Ingresos, Gastos de viaje, Gastos de mantenimiento
+                          Wrap(
+                            spacing: 10,
+                            runSpacing: 6,
+                            children: [
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.trending_up, size: 14, color: Colors.green),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Ing: \$${numberFormat.format(_currentMonthRevenue.round())}',
+                                    style: textTheme.bodySmall?.copyWith(
+                                      color: Colors.green,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.trending_down, size: 14, color: Colors.red),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'G. viaje: \$${numberFormat.format(_currentMonthExpenses.round())}',
+                                    style: textTheme.bodySmall?.copyWith(
+                                      color: Colors.red,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.build, size: 14, color: Colors.orange),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'G. mant: \$${numberFormat.format(_currentMonthMaintenanceExpenses.round())}',
+                                    style: textTheme.bodySmall?.copyWith(
+                                      color: Colors.orange,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                      const SizedBox(height: 8),
-                      // 5 Chips de Alerta (2 filas para evitar scroll)
-                      Expanded(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            // Primera fila: Docs, Mantenimiento, Flota
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                              children: [
-                                Expanded(
-                                  child: _buildStatusChip(
-                                    color: Colors.redAccent,
-                                    label: 'Docs vencidos',
-                                    value: '$_expiredDocumentsCount',
-                                    compact: true,
-                                  ),
+                      const SizedBox(height: 6),
+                      // Chips de Alerta (2 filas)
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Primera fila: Docs, Mantenimiento
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              Expanded(
+                                child: _buildStatusChip(
+                                  color: Colors.redAccent,
+                                  label: 'Docs vencidos',
+                                  value: '$_expiredDocumentsCount',
+                                  compact: true,
                                 ),
-                                const SizedBox(width: 6),
-                                Expanded(
-                                  child: _buildStatusChip(
-                                    color: Colors.orangeAccent,
-                                    label: 'Mantenimiento',
-                                    value: '$_activeAlertsCount',
-                                    compact: true,
-                                  ),
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: _buildStatusChip(
+                                  color: Colors.orangeAccent,
+                                  label: 'Mantenimiento',
+                                  value: '$_activeAlertsCount',
+                                  compact: true,
                                 ),
-                                const SizedBox(width: 6),
-                                Expanded(
-                                  child: _buildStatusChip(
-                                    color: Colors.green,
-                                    label: 'Flota',
-                                    value: '${_vehicleLocations.length}',
-                                    compact: true,
-                                  ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          // Segunda fila: Viajes en curso, Remisiones pendientes
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              Expanded(
+                                child: _buildStatusChip(
+                                  color: Colors.blue,
+                                  label: 'Viajes en curso',
+                                  value: '$_activeTripsCount',
+                                  compact: true,
                                 ),
-                              ],
-                            ),
-                            const SizedBox(height: 6),
-                            // Segunda fila: Viajes, Remisiones
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                              children: [
-                                Expanded(
-                                  child: _buildStatusChip(
-                                    color: Colors.blue,
-                                    label: 'Viajes',
-                                    value: '$_activeTripsCount',
-                                    compact: true,
-                                  ),
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: _buildStatusChip(
+                                  color: Colors.orange,
+                                  label: 'Remisiones pendientes',
+                                  value: '$_pendingRemittancesCount',
+                                  compact: true,
                                 ),
-                                const SizedBox(width: 6),
-                                Expanded(
-                                  child: _buildStatusChip(
-                                    color: Colors.orange,
-                                    label: 'Remisiones',
-                                    value: '$_pendingRemittancesCount',
-                                    compact: true,
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                // Espacio vacío para mantener el layout balanceado
-                                const Expanded(child: SizedBox()),
-                              ],
-                            ),
-                          ],
-                        ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -981,12 +975,12 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
                   ),
                   const SizedBox(height: 8),
                   _buildFloatingModuleButton(
-                    icon: Icons.directions_car,
-                    label: 'Vehículos',
+                    icon: Icons.trending_up,
+                    label: 'Rentabilidad',
                     onTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (_) => const FleetMonitoringPage(),
+                          builder: (_) => const ProfitabilityMainPage(),
                         ),
                       );
                     },

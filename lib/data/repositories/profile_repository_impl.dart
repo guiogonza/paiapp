@@ -256,23 +256,41 @@ class ProfileRepositoryImpl implements ProfileRepository {
     }
   }
 
+  /// Convierte cualquier texto de usuario a un formato válido para Supabase Auth
+  /// Si ya tiene formato de email, lo devuelve tal cual
+  /// Si no, lo convierte a usuario@local.pai
+  String _normalizeUsernameForSupabase(String username) {
+    final trimmed = username.trim();
+    // Si ya tiene formato de email (contiene @), usarlo tal cual
+    if (trimmed.contains('@')) {
+      return trimmed;
+    }
+    // Si no tiene formato de email, convertirlo a usuario@local.pai
+    return '$trimmed@local.pai';
+  }
+
   @override
   Future<Either<ProfileFailure, ProfileEntity>> createDriver(
-    String email,
+    String username,
     String password, {
     String? fullName,
     String? assignedVehicleId,
   }) async {
     try {
-      print('🔨 Creando nuevo conductor: email=$email');
+      print('🔨 Creando nuevo conductor: usuario=$username');
+      
+      // Normalizar el username para Supabase
+      final supabaseEmail = _normalizeUsernameForSupabase(username);
+      print('   Email normalizado para Supabase: $supabaseEmail');
       
       // Paso 1: Crear usuario en auth.users usando signUp
       final signUpResponse = await _supabase.auth.signUp(
-        email: email,
+        email: supabaseEmail,
         password: password,
         data: {
           if (fullName != null && fullName.isNotEmpty) 'full_name': fullName,
           'role': 'driver',
+          'original_username': username, // Guardar el username original
         },
       );
 
@@ -292,7 +310,7 @@ class ProfileRepositoryImpl implements ProfileRepository {
         final profileData = {
           'id': userId,
           'role': 'driver',
-          'email': email, // CRÍTICO: Guardar email en profiles para facilitar consultas
+          'email': username, // CRÍTICO: Guardar el username original (puede ser cualquier texto)
           'full_name': fullName ?? '', // CRÍTICO: Guardar full_name (vacío si no se proporciona)
           if (assignedVehicleId != null) 'assigned_vehicle_id': assignedVehicleId,
           'created_at': DateTime.now().toIso8601String(),
@@ -332,10 +350,10 @@ class ProfileRepositoryImpl implements ProfileRepository {
         if (e.code == '23505' || e.message.contains('duplicate') || e.message.contains('already exists')) {
           print('⚠️ Perfil ya existe, obteniendo y actualizando datos...');
           try {
-            // Actualizar role, email y full_name
+            // Actualizar role, email (username original) y full_name
             final updateData = {
               'role': 'driver',
-              'email': email,
+              'email': username, // Guardar el username original
               'full_name': fullName ?? '',
             };
             await _supabase
@@ -343,7 +361,7 @@ class ProfileRepositoryImpl implements ProfileRepository {
                 .update(updateData)
                 .eq('id', userId);
             
-            print('✅ Datos actualizados: role=driver, email=$email, full_name=${fullName ?? ""}');
+            print('✅ Datos actualizados: role=driver, email=$username, full_name=${fullName ?? ""}');
             
             // Luego obtener el perfil actualizado
             final existingProfile = await getProfileByUserId(userId);
@@ -378,7 +396,7 @@ class ProfileRepositoryImpl implements ProfileRepository {
       if (e.message.contains('already registered') || 
           e.message.contains('already exists') ||
           e.message.contains('User already registered')) {
-        return Left(DatabaseFailure('El email ya está registrado'));
+        return Left(DatabaseFailure('Este usuario ya está registrado'));
       }
       // Manejo de rate limiting - mensaje amigable
       if (e.message.contains('security purposes') || 

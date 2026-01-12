@@ -16,7 +16,7 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
   final _profileRepository = ProfileRepositoryImpl();
   final _vehicleRepository = VehicleRepositoryImpl();
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
+  final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   final _fullNameController = TextEditingController();
 
@@ -39,7 +39,7 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _usernameController.dispose();
     _passwordController.dispose();
     _fullNameController.dispose();
     _rateLimitTimer?.cancel();
@@ -365,7 +365,7 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
     });
 
     final result = await _profileRepository.createDriver(
-      _emailController.text.trim(),
+      _usernameController.text.trim(),
       _passwordController.text,
       fullName: _fullNameController.text.trim().isEmpty 
           ? null 
@@ -633,23 +633,21 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
                 ),
                 const SizedBox(height: 16),
 
-                // Email
+                // Usuario
                 TextFormField(
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
+                  controller: _usernameController,
+                  keyboardType: TextInputType.text,
                   decoration: InputDecoration(
-                    labelText: 'Email *',
-                    prefixIcon: const Icon(Icons.email),
+                    labelText: 'Usuario *',
+                    prefixIcon: const Icon(Icons.person),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
+                    helperText: 'Puede ser cualquier texto (email, nombre, etc.)',
                   ),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
-                      return 'El email es requerido';
-                    }
-                    if (!value.contains('@') || !value.contains('.')) {
-                      return 'Ingresa un email válido';
+                      return 'El usuario es requerido';
                     }
                     return null;
                   },
@@ -691,7 +689,7 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
                             final success = await _handleCreateDriver();
                             if (mounted && success) {
                               Navigator.of(context).pop(); // Cerrar modal
-                              _emailController.clear();
+                              _usernameController.clear();
                               _passwordController.clear();
                               _fullNameController.clear();
                             }

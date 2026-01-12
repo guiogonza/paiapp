@@ -284,9 +284,17 @@ class _BillingDashboardPageState extends State<BillingDashboardPage> {
                         ],
                       ),
                     ),
-                    // Botón de descarga (solo para pendiente_cobrar)
-                    if (remittance.status == 'pendiente_cobrar' && remittance.hasDocument) ...[
+                    // Botones de ver y descargar remisión (si tiene documento)
+                    if (remittance.hasDocument) ...[
                       const SizedBox(width: 8),
+                      IconButton(
+                        icon: const Icon(Icons.visibility, size: 20),
+                        onPressed: () => _viewRemittanceImage(remittance),
+                        tooltip: 'Ver remisión',
+                        color: AppColors.primary,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
                       IconButton(
                         icon: const Icon(Icons.download, size: 20),
                         onPressed: () => _downloadRemittanceImage(remittance),
@@ -481,8 +489,93 @@ class _BillingDashboardPageState extends State<BillingDashboardPage> {
     }
   }
 
+  void _viewRemittanceImage(RemittanceWithRouteEntity remittance) {
+    if (remittance.receiptUrl == null || remittance.receiptUrl!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No hay remisión adjunta'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    // Mostrar imagen en diálogo
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AppBar(
+              title: Text(
+                'Remisión - ${remittance.clientName ?? remittance.receiverName}',
+              ),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
+            Expanded(
+              child: InteractiveViewer(
+                child: Image.network(
+                  remittance.receiptUrl!,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) {
+                    return const Center(
+                      child: Text('Error al cargar la imagen'),
+                    );
+                  },
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return const Center(
+                      child: CircularProgressIndicator(),
+                    );
+                  },
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Cerrar'),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      _downloadRemittanceImage(remittance);
+                    },
+                    icon: const Icon(Icons.download),
+                    label: const Text('Descargar'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _downloadRemittanceImage(RemittanceWithRouteEntity remittance) {
     if (remittance.receiptUrl == null || remittance.receiptUrl!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No hay remisión adjunta'),
+          backgroundColor: Colors.orange,
+        ),
+      );
       return;
     }
 
@@ -500,6 +593,15 @@ class _BillingDashboardPageState extends State<BillingDashboardPage> {
           content: Text('Descarga iniciada'),
           backgroundColor: Colors.green,
           duration: Duration(seconds: 2),
+        ),
+      );
+    } else {
+      // Para móvil, abrir la URL en el navegador
+      // Puedes usar url_launcher si lo prefieres
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Abre: ${remittance.receiptUrl}'),
+          duration: const Duration(seconds: 3),
         ),
       );
     }

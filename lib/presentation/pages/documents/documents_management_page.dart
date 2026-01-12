@@ -31,6 +31,8 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
   List<VehicleEntity> _vehicles = [];
   Map<String, String> _driverNames = {}; // driver_id -> email/name
   bool _isLoading = true;
+  bool _isLoadingDrivers = false;
+  bool _isLoadingVehicles = false;
 
   // Formulario
   final _formKey = GlobalKey<FormState>();
@@ -123,22 +125,32 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
   }
 
   Future<void> _loadDrivers() async {
+    if (_isLoadingDrivers) return; // Evitar cargas duplicadas
+    
+    setState(() {
+      _isLoadingDrivers = true;
+    });
+    
     print('🔄 Recargando lista de conductores...');
     final driversResult = await _profileRepository.getDriversList();
     driversResult.fold(
       (failure) {
         print('❌ Error al cargar conductores: ${failure.message}');
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error al cargar conductores: ${failure.message}'),
-              backgroundColor: Colors.orange,
-              duration: const Duration(seconds: 4),
-            ),
-          );
           setState(() {
             _driverNames = {}; // Asegurar que esté vacío en caso de error
+            _isLoadingDrivers = false;
           });
+          // Solo mostrar error si el usuario está en el formulario
+          if (_selectedAssociationType == 'Conductor') {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Error al cargar conductores: ${failure.message}'),
+                backgroundColor: Colors.orange,
+                duration: const Duration(seconds: 3),
+              ),
+            );
+          }
         }
       },
       (driversMap) {
@@ -146,27 +158,84 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
         if (mounted) {
           setState(() {
             _driverNames = driversMap;
+            _isLoadingDrivers = false;
           });
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Lista de conductores actualizada: ${driversMap.length} encontrados'),
-              backgroundColor: Colors.green,
-              duration: const Duration(seconds: 2),
-            ),
-          );
-          // Mostrar advertencia si no hay conductores
-          if (driversMap.isEmpty && mounted) {
+          // Solo mostrar mensaje si el usuario está en el formulario y no hay conductores
+          if (_selectedAssociationType == 'Conductor' && driversMap.isEmpty) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('No hay conductores registrados en el sistema. Por favor, crea usuarios con rol "driver" primero.'),
+                content: Text('No hay conductores registrados. Por favor, crea usuarios con rol "driver" primero.'),
                 backgroundColor: Colors.orange,
-                duration: Duration(seconds: 5),
+                duration: Duration(seconds: 4),
               ),
             );
           }
         }
       },
     );
+    
+    if (mounted && _isLoadingDrivers) {
+      setState(() {
+        _isLoadingDrivers = false;
+      });
+    }
+  }
+
+  Future<void> _loadVehicles() async {
+    if (_isLoadingVehicles) return; // Evitar cargas duplicadas
+    
+    setState(() {
+      _isLoadingVehicles = true;
+    });
+    
+    print('🔄 Cargando lista de vehículos...');
+    final vehiclesResult = await _vehicleRepository.getVehicles();
+    vehiclesResult.fold(
+      (failure) {
+        print('❌ Error al cargar vehículos: ${failure.message}');
+        if (mounted) {
+          setState(() {
+            _vehicles = []; // Asegurar que esté vacío en caso de error
+            _isLoadingVehicles = false;
+          });
+          // Solo mostrar error si el usuario está en el formulario
+          if (_selectedAssociationType == 'Vehículo') {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Error al cargar vehículos: ${failure.message}'),
+                backgroundColor: Colors.orange,
+                duration: const Duration(seconds: 3),
+              ),
+            );
+          }
+        }
+      },
+      (vehicles) {
+        print('✅ Vehículos cargados: ${vehicles.length}');
+        if (mounted) {
+          setState(() {
+            _vehicles = vehicles;
+            _isLoadingVehicles = false;
+          });
+          // Solo mostrar mensaje si el usuario está en el formulario y no hay vehículos
+          if (_selectedAssociationType == 'Vehículo' && vehicles.isEmpty) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('No hay vehículos registrados. Por favor, crea vehículos primero.'),
+                backgroundColor: Colors.orange,
+                duration: Duration(seconds: 4),
+              ),
+            );
+          }
+        }
+      },
+    );
+    
+    if (mounted && _isLoadingVehicles) {
+      setState(() {
+        _isLoadingVehicles = false;
+      });
+    }
   }
 
 
@@ -639,14 +708,121 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
       minChildSize: 0.5,
       maxChildSize: 0.95,
       builder: (context, scrollController) {
-        return SingleChildScrollView(
-          controller: scrollController,
-          padding: const EdgeInsets.all(16.0),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setModalState) {
+            // Función helper para actualizar ambos estados
+            void updateBothStates(VoidCallback fn) {
+              setModalState(fn);
+              setState(fn);
+            }
+            
+            // Función helper para cargar conductores con actualización del modal
+            Future<void> loadDriversForModal() async {
+              if (_isLoadingDrivers) return;
+              updateBothStates(() {
+                _isLoadingDrivers = true;
+              });
+              
+              // Cargar conductores directamente
+              print('🔄 Cargando lista de conductores desde modal...');
+              final driversResult = await _profileRepository.getDriversList();
+              driversResult.fold(
+                (failure) {
+                  print('❌ Error al cargar conductores: ${failure.message}');
+                  if (mounted) {
+                    updateBothStates(() {
+                      _driverNames = {};
+                      _isLoadingDrivers = false;
+                    });
+                    if (_selectedAssociationType == 'Conductor') {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Error al cargar conductores: ${failure.message}'),
+                          backgroundColor: Colors.orange,
+                          duration: const Duration(seconds: 3),
+                        ),
+                      );
+                    }
+                  }
+                },
+                (driversMap) {
+                  print('✅ Conductores cargados: ${driversMap.length}');
+                  if (mounted) {
+                    updateBothStates(() {
+                      _driverNames = driversMap;
+                      _isLoadingDrivers = false;
+                    });
+                    if (_selectedAssociationType == 'Conductor' && driversMap.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('No hay conductores registrados. Por favor, crea usuarios con rol "driver" primero.'),
+                          backgroundColor: Colors.orange,
+                          duration: Duration(seconds: 4),
+                        ),
+                      );
+                    }
+                  }
+                },
+              );
+            }
+            
+            // Función helper para cargar vehículos con actualización del modal
+            Future<void> loadVehiclesForModal() async {
+              if (_isLoadingVehicles) return;
+              updateBothStates(() {
+                _isLoadingVehicles = true;
+              });
+              
+              // Cargar vehículos directamente
+              print('🔄 Cargando lista de vehículos desde modal...');
+              final vehiclesResult = await _vehicleRepository.getVehicles();
+              vehiclesResult.fold(
+                (failure) {
+                  print('❌ Error al cargar vehículos: ${failure.message}');
+                  if (mounted) {
+                    updateBothStates(() {
+                      _vehicles = [];
+                      _isLoadingVehicles = false;
+                    });
+                    if (_selectedAssociationType == 'Vehículo') {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Error al cargar vehículos: ${failure.message}'),
+                          backgroundColor: Colors.orange,
+                          duration: const Duration(seconds: 3),
+                        ),
+                      );
+                    }
+                  }
+                },
+                (vehicles) {
+                  print('✅ Vehículos cargados: ${vehicles.length}');
+                  if (mounted) {
+                    updateBothStates(() {
+                      _vehicles = vehicles;
+                      _isLoadingVehicles = false;
+                    });
+                    if (_selectedAssociationType == 'Vehículo' && vehicles.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('No hay vehículos registrados. Por favor, crea vehículos primero.'),
+                          backgroundColor: Colors.orange,
+                          duration: Duration(seconds: 4),
+                        ),
+                      );
+                    }
+                  }
+                },
+              );
+            }
+            return SingleChildScrollView(
+              controller: scrollController,
+              padding: const EdgeInsets.all(16.0),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                 Row(
                   children: [
                     Icon(Icons.add_circle, color: AppColors.primary),
@@ -667,110 +843,197 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
                 const SizedBox(height: 24),
                 // Tipo de Asociación
                 DropdownButtonFormField<String>(
-                        initialValue: _selectedAssociationType,
-                        decoration: InputDecoration(
-                          labelText: 'Asociar a *',
-                          prefixIcon: const Icon(Icons.link),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        items: _associationTypes.map((type) {
-                          return DropdownMenuItem(
-                            value: type,
-                            child: Text(type),
-                          );
-                        }).toList(),
-                        onChanged: (value) {
-                          setState(() {
-                            _selectedAssociationType = value;
-                            _selectedVehicleId = null;
-                            _selectedDriverId = null;
-                          });
-                        },
+                  value: _selectedAssociationType,
+                  decoration: InputDecoration(
+                    labelText: 'Asociar a *',
+                    prefixIcon: const Icon(Icons.link),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  items: _associationTypes.map((type) {
+                    return DropdownMenuItem(
+                      value: type,
+                      child: Text(type),
+                    );
+                  }).toList(),
+                  onChanged: (value) async {
+                    // Actualizar estado del modal y del widget principal
+                    updateBothStates(() {
+                      _selectedAssociationType = value;
+                      _selectedVehicleId = null;
+                      _selectedDriverId = null;
+                    });
+                    
+                    // Cargar datos según la selección
+                    if (value == 'Conductor') {
+                      // Cargar conductores si no están cargados
+                      if (_driverNames.isEmpty) {
+                        await loadDriversForModal();
+                      }
+                    } else if (value == 'Vehículo') {
+                      // Cargar vehículos si no están cargados
+                      if (_vehicles.isEmpty) {
+                        await loadVehiclesForModal();
+                      }
+                    }
+                  },
                 ),
                 const SizedBox(height: 16),
 
                 // Selector de Vehículo
                 if (_selectedAssociationType == 'Vehículo')
-                  DropdownButtonFormField<String>(
-                    initialValue: _selectedVehicleId,
-                    decoration: InputDecoration(
-                      labelText: 'Vehículo *',
-                      prefixIcon: const Icon(Icons.directions_car),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    items: _vehicles.map((vehicle) {
-                      return DropdownMenuItem(
-                        value: vehicle.id,
-                        child: Text('${vehicle.placa} - ${vehicle.marca} ${vehicle.modelo}'),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedVehicleId = value;
-                      });
-                    },
-                  ),
+                  _isLoadingVehicles
+                      ? Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey[300]!),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            children: [
+                              const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                'Cargando vehículos...',
+                                style: TextStyle(color: Colors.grey[600]),
+                              ),
+                            ],
+                          ),
+                        )
+                      : _vehicles.isEmpty
+                          ? Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.orange, width: 1),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.warning, color: Colors.orange),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      'No hay vehículos registrados. Por favor, crea vehículos primero.',
+                                      style: TextStyle(
+                                        color: Colors.orange[800],
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : DropdownButtonFormField<String>(
+                              value: _selectedVehicleId,
+                              decoration: InputDecoration(
+                                labelText: 'Vehículo *',
+                                prefixIcon: const Icon(Icons.directions_car),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                helperText: '${_vehicles.length} vehículo(s) disponible(s)',
+                              ),
+                              items: _vehicles.map((vehicle) {
+                                return DropdownMenuItem(
+                                  value: vehicle.id,
+                                  child: Text('${vehicle.placa} - ${vehicle.marca} ${vehicle.modelo}'),
+                                );
+                              }).toList(),
+                              onChanged: (value) {
+                                updateBothStates(() {
+                                  _selectedVehicleId = value;
+                                });
+                              },
+                              validator: (value) {
+                                if (_selectedAssociationType == 'Vehículo' && (value == null || value.isEmpty)) {
+                                  return 'Debes seleccionar un vehículo';
+                                }
+                                return null;
+                              },
+                            ),
 
                 // Selector de Conductor
                 if (_selectedAssociationType == 'Conductor')
-                        _driverNames.isEmpty
-                            ? Container(
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: Colors.orange.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: Colors.orange, width: 1),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.warning, color: Colors.orange),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Text(
-                                        'No hay conductores registrados. Por favor, crea usuarios con rol "driver" primero.',
-                                        style: TextStyle(
-                                          color: Colors.orange[800],
-                                          fontSize: 14,
-                                        ),
+                  _isLoadingDrivers
+                      ? Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey[300]!),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            children: [
+                              const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                'Cargando conductores...',
+                                style: TextStyle(color: Colors.grey[600]),
+                              ),
+                            ],
+                          ),
+                        )
+                      : _driverNames.isEmpty
+                          ? Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.orange, width: 1),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.warning, color: Colors.orange),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      'No hay conductores registrados. Por favor, crea usuarios con rol "driver" primero.',
+                                      style: TextStyle(
+                                        color: Colors.orange[800],
+                                        fontSize: 14,
                                       ),
                                     ),
-                                  ],
+                                  ),
+                                ],
+                              ),
+                            )
+                          : DropdownButtonFormField<String>(
+                              value: _selectedDriverId,
+                              decoration: InputDecoration(
+                                labelText: 'Conductor *',
+                                prefixIcon: const Icon(Icons.person),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
                                 ),
-                              )
-                  : DropdownButtonFormField<String>(
-                      initialValue: _selectedDriverId,
-                      decoration: InputDecoration(
-                        labelText: 'Conductor *',
-                        prefixIcon: const Icon(Icons.person),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        helperText: _driverNames.isEmpty
-                            ? 'No hay conductores disponibles'
-                            : '${_driverNames.length} conductor(es) disponible(s)',
-                      ),
-                      items: _driverNames.entries.map((entry) {
-                        return DropdownMenuItem(
-                          value: entry.key,
-                          child: Text(entry.value),
-                        );
-                      }).toList(),
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedDriverId = value;
-                        });
-                      },
-                      validator: (value) {
-                        if (_selectedAssociationType == 'Conductor' && (value == null || value.isEmpty)) {
-                          return 'Debes seleccionar un conductor';
-                        }
-                        return null;
-                      },
-                    ),
+                                helperText: '${_driverNames.length} conductor(es) disponible(s)',
+                              ),
+                              items: _driverNames.entries.map((entry) {
+                                return DropdownMenuItem(
+                                  value: entry.key,
+                                  child: Text(entry.value),
+                                );
+                              }).toList(),
+                              onChanged: (value) {
+                                updateBothStates(() {
+                                  _selectedDriverId = value;
+                                });
+                              },
+                              validator: (value) {
+                                if (_selectedAssociationType == 'Conductor' && (value == null || value.isEmpty)) {
+                                  return 'Debes seleccionar un conductor';
+                                }
+                                return null;
+                              },
+                            ),
 
                 if (_selectedAssociationType != null) const SizedBox(height: 16),
 
@@ -924,9 +1187,11 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
                           ),
                   ),
                 ),
-              ],
-            ),
-          ),
+                  ],
+                ),
+              ),
+            );
+          },
         );
       },
     );
