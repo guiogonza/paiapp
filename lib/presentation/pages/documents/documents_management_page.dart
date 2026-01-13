@@ -588,21 +588,6 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
     _documentTypeController.clear();
   }
 
-  Future<void> _selectExpirationDate() async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedExpirationDate ?? DateTime.now().add(const Duration(days: 30)),
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365 * 10)), // 10 años
-      locale: const Locale('es', 'ES'),
-    );
-
-    if (picked != null) {
-      setState(() {
-        _selectedExpirationDate = picked;
-      });
-    }
-  }
 
   String _getAssociatedName(DocumentEntity document) {
     if (document.isVehicleDocument) {
@@ -1228,7 +1213,20 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
 
                 // Fecha de Expiración
                 InkWell(
-                  onTap: _selectExpirationDate,
+                  onTap: () async {
+                    final DateTime? picked = await showDatePicker(
+                      context: context,
+                      initialDate: _selectedExpirationDate ?? DateTime.now().add(const Duration(days: 30)),
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime.now().add(const Duration(days: 365 * 10)), // 10 años
+                    );
+
+                    if (picked != null) {
+                      updateBothStates(() {
+                        _selectedExpirationDate = picked;
+                      });
+                    }
+                  },
                   child: InputDecorator(
                     decoration: InputDecoration(
                       labelText: 'Fecha de Expiración *',

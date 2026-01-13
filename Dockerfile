@@ -1,32 +1,29 @@
-# Multi-stage build para Flutter Web
-# Stage 1: Build
-# Forzar arquitectura amd64 explícitamente
-FROM --platform=linux/amd64 ghcr.io/cirruslabs/flutter:stable AS build
+# Multi-stage build para construir Flutter y servir con Nginx
+FROM ghcr.io/cirruslabs/flutter:stable AS builder
 
 WORKDIR /app
 
-# Copiar archivos de configuración
+# Copiar archivos necesarios para pub get
 COPY pubspec.yaml pubspec.lock ./
 RUN flutter pub get
 
 # Copiar código fuente
-COPY . .
+COPY lib/ lib/
+COPY assets/ assets/
+COPY web/ web/
 
-# Construir la aplicación web
+# Construir para web
 RUN flutter build web --release
 
-# Stage 2: Production
-# Usar nginx:latest (más compatible que alpine)
-FROM --platform=linux/amd64 nginx:latest
+# Stage 2: Servir con Nginx
+FROM nginx:stable-alpine
 
-# Copiar los archivos compilados
-COPY --from=build /app/build/web /usr/share/nginx/html
+# Copiar build/web desde el stage anterior
+COPY --from=builder /app/build/web /usr/share/nginx/html
 
-# Copiar configuración personalizada de nginx
+# Copiar configuración de nginx
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Exponer el puerto 80
 EXPOSE 80
 
-# Comando por defecto de nginx
 CMD ["nginx", "-g", "daemon off;"]
