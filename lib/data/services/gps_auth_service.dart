@@ -275,16 +275,41 @@ class GPSAuthService {
 
   /// Obtiene la lista de dispositivos GPS directamente del API
   /// Retorna una lista de maps con los datos de cada dispositivo
-  Future<List<Map<String, dynamic>>> getDevicesFromGPS() async {
+  /// Usa las credenciales del usuario actual o el API key guardado
+  Future<List<Map<String, dynamic>>> getDevicesFromGPS({
+    String? email,
+    String? password,
+  }) async {
     try {
       print('📡 Obteniendo dispositivos del API GPS...');
 
-      // Usar credenciales por defecto
-      const email = 'luisr@rastrear.com.co';
-      const password = '2023';
+      String? apiKey;
 
-      // Autenticarse
-      final apiKey = await login(email, password);
+      // Si se proporcionan credenciales, usarlas
+      if (email != null && password != null) {
+        print('🔐 Usando credenciales proporcionadas: $email');
+        apiKey = await login(email, password);
+      } else {
+        // Intentar usar el API key guardado primero
+        apiKey = await getApiKey();
+        if (apiKey == null || apiKey.isEmpty) {
+          // Intentar obtener credenciales guardadas de SharedPreferences
+          final prefs = await SharedPreferences.getInstance();
+          final savedEmail = prefs.getString('saved_username');
+          final savedPassword = prefs.getString('saved_password');
+
+          if (savedEmail != null && savedPassword != null) {
+            print('🔐 Usando credenciales guardadas: $savedEmail');
+            apiKey = await login(savedEmail, savedPassword);
+          } else {
+            print('❌ No hay credenciales guardadas disponibles');
+            return [];
+          }
+        } else {
+          print('🔑 Usando API key guardado');
+        }
+      }
+
       if (apiKey == null || apiKey.isEmpty) {
         print('❌ No se pudo autenticar con el GPS');
         return [];
