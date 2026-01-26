@@ -123,15 +123,16 @@ class _LoginPageState extends State<LoginPage> {
         _passwordController.text,
       );
 
-      // Guardar credenciales si "Recordarme" está activo
+      // SIEMPRE guardar credenciales para poder cargar vehículos del GPS
+      await _localAuthService.saveCredentials(
+        _usernameController.text.trim(),
+        _passwordController.text,
+      );
+
+      // Configurar preferencias de "Recordarme" y biometría
       if (_rememberMe) {
-        await _localAuthService.saveCredentials(
-          _usernameController.text.trim(),
-          _passwordController.text,
-        );
         await _localAuthService.setRememberMe(true);
       } else {
-        await _localAuthService.clearCredentials();
         await _localAuthService.setRememberMe(false);
         await _localAuthService.setBiometricEnabled(false);
       }
