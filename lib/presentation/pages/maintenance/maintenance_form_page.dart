@@ -129,7 +129,7 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
           _isLoadingMileage = false;
           _currentMileage = _selectedVehicle!.currentMileage;
         });
-        print('✅ Usando kilometraje guardado: ${_currentMileage} km');
+        print('✅ Usando kilometraje guardado: $_currentMileage km');
       } else {
         setState(() {
           _isLoadingMileage = false;
@@ -423,7 +423,7 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
             children: [
               // Selector de vehículo
               DropdownButtonFormField<VehicleEntity>(
-                value: _selectedVehicle,
+                initialValue: _selectedVehicle,
                 decoration: InputDecoration(
                   labelText: 'Vehículo *',
                   prefixIcon: const Icon(Icons.directions_car),
@@ -664,7 +664,7 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
                   const SizedBox(height: 16),
                   // Fallback: Dropdown simple si no hay tipo de vehículo
                   DropdownButtonFormField<int>(
-                    value: _selectedTirePosition,
+                    initialValue: _selectedTirePosition,
                     decoration: InputDecoration(
                       labelText: 'Posición de Llanta *',
                       prefixIcon: const Icon(Icons.location_on),
@@ -693,7 +693,7 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
                 ] else ...[
                   // Fallback: Dropdown simple si el vehículo no tiene tipo
                   DropdownButtonFormField<int>(
-                    value: _selectedTirePosition,
+                    initialValue: _selectedTirePosition,
                     decoration: InputDecoration(
                       labelText: 'Posición de Llanta *',
                       prefixIcon: const Icon(Icons.location_on),

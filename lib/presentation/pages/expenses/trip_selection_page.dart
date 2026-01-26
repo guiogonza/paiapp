@@ -34,8 +34,8 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
   
   List<TripEntity> _trips = [];
   List<TripEntity> _filteredTrips = [];
-  Map<String, List<ExpenseEntity>> _expensesByTrip = {}; // tripId -> expenses
-  Map<String, Map<String, String>> _driverNamesByTrip = {}; // tripId -> {driverId: name}
+  final Map<String, List<ExpenseEntity>> _expensesByTrip = {}; // tripId -> expenses
+  final Map<String, Map<String, String>> _driverNamesByTrip = {}; // tripId -> {driverId: name}
   bool _isLoading = true;
   String? _userRole;
   String? _userEmail;
@@ -404,7 +404,7 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
               children: [
                 // Selector de tipo de búsqueda
                 DropdownButtonFormField<String>(
-                  value: _searchType,
+                  initialValue: _searchType,
                   decoration: InputDecoration(
                     labelText: 'Buscar por',
                     prefixIcon: const Icon(Icons.search),
@@ -436,7 +436,7 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
                 // Campo de búsqueda o dropdown de conductores
                 _searchType == 'Conductor'
                     ? DropdownButtonFormField<String>(
-                        value: _selectedDriverFilter,
+                        initialValue: _selectedDriverFilter,
                         decoration: InputDecoration(
                           labelText: 'Seleccionar conductor',
                           prefixIcon: const Icon(Icons.person),

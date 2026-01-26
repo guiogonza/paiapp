@@ -15,7 +15,7 @@ class DatabaseFailure extends ExpenseFailure {
 }
 
 class ValidationFailure extends ExpenseFailure {
-  const ValidationFailure(String message) : super(message);
+  const ValidationFailure(super.message);
 }
 
 class NotFoundFailure extends ExpenseFailure {

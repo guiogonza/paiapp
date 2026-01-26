@@ -27,6 +27,8 @@ import 'package:pai_app/data/repositories/document_repository_impl.dart';
 import 'package:pai_app/data/repositories/profile_repository_impl.dart';
 import 'package:pai_app/presentation/pages/super_admin/super_admin_dashboard_page.dart';
 import 'package:pai_app/presentation/pages/profitability/profitability_main_page.dart';
+import 'package:pai_app/presentation/widgets/pwa_install_prompt.dart';
+import 'package:pai_app/core/services/pwa_service_export.dart';
 
 class OwnerDashboardPage extends StatefulWidget {
   const OwnerDashboardPage({super.key});
@@ -48,22 +50,30 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
   int _activeTripsCount = 0; // Viajes activos (en ruta)
   int _pendingRemittancesCount = 0; // Remisiones pendientes de cobro
   int _expiredDocumentsCount = 0; // Documentos vencidos
-  
+
+  // Estado de PWA
+  bool _canInstallPwa = false;
+  bool _isPwaInstalled = false;
+
   // Controllers para mapas
   gmaps.GoogleMapController? _mapController;
   MapController? _flutterMapController;
   Set<gmaps.Marker> _markers = {};
   List<Marker> _flutterMarkers = [];
-  
+
   // Ubicación por defecto: Bogotá, Colombia
   static const gmaps.LatLng _defaultLocation = gmaps.LatLng(4.7110, -74.0721);
-  static const latlng.LatLng _defaultLocationFlutter = latlng.LatLng(4.7110, -74.0721);
+  static const latlng.LatLng _defaultLocationFlutter = latlng.LatLng(
+    4.7110,
+    -74.0721,
+  );
 
   @override
   void initState() {
     super.initState();
     if (kIsWeb) {
       _flutterMapController = MapController();
+      _initPwaService(); // Inicializar servicio PWA
     }
     _loadUserRole(); // Cargar role del usuario
     _loadVehicleLocations();
@@ -71,6 +81,31 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
     _loadFinancialKpi(); // Cargar KPI financiero
     _loadOperationalKpis(); // Cargar KPIs operativos
     _loadDocumentAlerts(); // Cargar alertas de documentos
+  }
+
+  /// Inicializa el servicio PWA y escucha cambios
+  void _initPwaService() {
+    final pwaService = PWAService();
+
+    // Verificar estado inicial
+    final deviceInfo = pwaService.deviceInfo;
+    if (deviceInfo != null) {
+      setState(() {
+        _isPwaInstalled = deviceInfo.isStandalone;
+        _canInstallPwa = pwaService.canInstall && !deviceInfo.isStandalone;
+      });
+    }
+
+    // Escuchar cambios en el estado de instalación
+    pwaService.installStateStream.listen((canInstall) {
+      if (mounted) {
+        final info = pwaService.deviceInfo;
+        setState(() {
+          _canInstallPwa = canInstall && !(info?.isStandalone ?? false);
+          _isPwaInstalled = info?.isStandalone ?? false;
+        });
+      }
+    });
   }
 
   /// Carga el role del usuario actual
@@ -118,9 +153,11 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
       );
 
       // Obtener remisiones pendientes (todas las que no están cobradas)
-      final remittancesResult = await remittanceRepository.getPendingRemittancesWithRoutes();
+      final remittancesResult = await remittanceRepository
+          .getPendingRemittancesWithRoutes();
       remittancesResult.fold(
-        (failure) => debugPrint('Error al cargar remisiones: ${failure.message}'),
+        (failure) =>
+            debugPrint('Error al cargar remisiones: ${failure.message}'),
         (remittances) {
           if (mounted) {
             setState(() {
@@ -139,7 +176,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
     try {
       final documentRepository = DocumentRepositoryImpl();
       final documentsResult = await documentRepository.getDocuments();
-      
+
       documentsResult.fold(
         (failure) {
           debugPrint('Error al cargar documentos: ${failure.message}');
@@ -153,7 +190,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
           final now = DateTime.now();
           // Normalizar la fecha actual para comparar solo fechas (sin hora)
           final today = DateTime(now.year, now.month, now.day);
-          
+
           int expiredCount = 0;
           for (var document in documents) {
             // Normalizar la fecha de expiración para comparar solo fechas
@@ -162,13 +199,13 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
               document.expirationDate.month,
               document.expirationDate.day,
             );
-            
+
             // Un documento está vencido si su fecha de expiración es anterior a hoy
             if (expirationDate.isBefore(today)) {
               expiredCount++;
             }
           }
-          
+
           if (mounted) {
             setState(() {
               _expiredDocumentsCount = expiredCount;
@@ -191,7 +228,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
     try {
       final tripRepository = TripRepositoryImpl();
       final expenseRepository = ExpenseRepositoryImpl();
-      
+
       final now = DateTime.now();
       final firstDayOfMonth = DateTime(now.year, now.month, 1);
       final lastDayOfMonth = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
@@ -242,9 +279,11 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
       );
 
       // Obtener gastos de mantenimiento del mes
-      final maintenanceResult = await _maintenanceRepository.getAllMaintenance();
+      final maintenanceResult = await _maintenanceRepository
+          .getAllMaintenance();
       maintenanceResult.fold(
-        (failure) => debugPrint('Error al cargar mantenimientos: ${failure.message}'),
+        (failure) =>
+            debugPrint('Error al cargar mantenimientos: ${failure.message}'),
         (maintenanceList) {
           double totalMaintenanceExpenses = 0.0;
           for (var maintenance in maintenanceList) {
@@ -285,18 +324,17 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
     );
   }
 
-
   Future<void> _loadVehicleLocations() async {
     // El servicio ahora retorna lista vacía en caso de error, no lanza excepciones
     debugPrint('🔄 Cargando ubicaciones de vehículos...');
     final locations = await _locationService.getVehicleLocations();
     debugPrint('✅ Ubicaciones cargadas: ${locations.length} vehículos');
-    
+
     if (mounted) {
       setState(() {
         _vehicleLocations = locations;
       });
-      
+
       if (locations.isNotEmpty) {
         _updateMarkers();
         _centerMapOnVehicles();
@@ -338,12 +376,14 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
         final timeStr = vehicle.timestamp != null
             ? '${vehicle.timestamp!.hour.toString().padLeft(2, '0')}:${vehicle.timestamp!.minute.toString().padLeft(2, '0')}'
             : '--:--';
-        
+
         markers.add(
           gmaps.Marker(
             markerId: gmaps.MarkerId(vehicle.id),
             position: gmaps.LatLng(vehicle.lat, vehicle.lng),
-            icon: gmaps.BitmapDescriptor.defaultMarkerWithHue(gmaps.BitmapDescriptor.hueRed),
+            icon: gmaps.BitmapDescriptor.defaultMarkerWithHue(
+              gmaps.BitmapDescriptor.hueRed,
+            ),
             infoWindow: gmaps.InfoWindow(
               title: 'Vehículo ${vehicle.plate}',
               snippet: 'Último reporte: $timeStr',
@@ -414,10 +454,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
           ),
           Text(
             timeStr,
-            style: TextStyle(
-              fontSize: 7,
-              color: AppColors.textSecondary,
-            ),
+            style: TextStyle(fontSize: 7, color: AppColors.textSecondary),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -501,15 +538,12 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
     _centerMapOnVehicles();
   }
 
-
   /// Construye el isotipo PAI (logo geométrico)
   Widget _buildPaiIsotype() {
     return Container(
       width: 40,
       height: 40,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
-      ),
+      decoration: BoxDecoration(borderRadius: BorderRadius.circular(8)),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(8),
         child: Image.asset(
@@ -562,10 +596,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
           Container(
             width: compact ? 6 : 8,
             height: compact ? 6 : 8,
-            decoration: BoxDecoration(
-              color: color,
-              shape: BoxShape.circle,
-            ),
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
           ),
           SizedBox(width: compact ? 6 : 8),
           Text(
@@ -598,9 +629,10 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
     final baseTheme = Theme.of(context);
     final textTheme = GoogleFonts.poppinsTextTheme(baseTheme.textTheme);
 
-    final totalExpenses = _currentMonthExpenses + _currentMonthMaintenanceExpenses;
+    final totalExpenses =
+        _currentMonthExpenses + _currentMonthMaintenanceExpenses;
     final balance = _currentMonthRevenue - totalExpenses;
-    
+
     // Formateador de números con separador de miles (punto)
     final numberFormat = NumberFormat('#,###', 'es_CO');
 
@@ -617,10 +649,11 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
                 Container(
                   height: 80,
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: const BoxDecoration(
-                    color: AppColors.primary,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
                   ),
+                  decoration: const BoxDecoration(color: AppColors.primary),
                   child: SafeArea(
                     bottom: false,
                     child: Row(
@@ -653,87 +686,286 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
                             ),
                           ],
                         ),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (_activeAlertsCount > 0)
-                              Stack(
+                        LayoutBuilder(
+                          builder: (context, constraints) {
+                            // En móvil (ancho < 600), mostrar solo notificaciones y menú
+                            final isMobile =
+                                MediaQuery.of(context).size.width < 600;
+
+                            if (isMobile) {
+                              return Row(
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  IconButton(
-                                    icon: const Icon(Icons.notifications, color: Colors.white, size: 20),
-                                    onPressed: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (_) => const MaintenancePage(),
+                                  if (_activeAlertsCount > 0)
+                                    Stack(
+                                      children: [
+                                        IconButton(
+                                          icon: const Icon(
+                                            Icons.notifications,
+                                            color: Colors.white,
+                                            size: 20,
+                                          ),
+                                          onPressed: () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (_) =>
+                                                    const MaintenancePage(),
+                                              ),
+                                            ).then((_) => _checkActiveAlerts());
+                                          },
+                                          tooltip:
+                                              'Tienes $_activeAlertsCount alertas',
                                         ),
-                                      ).then((_) => _checkActiveAlerts());
-                                    },
-                                    tooltip: 'Tienes $_activeAlertsCount alertas',
-                                  ),
-                                  Positioned(
-                                    right: 8,
-                                    top: 8,
-                                    child: Container(
-                                      padding: const EdgeInsets.all(3),
-                                      decoration: const BoxDecoration(
-                                        color: Colors.red,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      constraints: const BoxConstraints(
-                                        minWidth: 14,
-                                        minHeight: 14,
-                                      ),
-                                      child: Text(
-                                        _activeAlertsCount > 9 ? '9+' : '$_activeAlertsCount',
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 9,
-                                          fontWeight: FontWeight.bold,
+                                        Positioned(
+                                          right: 8,
+                                          top: 8,
+                                          child: Container(
+                                            padding: const EdgeInsets.all(3),
+                                            decoration: const BoxDecoration(
+                                              color: Colors.red,
+                                              shape: BoxShape.circle,
+                                            ),
+                                            constraints: const BoxConstraints(
+                                              minWidth: 14,
+                                              minHeight: 14,
+                                            ),
+                                            child: Text(
+                                              _activeAlertsCount > 9
+                                                  ? '9+'
+                                                  : '$_activeAlertsCount',
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 9,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                              textAlign: TextAlign.center,
+                                            ),
+                                          ),
                                         ),
-                                        textAlign: TextAlign.center,
-                                      ),
+                                      ],
                                     ),
+                                  PopupMenuButton<String>(
+                                    icon: const Icon(
+                                      Icons.more_vert,
+                                      color: Colors.white,
+                                      size: 20,
+                                    ),
+                                    tooltip: 'Más opciones',
+                                    onSelected: (value) async {
+                                      switch (value) {
+                                        case 'super_admin':
+                                          Navigator.of(context).push(
+                                            MaterialPageRoute(
+                                              builder: (_) =>
+                                                  const SuperAdminDashboardPage(),
+                                            ),
+                                          );
+                                          break;
+                                        case 'refresh':
+                                          _loadVehicleLocations();
+                                          _checkActiveAlerts();
+                                          _loadFinancialKpi();
+                                          _loadOperationalKpis();
+                                          _loadDocumentAlerts();
+                                          break;
+                                        case 'install':
+                                          PWAInstallPrompt.showInstallDialog(
+                                            context,
+                                          );
+                                          break;
+                                        case 'logout':
+                                          final authRepository =
+                                              AuthRepositoryImpl();
+                                          await authRepository.logout();
+                                          if (!mounted) return;
+                                          Navigator.of(context).pushReplacement(
+                                            MaterialPageRoute(
+                                              builder: (_) => const LoginPage(),
+                                            ),
+                                          );
+                                          break;
+                                      }
+                                    },
+                                    itemBuilder: (BuildContext context) =>
+                                        <PopupMenuEntry<String>>[
+                                          if (_userRole == 'super_admin')
+                                            const PopupMenuItem<String>(
+                                              value: 'super_admin',
+                                              child: Row(
+                                                children: [
+                                                  Icon(
+                                                    Icons.admin_panel_settings,
+                                                    size: 20,
+                                                  ),
+                                                  SizedBox(width: 12),
+                                                  Text('Super Admin'),
+                                                ],
+                                              ),
+                                            ),
+                                          const PopupMenuItem<String>(
+                                            value: 'refresh',
+                                            child: Row(
+                                              children: [
+                                                Icon(Icons.refresh, size: 20),
+                                                SizedBox(width: 12),
+                                                Text('Actualizar'),
+                                              ],
+                                            ),
+                                          ),
+                                          if (kIsWeb &&
+                                              _canInstallPwa &&
+                                              !_isPwaInstalled)
+                                            const PopupMenuItem<String>(
+                                              value: 'install',
+                                              child: Row(
+                                                children: [
+                                                  Icon(
+                                                    Icons.install_mobile,
+                                                    size: 20,
+                                                  ),
+                                                  SizedBox(width: 12),
+                                                  Text('Instalar App'),
+                                                ],
+                                              ),
+                                            ),
+                                          const PopupMenuItem<String>(
+                                            value: 'logout',
+                                            child: Row(
+                                              children: [
+                                                Icon(Icons.logout, size: 20),
+                                                SizedBox(width: 12),
+                                                Text('Cerrar sesión'),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
                                   ),
                                 ],
-                              ),
-                            // Botón Super Admin (solo visible para super_admin)
-                            if (_userRole == 'super_admin')
-                              IconButton(
-                                icon: const Icon(Icons.admin_panel_settings, color: Colors.white, size: 20),
-                                onPressed: () {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (_) => const SuperAdminDashboardPage(),
+                              );
+                            }
+
+                            // En web/tablet, mostrar todos los iconos como antes
+                            return Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (_activeAlertsCount > 0)
+                                  Stack(
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.notifications,
+                                          color: Colors.white,
+                                          size: 20,
+                                        ),
+                                        onPressed: () {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (_) =>
+                                                  const MaintenancePage(),
+                                            ),
+                                          ).then((_) => _checkActiveAlerts());
+                                        },
+                                        tooltip:
+                                            'Tienes $_activeAlertsCount alertas',
+                                      ),
+                                      Positioned(
+                                        right: 8,
+                                        top: 8,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(3),
+                                          decoration: const BoxDecoration(
+                                            color: Colors.red,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          constraints: const BoxConstraints(
+                                            minWidth: 14,
+                                            minHeight: 14,
+                                          ),
+                                          child: Text(
+                                            _activeAlertsCount > 9
+                                                ? '9+'
+                                                : '$_activeAlertsCount',
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                            textAlign: TextAlign.center,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                // Botón Super Admin (solo visible para super_admin)
+                                if (_userRole == 'super_admin')
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.admin_panel_settings,
+                                      color: Colors.white,
+                                      size: 20,
                                     ),
-                                  );
-                                },
-                                tooltip: 'Super Admin',
-                              ),
-                            IconButton(
-                              icon: const Icon(Icons.refresh, color: Colors.white, size: 20),
-                              onPressed: () {
-                                _loadVehicleLocations();
-                                _checkActiveAlerts();
-                                _loadFinancialKpi();
-                                _loadOperationalKpis();
-                                _loadDocumentAlerts();
-                              },
-                              tooltip: 'Actualizar',
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.logout, color: Colors.white, size: 20),
-                              onPressed: () async {
-                                final authRepository = AuthRepositoryImpl();
-                                await authRepository.logout();
-                                if (!mounted) return;
-                                Navigator.of(context).pushReplacement(
-                                  MaterialPageRoute(builder: (_) => const LoginPage()),
-                                );
-                              },
-                              tooltip: 'Cerrar sesión',
-                            ),
-                          ],
+                                    onPressed: () {
+                                      Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                          builder: (_) =>
+                                              const SuperAdminDashboardPage(),
+                                        ),
+                                      );
+                                    },
+                                    tooltip: 'Super Admin',
+                                  ),
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.refresh,
+                                    color: Colors.white,
+                                    size: 20,
+                                  ),
+                                  onPressed: () {
+                                    _loadVehicleLocations();
+                                    _checkActiveAlerts();
+                                    _loadFinancialKpi();
+                                    _loadOperationalKpis();
+                                    _loadDocumentAlerts();
+                                  },
+                                  tooltip: 'Actualizar',
+                                ),
+                                // Botón para instalar PWA (solo en web)
+                                if (kIsWeb)
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.install_mobile,
+                                      color: Colors.white,
+                                      size: 20,
+                                    ),
+                                    onPressed: () =>
+                                        PWAInstallPrompt.showInstallDialog(
+                                          context,
+                                        ),
+                                    tooltip: 'Instalar App',
+                                  ),
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.logout,
+                                    color: Colors.white,
+                                    size: 20,
+                                  ),
+                                  onPressed: () async {
+                                    final authRepository = AuthRepositoryImpl();
+                                    await authRepository.logout();
+                                    if (!mounted) return;
+                                    Navigator.of(context).pushReplacement(
+                                      MaterialPageRoute(
+                                        builder: (_) => const LoginPage(),
+                                      ),
+                                    );
+                                  },
+                                  tooltip: 'Cerrar sesión',
+                                ),
+                              ],
+                            );
+                          },
                         ),
                       ],
                     ),
@@ -758,17 +990,18 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
                                   : _defaultLocationFlutter,
                               initialZoom: 8.0,
                               interactionOptions: const InteractionOptions(
-                                flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+                                flags:
+                                    InteractiveFlag.all &
+                                    ~InteractiveFlag.rotate,
                               ),
                             ),
                             children: [
                               TileLayer(
-                                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                urlTemplate:
+                                    'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                                 userAgentPackageName: 'com.example.pai_app',
                               ),
-                              MarkerLayer(
-                                markers: _flutterMarkers,
-                              ),
+                              MarkerLayer(markers: _flutterMarkers),
                             ],
                           )
                         : gmaps.GoogleMap(
@@ -805,7 +1038,10 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
                     maxHeight: 200,
                   ),
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.white,
                     boxShadow: [
@@ -836,7 +1072,9 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
                           Text(
                             '\$${numberFormat.format(balance.round())}',
                             style: textTheme.titleMedium?.copyWith(
-                              color: balance >= 0 ? AppColors.paiOrange : Colors.red,
+                              color: balance >= 0
+                                  ? AppColors.paiOrange
+                                  : Colors.red,
                               fontWeight: FontWeight.bold,
                               fontSize: 18,
                             ),
@@ -850,7 +1088,11 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
                               Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.trending_up, size: 14, color: Colors.green),
+                                  Icon(
+                                    Icons.trending_up,
+                                    size: 14,
+                                    color: Colors.green,
+                                  ),
                                   const SizedBox(width: 4),
                                   Text(
                                     'Ing: \$${numberFormat.format(_currentMonthRevenue.round())}',
@@ -865,7 +1107,11 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
                               Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.trending_down, size: 14, color: Colors.red),
+                                  Icon(
+                                    Icons.trending_down,
+                                    size: 14,
+                                    color: Colors.red,
+                                  ),
                                   const SizedBox(width: 4),
                                   Text(
                                     'G. viaje: \$${numberFormat.format(_currentMonthExpenses.round())}',
@@ -880,7 +1126,11 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
                               Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.build, size: 14, color: Colors.orange),
+                                  Icon(
+                                    Icons.build,
+                                    size: 14,
+                                    color: Colors.orange,
+                                  ),
                                   const SizedBox(width: 4),
                                   Text(
                                     'G. mant: \$${numberFormat.format(_currentMonthMaintenanceExpenses.round())}',
@@ -1027,9 +1277,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
                     label: 'Gastos',
                     onTap: () {
                       Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const ExpensesPage(),
-                        ),
+                        MaterialPageRoute(builder: (_) => const ExpensesPage()),
                       );
                     },
                   ),
@@ -1083,6 +1331,4 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
       ),
     );
   }
-
 }
-

@@ -1,0 +1,18 @@
+# Dockerfile para construir APK de Flutter
+# Usa una imagen oficial de Flutter que ya tiene todo configurado
+FROM cirrusci/flutter:stable
+
+# Establecer directorio de trabajo
+WORKDIR /app
+
+# Copiar todos los archivos del proyecto
+COPY . .
+
+# Pre-descargar dependencias
+RUN flutter pub get
+
+# Configurar Gradle Wrapper con permisos de ejecución
+RUN chmod +x android/gradlew || true
+
+# Comando para construir el APK
+CMD ["flutter", "build", "apk", "--release"]

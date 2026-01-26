@@ -4,10 +4,16 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:pai_app/core/constants/app_constants.dart';
 import 'package:pai_app/core/theme/app_theme.dart';
+import 'package:pai_app/core/services/pwa_service_export.dart';
 import 'package:pai_app/presentation/pages/splash/splash_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Inicializar servicio PWA para web
+  if (kIsWeb) {
+    await PWAService().initialize();
+  }
   
   // Manejo global de errores de Flutter
   FlutterError.onError = (FlutterErrorDetails details) {

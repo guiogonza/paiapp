@@ -641,7 +641,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
               // Selector de Viaje (solo si no viene tripId)
               if (widget.tripId == null)
                 DropdownButtonFormField<String>(
-                  value: _selectedTripId,
+                  initialValue: _selectedTripId,
                   decoration: InputDecoration(
                     labelText: 'Viaje *',
                     hintText: 'Selecciona un viaje',
@@ -687,7 +687,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
 
               // Tipo de Gasto (Dropdown) - Obligatorio
               DropdownButtonFormField<String>(
-                value: _selectedType,
+                initialValue: _selectedType,
                 decoration: InputDecoration(
                   labelText: 'Tipo de Gasto *',
                   hintText: 'Selecciona un tipo',

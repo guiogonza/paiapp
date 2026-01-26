@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: pai-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres123
+      POSTGRES_DB: pai_app
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      # Volumen persistente para datos
+      - ./postgres-data:/var/lib/postgresql/data
+      # Carpeta para backups (opcional)
+      - ./backups:/backups
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - pai-network
+
+  # Opcional: Adminer para gestión visual de la BD
+  adminer:
+    image: adminer:latest
+    container_name: pai-adminer
+    ports:
+      - "8081:8080"
+    restart: unless-stopped
+    networks:
+      - pai-network
+    depends_on:
+      - postgres
+
+networks:
+  pai-network:
+    driver: bridge

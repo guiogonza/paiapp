@@ -192,7 +192,7 @@ class _ProfitabilityByVehiclePageState extends State<ProfitabilityByVehiclePage>
               children: [
                 // Selector de vehículo
                 DropdownButtonFormField<VehicleEntity>(
-                  value: _selectedVehicle,
+                  initialValue: _selectedVehicle,
                   decoration: InputDecoration(
                     labelText: 'Vehículo *',
                     prefixIcon: const Icon(Icons.directions_car),
@@ -324,7 +324,7 @@ class _ProfitabilityByVehiclePageState extends State<ProfitabilityByVehiclePage>
       scrollDirection: Axis.horizontal,
       child: SingleChildScrollView(
         child: DataTable(
-          headingRowColor: MaterialStateProperty.all(AppColors.primary.withOpacity(0.1)),
+          headingRowColor: WidgetStateProperty.all(AppColors.primary.withOpacity(0.1)),
           columns: const [
             DataColumn(label: Text('Fecha')),
             DataColumn(label: Text('Tipo')),

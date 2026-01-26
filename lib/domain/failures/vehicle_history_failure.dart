@@ -9,15 +9,15 @@ class NetworkFailure extends VehicleHistoryFailure {
 }
 
 class DatabaseFailure extends VehicleHistoryFailure {
-  const DatabaseFailure(String message) : super(message);
+  const DatabaseFailure(super.message);
 }
 
 class NotFoundFailure extends VehicleHistoryFailure {
-  const NotFoundFailure(String message) : super(message);
+  const NotFoundFailure(super.message);
 }
 
 class UnknownFailure extends VehicleHistoryFailure {
-  const UnknownFailure(String message) : super(message);
+  const UnknownFailure(super.message);
 }
 
 

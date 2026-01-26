@@ -182,7 +182,7 @@ class _MaintenanceHistoryPageState extends State<MaintenanceHistoryPage> {
       
       // Renombrar Sheet1 a Mantenimiento
       excel.rename('Sheet1', 'Mantenimiento');
-      final sheet = excel['Mantenimiento']!;
+      final sheet = excel['Mantenimiento'];
 
       // Formato de fecha
       final dateFormat = DateFormat('dd/MM/yyyy');
@@ -344,7 +344,7 @@ class _MaintenanceHistoryPageState extends State<MaintenanceHistoryPage> {
               children: [
                 // Filtro por vehículo
                 DropdownButtonFormField<VehicleEntity>(
-                  value: _selectedVehicle,
+                  initialValue: _selectedVehicle,
                   decoration: InputDecoration(
                     labelText: 'Filtrar por Vehículo',
                     prefixIcon: const Icon(Icons.directions_car),
@@ -379,7 +379,7 @@ class _MaintenanceHistoryPageState extends State<MaintenanceHistoryPage> {
                 const SizedBox(height: 16),
                 // Filtro por tipo de servicio
                 DropdownButtonFormField<String>(
-                  value: _selectedServiceType,
+                  initialValue: _selectedServiceType,
                   decoration: InputDecoration(
                     labelText: 'Filtrar por Tipo de Servicio',
                     prefixIcon: const Icon(Icons.build),

@@ -15,7 +15,7 @@ class DatabaseFailure extends TripFailure {
 }
 
 class ValidationFailure extends TripFailure {
-  const ValidationFailure(String message) : super(message);
+  const ValidationFailure(super.message);
 }
 
 class NotFoundFailure extends TripFailure {

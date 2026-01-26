@@ -192,7 +192,7 @@ class _ProfitabilityByDriverPageState extends State<ProfitabilityByDriverPage> {
               children: [
                 // Selector de conductor
                 DropdownButtonFormField<ProfileEntity>(
-                  value: _selectedDriver,
+                  initialValue: _selectedDriver,
                   decoration: InputDecoration(
                     labelText: 'Conductor *',
                     prefixIcon: const Icon(Icons.person),
@@ -324,7 +324,7 @@ class _ProfitabilityByDriverPageState extends State<ProfitabilityByDriverPage> {
       scrollDirection: Axis.horizontal,
       child: SingleChildScrollView(
         child: DataTable(
-          headingRowColor: MaterialStateProperty.all(AppColors.primary.withOpacity(0.1)),
+          headingRowColor: WidgetStateProperty.all(AppColors.primary.withOpacity(0.1)),
           columns: const [
             DataColumn(label: Text('Fecha')),
             DataColumn(label: Text('Tipo')),

@@ -26,7 +26,7 @@ class _TripsListPageState extends State<TripsListPage> {
   final _profileRepository = ProfileRepositoryImpl();
   List<TripEntity> _allTrips = []; // Todos los viajes cargados
   List<TripEntity> _trips = []; // Viajes filtrados
-  Map<String, List<ExpenseEntity>> _expensesByTrip = {}; // tripId -> expenses
+  final Map<String, List<ExpenseEntity>> _expensesByTrip = {}; // tripId -> expenses
   bool _isLoading = true;
   TripFailure? _error;
   Map<String, VehicleEntity> _vehiclesById = {};
@@ -280,7 +280,7 @@ class _TripsListPageState extends State<TripsListPage> {
     if (vehicle == null) {
       return '-';
     }
-    return '${vehicle.placa}';
+    return vehicle.placa;
   }
 
   double _getTotalExpenses(String? tripId) {
@@ -343,7 +343,7 @@ class _TripsListPageState extends State<TripsListPage> {
               children: [
                 // Selector de tipo de búsqueda
                 DropdownButtonFormField<String>(
-                  value: _searchType,
+                  initialValue: _searchType,
                   decoration: InputDecoration(
                     labelText: 'Buscar por',
                     prefixIcon: const Icon(Icons.search),
@@ -375,7 +375,7 @@ class _TripsListPageState extends State<TripsListPage> {
                 // Campo de búsqueda o dropdown de conductores
                 _searchType == 'Conductor'
                     ? DropdownButtonFormField<String>(
-                        value: _selectedDriverFilter,
+                        initialValue: _selectedDriverFilter,
                         decoration: InputDecoration(
                           labelText: 'Seleccionar conductor',
                           prefixIcon: const Icon(Icons.person),

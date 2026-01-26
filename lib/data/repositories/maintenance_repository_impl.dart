@@ -268,7 +268,7 @@ class MaintenanceRepositoryImpl implements MaintenanceRepository {
                     // Es un string XML, usar extractMileage
                     print('🔍 other es String, llamando extractMileage...');
                     final otherStr = otherValue;
-                    print('🔍 Llamando extractMileage con: ${otherStr.length > 200 ? otherStr.substring(0, 200) + '...' : otherStr}');
+                    print('🔍 Llamando extractMileage con: ${otherStr.length > 200 ? '${otherStr.substring(0, 200)}...' : otherStr}');
                     mileage = extractMileage(otherStr);
                     if (mileage == null) {
                       print('⚠️ extractMileage devolvió null');
@@ -295,7 +295,7 @@ class MaintenanceRepositoryImpl implements MaintenanceRepository {
                       print('🔍 Claves disponibles en other: ${otherValue.keys.toList()}');
                       // Intentar convertir a string y parsear como XML
                       final otherStr = otherValue.toString();
-                      print('🔍 Intentando parsear como XML: ${otherStr.length > 200 ? otherStr.substring(0, 200) + '...' : otherStr}');
+                      print('🔍 Intentando parsear como XML: ${otherStr.length > 200 ? '${otherStr.substring(0, 200)}...' : otherStr}');
                       mileage = extractMileage(otherStr);
                     }
                   } else {

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
   <!--
     If you are serving your web app in a path other than the root, change the
@@ -18,23 +18,56 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
+  <meta name="description" content="PAI App - Sistema de gestión de flotas y vehículos">
   
   <!-- Viewport para móviles - CRÍTICO para iOS -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 
-  <!-- iOS meta tags & icons -->
+  <!-- PWA Meta Tags -->
+  <meta name="theme-color" content="#0175C2">
   <meta name="mobile-web-app-capable" content="yes">
+  <meta name="application-name" content="PAI App">
+  
+  <!-- iOS meta tags & icons -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="pai_app">
+  <meta name="apple-mobile-web-app-title" content="PAI App">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
+  <link rel="apple-touch-icon" sizes="152x152" href="icons/Icon-192.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/Icon-192.png">
+  <link rel="apple-touch-icon" sizes="167x167" href="icons/Icon-192.png">
 
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/Icon-192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="icons/Icon-512.png">
 
-  <title>pai_app</title>
+  <!-- Microsoft Tiles -->
+  <meta name="msapplication-TileColor" content="#0175C2">
+  <meta name="msapplication-TileImage" content="icons/Icon-192.png">
+
+  <title>PAI App</title>
   <link rel="manifest" href="manifest.json">
+  
+  <!-- Splash Screen para iOS -->
+  <style>
+    .ios-splash {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, #0175C2 0%, #01579B 100%);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+    }
+    .ios-splash img {
+      width: 120px;
+      height: 120px;
+    }
+  </style>
 </head>
 <body>
   <script>
@@ -81,5 +114,56 @@
     });
   </script>
   <script src="flutter_bootstrap.js" async></script>
+  
+  <!-- Registro del Service Worker para PWA -->
+  <script>
+    // Guardar el evento de instalación para usarlo desde Flutter
+    window.deferredPrompt = null;
+    
+    window.addEventListener('beforeinstallprompt', function(e) {
+      console.log('📲 beforeinstallprompt captured');
+      e.preventDefault();
+      window.deferredPrompt = e;
+    });
+    
+    // Registrar Service Worker
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('/sw.js')
+          .then(function(registration) {
+            console.log('✅ Service Worker registered with scope:', registration.scope);
+            
+            // Verificar actualizaciones
+            registration.addEventListener('updatefound', function() {
+              const newWorker = registration.installing;
+              console.log('🔄 New Service Worker installing...');
+              
+              newWorker.addEventListener('statechange', function() {
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  console.log('🆕 New content available, refresh to update');
+                }
+              });
+            });
+          })
+          .catch(function(error) {
+            console.log('⚠️ Service Worker registration failed:', error);
+          });
+      });
+    }
+    
+    // Detectar si está en modo standalone (instalado)
+    function isStandalone() {
+      return window.matchMedia('(display-mode: standalone)').matches ||
+             window.navigator.standalone === true ||
+             document.referrer.includes('android-app://');
+    }
+    
+    // Log del estado de instalación
+    if (isStandalone()) {
+      console.log('📱 App running in standalone mode (installed)');
+    } else {
+      console.log('🌐 App running in browser mode');
+    }
+  </script>
 </body>
 </html>

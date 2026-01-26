@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:pai_app/core/theme/app_colors.dart';
 import 'package:pai_app/data/repositories/auth_repository_impl.dart';
@@ -8,6 +9,7 @@ import 'package:pai_app/presentation/pages/login/login_page.dart';
 import 'package:pai_app/presentation/pages/driver/driver_remittance_list_page.dart';
 import 'package:pai_app/presentation/pages/expenses/expenses_page.dart';
 import 'package:pai_app/presentation/pages/trips/trips_list_page.dart';
+import 'package:pai_app/presentation/widgets/pwa_install_prompt.dart';
 
 class DriverDashboardPage extends StatefulWidget {
   const DriverDashboardPage({super.key});
@@ -98,6 +100,13 @@ class _DriverDashboardPageState extends State<DriverDashboardPage> {
       appBar: AppBar(
         title: const Text('Dashboard - Conductor'),
         actions: [
+          // Botón para instalar PWA (solo en web)
+          if (kIsWeb)
+            IconButton(
+              icon: const Icon(Icons.install_mobile),
+              onPressed: () => PWAInstallPrompt.showInstallDialog(context),
+              tooltip: 'Instalar App',
+            ),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {

@@ -1,9 +1,12 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:pai_app/core/theme/app_colors.dart';
+import 'package:pai_app/core/services/local_auth_service.dart';
 import 'package:pai_app/data/repositories/auth_repository_impl.dart';
 import 'package:pai_app/data/repositories/profile_repository_impl.dart';
 import 'package:pai_app/presentation/pages/owner/owner_dashboard_page.dart';
 import 'package:pai_app/presentation/pages/driver/driver_dashboard_page.dart';
+import 'package:pai_app/presentation/widgets/pwa_install_prompt.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -17,8 +20,63 @@ class _LoginPageState extends State<LoginPage> {
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   final _authRepository = AuthRepositoryImpl();
+  final _localAuthService = LocalAuthService();
   bool _isLoading = false;
   bool _obscurePassword = true;
+  bool _rememberMe = false;
+  bool _biometricAvailable = false;
+  bool _biometricEnabled = false;
+  bool _hasSavedCredentials = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedPreferences();
+  }
+
+  Future<void> _loadSavedPreferences() async {
+    // Cargar preferencia de "Recordarme"
+    final rememberMe = await _localAuthService.getRememberMe();
+
+    // Verificar si hay credenciales guardadas
+    final savedCredentials = await _localAuthService.getSavedCredentials();
+
+    // Verificar disponibilidad de biometría
+    final biometricAvailable = await _localAuthService.isBiometricAvailable();
+    final biometricEnabled = await _localAuthService.isBiometricEnabled();
+
+    if (mounted) {
+      setState(() {
+        _rememberMe = rememberMe;
+        _hasSavedCredentials = savedCredentials != null;
+        _biometricAvailable = biometricAvailable;
+        _biometricEnabled = biometricEnabled;
+      });
+
+      // Si hay credenciales guardadas y recordarme está activo, cargarlas
+      if (rememberMe && savedCredentials != null) {
+        _usernameController.text = savedCredentials['username'] ?? '';
+        _passwordController.text = savedCredentials['password'] ?? '';
+      }
+
+      // Si la biometría está habilitada y hay credenciales, ofrecer login biométrico
+      if (biometricEnabled && _hasSavedCredentials && biometricAvailable) {
+        _attemptBiometricLogin();
+      }
+    }
+  }
+
+  Future<void> _attemptBiometricLogin() async {
+    final authenticated = await _localAuthService.authenticateWithBiometrics();
+    if (authenticated) {
+      final credentials = await _localAuthService.getSavedCredentials();
+      if (credentials != null && mounted) {
+        _usernameController.text = credentials['username'] ?? '';
+        _passwordController.text = credentials['password'] ?? '';
+        await _handleLogin();
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -65,26 +123,46 @@ class _LoginPageState extends State<LoginPage> {
         _passwordController.text,
       );
 
+      // Guardar credenciales si "Recordarme" está activo
+      if (_rememberMe) {
+        await _localAuthService.saveCredentials(
+          _usernameController.text.trim(),
+          _passwordController.text,
+        );
+        await _localAuthService.setRememberMe(true);
+      } else {
+        await _localAuthService.clearCredentials();
+        await _localAuthService.setRememberMe(false);
+        await _localAuthService.setBiometricEnabled(false);
+      }
+
       if (mounted) {
+        // Si el login fue exitoso y la biometría está disponible, preguntar si quiere habilitarla
+        if (_biometricAvailable && _rememberMe && !_biometricEnabled) {
+          _showBiometricPrompt();
+        }
         _navigateToDashboard();
       }
     } catch (e) {
       if (mounted) {
         String errorMessage = e.toString().replaceFirst('Exception: ', '');
-        
+
         // Mensajes más amigables para errores comunes
-        if (errorMessage.contains('ERR_NAME_NOT_RESOLVED') || 
+        if (errorMessage.contains('ERR_NAME_NOT_RESOLVED') ||
             errorMessage.contains('Failed to load resource') ||
             errorMessage.contains('network') ||
             errorMessage.contains('connection')) {
-          errorMessage = 'Error de conexión. Verifica tu internet y que puedas acceder a Supabase.';
+          errorMessage =
+              'Error de conexión. Verifica tu internet y que puedas acceder a Supabase.';
         } else if (errorMessage.contains('Invalid login credentials') ||
-                   errorMessage.contains('Credenciales inválidas')) {
-          errorMessage = 'Usuario o contraseña incorrectos. Verifica tus credenciales.';
+            errorMessage.contains('Credenciales inválidas')) {
+          errorMessage =
+              'Usuario o contraseña incorrectos. Verifica tus credenciales.';
         } else if (errorMessage.contains('User not found')) {
-          errorMessage = 'Usuario no encontrado. Verifica tu usuario o regístrate primero.';
+          errorMessage =
+              'Usuario no encontrado. Verifica tu usuario o regístrate primero.';
         }
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(errorMessage),
@@ -103,11 +181,59 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  void _showBiometricPrompt() {
+    // Mostrar diálogo preguntando si quiere habilitar biometría
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.fingerprint, color: AppColors.primary),
+              SizedBox(width: 12),
+              Text('Acceso Rápido'),
+            ],
+          ),
+          content: const Text(
+            '¿Deseas usar tu huella dactilar o Face ID para iniciar sesión más rápido la próxima vez?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('No, gracias'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                await _localAuthService.setBiometricEnabled(true);
+                if (mounted) {
+                  Navigator.of(context).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('¡Acceso biométrico habilitado!'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+              ),
+              child: const Text('Sí, habilitar'),
+            ),
+          ],
+        ),
+      );
+    });
+  }
+
   Future<void> _navigateToDashboard() async {
     try {
       final profileRepository = ProfileRepositoryImpl();
       final profileResult = await profileRepository.getCurrentUserProfile();
-      
+
       if (mounted) {
         profileResult.fold(
           (failure) {
@@ -128,10 +254,10 @@ class _LoginPageState extends State<LoginPage> {
               // Role desconocido, mostrar OwnerDashboardPage por defecto
               targetPage = const OwnerDashboardPage();
             }
-            
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(builder: (_) => targetPage),
-            );
+
+            Navigator.of(
+              context,
+            ).pushReplacement(MaterialPageRoute(builder: (_) => targetPage));
           },
         );
       }
@@ -214,7 +340,10 @@ class _LoginPageState extends State<LoginPage> {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 24.0,
+              vertical: 16.0,
+            ),
             child: Form(
               key: _formKey,
               child: Column(
@@ -246,7 +375,8 @@ class _LoginPageState extends State<LoginPage> {
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      helperText: 'Puede ser cualquier texto (email, nombre, etc.)',
+                      helperText:
+                          'Puede ser cualquier texto (email, nombre, etc.)',
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
@@ -288,7 +418,33 @@ class _LoginPageState extends State<LoginPage> {
                       return null;
                     },
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 8),
+                  // Checkbox Recordarme
+                  Row(
+                    children: [
+                      Checkbox(
+                        value: _rememberMe,
+                        onChanged: (value) {
+                          setState(() {
+                            _rememberMe = value ?? false;
+                          });
+                        },
+                        activeColor: AppColors.primary,
+                      ),
+                      GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _rememberMe = !_rememberMe;
+                          });
+                        },
+                        child: const Text(
+                          'Recordar mis datos',
+                          style: TextStyle(fontSize: 14),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
                   // Login Button
                   SizedBox(
                     height: 56,
@@ -308,8 +464,9 @@ class _LoginPageState extends State<LoginPage> {
                               width: 24,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                valueColor:
-                                    AlwaysStoppedAnimation<Color>(Colors.white),
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
                               ),
                             )
                           : const Text(
@@ -322,6 +479,25 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                     ),
                   ),
+                  // Botón de Biometría (solo si está disponible y habilitada)
+                  if (_biometricAvailable &&
+                      _biometricEnabled &&
+                      _hasSavedCredentials) ...[
+                    const SizedBox(height: 16),
+                    OutlinedButton.icon(
+                      onPressed: _isLoading ? null : _attemptBiometricLogin,
+                      icon: const Icon(Icons.fingerprint, size: 28),
+                      label: const Text('Ingresar con huella / Face ID'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        side: BorderSide(color: AppColors.primary),
+                        foregroundColor: AppColors.primary,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 16),
                   // Register Link
                   TextButton(
@@ -349,6 +525,24 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                     ),
                   ),
+                  // PWA Install Button
+                  if (kIsWeb) ...[
+                    const SizedBox(height: 24),
+                    OutlinedButton.icon(
+                      onPressed: () =>
+                          PWAInstallPrompt.showInstallDialog(context),
+                      icon: const Icon(Icons.install_mobile),
+                      label: const Text('Instalar App'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        side: BorderSide(color: AppColors.accent),
+                        foregroundColor: AppColors.accent,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -358,5 +552,3 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 }
-
-

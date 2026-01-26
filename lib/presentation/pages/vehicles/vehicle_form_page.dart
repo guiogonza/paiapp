@@ -247,7 +247,7 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
 
               // Tipo de Vehículo (Obligatorio)
               DropdownButtonFormField<String>(
-                value: _selectedVehicleType,
+                initialValue: _selectedVehicleType,
                 decoration: InputDecoration(
                   labelText: 'Tipo de Vehículo *',
                   hintText: 'Selecciona el tipo',

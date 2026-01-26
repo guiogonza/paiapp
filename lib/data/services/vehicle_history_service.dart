@@ -288,10 +288,7 @@ class VehicleHistoryService {
           }
         }
 
-        if (timestamp == null) {
-          // Si no se pudo parsear, usar la fecha actual
-          timestamp = DateTime.now();
-        }
+        timestamp ??= DateTime.now();
 
         // Extraer otros campos
         final speed = item['speed'] != null ? (item['speed'] as num).toDouble() : null;

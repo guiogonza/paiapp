@@ -251,7 +251,7 @@ class _ProfitabilityGlobalPageState extends State<ProfitabilityGlobalPage> {
                   children: [
                     Expanded(
                       child: DropdownButtonFormField<String>(
-                        value: _filterType,
+                        initialValue: _filterType,
                         decoration: InputDecoration(
                           labelText: 'Filtrar por tipo',
                           prefixIcon: const Icon(Icons.filter_list),
@@ -419,7 +419,7 @@ class _ProfitabilityGlobalPageState extends State<ProfitabilityGlobalPage> {
       scrollDirection: Axis.horizontal,
       child: SingleChildScrollView(
         child: DataTable(
-          headingRowColor: MaterialStateProperty.all(AppColors.primary.withOpacity(0.1)),
+          headingRowColor: WidgetStateProperty.all(AppColors.primary.withOpacity(0.1)),
           columns: const [
             DataColumn(label: Text('Fecha')),
             DataColumn(label: Text('Tipo')),

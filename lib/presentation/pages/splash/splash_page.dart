@@ -193,7 +193,7 @@ class _SplashPageState extends State<SplashPage>
 
   Widget _buildLogo() {
     // Logo PPAI con imagen corporativa
-    return Container(
+    return SizedBox(
       width: 200.0,
       child: Image.asset(
         'assets/images/ppai_logo.png',
@@ -202,7 +202,7 @@ class _SplashPageState extends State<SplashPage>
         errorBuilder: (context, error, stackTrace) {
           // Si la imagen no existe, mostrar mensaje de ayuda
           debugPrint('Error cargando logo: $error');
-          return Container(
+          return SizedBox(
             width: 200.0,
             height: 120,
             child: Column(

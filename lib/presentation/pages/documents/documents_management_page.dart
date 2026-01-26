@@ -661,7 +661,7 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
               children: [
                 // Filtro por vehículo
                 DropdownButtonFormField<String>(
-                  value: _selectedVehicleFilter,
+                  initialValue: _selectedVehicleFilter,
                   decoration: InputDecoration(
                     labelText: 'Filtrar por Vehículo',
                     prefixIcon: const Icon(Icons.directions_car),
@@ -692,7 +692,7 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
                 const SizedBox(height: 12),
                 // Filtro por conductor
                 DropdownButtonFormField<String>(
-                  value: _selectedDriverFilter,
+                  initialValue: _selectedDriverFilter,
                   decoration: InputDecoration(
                     labelText: 'Filtrar por Conductor',
                     prefixIcon: const Icon(Icons.person),
@@ -723,7 +723,7 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
                 const SizedBox(height: 12),
                 // Filtro por tipo de documento
                 DropdownButtonFormField<String>(
-                  value: _selectedDocumentTypeFilter ?? 'Todos',
+                  initialValue: _selectedDocumentTypeFilter ?? 'Todos',
                   decoration: InputDecoration(
                     labelText: 'Filtrar por Tipo de Documento',
                     prefixIcon: const Icon(Icons.description),
@@ -983,7 +983,7 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
                 const SizedBox(height: 24),
                 // Tipo de Asociación
                 DropdownButtonFormField<String>(
-                  value: _selectedAssociationType,
+                  initialValue: _selectedAssociationType,
                   decoration: InputDecoration(
                     labelText: 'Asociar a *',
                     prefixIcon: const Icon(Icons.link),
@@ -1070,7 +1070,7 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
                               ),
                             )
                           : DropdownButtonFormField<String>(
-                              value: _selectedVehicleId,
+                              initialValue: _selectedVehicleId,
                               decoration: InputDecoration(
                                 labelText: 'Vehículo *',
                                 prefixIcon: const Icon(Icons.directions_car),
@@ -1147,7 +1147,7 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
                               ),
                             )
                           : DropdownButtonFormField<String>(
-                              value: _selectedDriverId,
+                              initialValue: _selectedDriverId,
                               decoration: InputDecoration(
                                 labelText: 'Conductor *',
                                 prefixIcon: const Icon(Icons.person),

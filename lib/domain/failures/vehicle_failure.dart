@@ -15,7 +15,7 @@ class DatabaseFailure extends VehicleFailure {
 }
 
 class ValidationFailure extends VehicleFailure {
-  const ValidationFailure(String message) : super(message);
+  const ValidationFailure(super.message);
 }
 
 class NotFoundFailure extends VehicleFailure {

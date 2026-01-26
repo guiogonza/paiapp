@@ -279,7 +279,7 @@ class _BillingDashboardPageState extends State<BillingDashboardPage> {
                 children: [
                   // Selector de tipo de búsqueda
                   DropdownButtonFormField<String>(
-                    value: _searchType,
+                    initialValue: _searchType,
                     decoration: InputDecoration(
                       labelText: 'Buscar por',
                       prefixIcon: const Icon(Icons.search),
@@ -311,7 +311,7 @@ class _BillingDashboardPageState extends State<BillingDashboardPage> {
                   // Campo de búsqueda o dropdown de conductores
                   _searchType == 'Conductor'
                       ? DropdownButtonFormField<String>(
-                          value: _selectedDriverFilter,
+                          initialValue: _selectedDriverFilter,
                           decoration: InputDecoration(
                             labelText: 'Seleccionar conductor',
                             prefixIcon: const Icon(Icons.person),

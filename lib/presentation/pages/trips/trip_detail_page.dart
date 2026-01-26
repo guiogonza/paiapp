@@ -40,7 +40,7 @@ class _TripDetailPageState extends State<TripDetailPage> {
   TripEntity? _trip;
   RemittanceEntity? _remittance;
   List<ExpenseEntity> _allExpenses = [];
-  Map<String, String> _driverNames = {}; // Map driver_id -> email/name
+  final Map<String, String> _driverNames = {}; // Map driver_id -> email/name
   bool _isLoading = true;
   VehicleEntity? _vehicle;
 

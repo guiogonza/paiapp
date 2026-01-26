@@ -56,7 +56,7 @@ class VehicleRepositoryImpl implements VehicleRepository {
         return const Left(NotFoundFailure());
       }
 
-      final vehicle = VehicleModel.fromJson(response as Map<String, dynamic>);
+      final vehicle = VehicleModel.fromJson(response);
       return Right(vehicle.toEntity());
     } on PostgrestException catch (e) {
       if (e.code == 'PGRST116') {
@@ -85,7 +85,7 @@ class VehicleRepositoryImpl implements VehicleRepository {
           .single();
 
       final createdVehicle =
-          VehicleModel.fromJson(response as Map<String, dynamic>);
+          VehicleModel.fromJson(response);
       return Right(createdVehicle.toEntity());
     } on PostgrestException catch (e) {
       // Si el error es de RLS, dar un mensaje más claro
@@ -124,7 +124,7 @@ class VehicleRepositoryImpl implements VehicleRepository {
           .single();
 
       final updatedVehicle =
-          VehicleModel.fromJson(response as Map<String, dynamic>);
+          VehicleModel.fromJson(response);
       return Right(updatedVehicle.toEntity());
     } on PostgrestException catch (e) {
       if (e.code == 'PGRST116') {

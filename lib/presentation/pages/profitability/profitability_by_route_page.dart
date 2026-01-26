@@ -202,7 +202,7 @@ class _ProfitabilityByRoutePageState extends State<ProfitabilityByRoutePage> {
               children: [
                 // Selector de origen
                 DropdownButtonFormField<String>(
-                  value: _selectedOrigin,
+                  initialValue: _selectedOrigin,
                   decoration: InputDecoration(
                     labelText: 'Origen *',
                     prefixIcon: const Icon(Icons.location_on),
@@ -225,7 +225,7 @@ class _ProfitabilityByRoutePageState extends State<ProfitabilityByRoutePage> {
                 const SizedBox(height: 16),
                 // Selector de destino
                 DropdownButtonFormField<String>(
-                  value: _selectedDestination,
+                  initialValue: _selectedDestination,
                   decoration: InputDecoration(
                     labelText: 'Destino *',
                     prefixIcon: const Icon(Icons.location_on),
@@ -357,7 +357,7 @@ class _ProfitabilityByRoutePageState extends State<ProfitabilityByRoutePage> {
       scrollDirection: Axis.horizontal,
       child: SingleChildScrollView(
         child: DataTable(
-          headingRowColor: MaterialStateProperty.all(AppColors.primary.withOpacity(0.1)),
+          headingRowColor: WidgetStateProperty.all(AppColors.primary.withOpacity(0.1)),
           columns: const [
             DataColumn(label: Text('Fecha')),
             DataColumn(label: Text('Tipo')),

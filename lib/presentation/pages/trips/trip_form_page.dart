@@ -474,7 +474,7 @@ class _TripFormPageState extends State<TripFormPage> {
                 )
               else
                 DropdownButtonFormField<String>(
-                  value: _selectedDriverId,
+                  initialValue: _selectedDriverId,
                   decoration: InputDecoration(
                     labelText: 'Conductor *',
                     hintText: _isLoadingDrivers
