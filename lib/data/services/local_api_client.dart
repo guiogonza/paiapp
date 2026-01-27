@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -9,8 +10,10 @@ class LocalApiClient {
   factory LocalApiClient() => _instance;
   LocalApiClient._internal();
 
-  // URL base de la API - cambiar según entorno
-  static const String _baseUrl = 'http://82.208.21.130:3000';
+  // URL base de la API - detectar entorno para evitar contenido mixto en web https
+  static final String _baseUrl = kIsWeb
+      ? '${Uri.base.origin}/api'
+      : 'http://82.208.21.130:3000';
 
   String? _accessToken;
   Map<String, dynamic>? _currentUser;
