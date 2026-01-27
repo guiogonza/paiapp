@@ -669,28 +669,35 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
       minChildSize: 0.5,
       maxChildSize: 0.95,
       builder: (context, scrollController) {
-        // Variables de estado local para el modal
-        String? localSelectedVehicle = _selectedVehicleIdForNewDriver;
-        List<VehicleEntity> localVehicles = List.from(_vehicles);
-        bool localIsLoading = _isLoadingVehicles;
-
         return StatefulBuilder(
           builder: (context, setModalState) {
+            // Variables de estado que se sincronizan con el widget padre
+            String? localSelectedVehicle = _selectedVehicleIdForNewDriver;
+            List<VehicleEntity> localVehicles = List.from(_vehicles);
+            bool localIsLoading = _isLoadingVehicles;
+
+            print(
+              '📱 Modal rebuild: ${localVehicles.length} vehículos, loading: $localIsLoading',
+            );
+
             // Si no hay vehículos y no estamos cargando, cargar ahora
             if (localVehicles.isEmpty && !localIsLoading) {
               Future.microtask(() async {
-                setModalState(() => localIsLoading = true);
-                print('📱 Modal: Cargando vehículos para dropdown...');
+                print('📱 Modal: Iniciando carga de vehículos...');
+                setState(() => _isLoadingVehicles = true);
+                setModalState(() {});
+
                 await _loadVehicles();
+
                 if (mounted) {
-                  setModalState(() {
-                    localVehicles = List.from(_vehicles);
-                    localIsLoading = false;
-                  });
-                  print('📱 Modal: ${localVehicles.length} vehículos cargados');
-                  for (var v in localVehicles) {
+                  print(
+                    '📱 Modal: Carga completada, ${_vehicles.length} vehículos',
+                  );
+                  for (var v in _vehicles) {
                     print('   - ${v.placa} (ID: ${v.id})');
                   }
+                  setState(() => _isLoadingVehicles = false);
+                  setModalState(() {});
                 }
               });
             }
@@ -738,20 +745,20 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
                     // Vehículo asignado (obligatorio)
                     DropdownButtonFormField<String>(
                       key: ValueKey(
-                        'dropdown_${localVehicles.length}_$localIsLoading',
+                        'dropdown_${_vehicles.length}_$_isLoadingVehicles',
                       ),
                       decoration: InputDecoration(
                         labelText: 'Vehículo asignado *',
-                        hintText: localIsLoading
+                        hintText: _isLoadingVehicles
                             ? 'Cargando vehículos...'
-                            : (localVehicles.isEmpty
+                            : (_vehicles.isEmpty
                                   ? 'No hay vehículos disponibles'
                                   : 'Selecciona un vehículo'),
                         prefixIcon: const Icon(Icons.directions_car),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        suffixIcon: localIsLoading
+                        suffixIcon: _isLoadingVehicles
                             ? const SizedBox(
                                 width: 20,
                                 height: 20,
@@ -764,14 +771,14 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
                               )
                             : null,
                       ),
-                      items: localIsLoading
+                      items: _isLoadingVehicles
                           ? null
                           : [
                               const DropdownMenuItem<String>(
                                 value: 'sin_vehiculo',
                                 child: Text('Sin vehículo asignado'),
                               ),
-                              ...localVehicles.map((vehicle) {
+                              ..._vehicles.map((vehicle) {
                                 return DropdownMenuItem<String>(
                                   value: vehicle.id,
                                   child: Text(
@@ -780,7 +787,7 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
                                 );
                               }),
                             ],
-                      onChanged: localIsLoading
+                      onChanged: _isLoadingVehicles
                           ? null
                           : (value) {
                               setModalState(() {
@@ -792,7 +799,7 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
                               });
                             },
                       validator: (value) {
-                        if (!localIsLoading &&
+                        if (!_isLoadingVehicles &&
                             (value == null || value.isEmpty)) {
                           return 'Debes seleccionar una opción';
                         }
