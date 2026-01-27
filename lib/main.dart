@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:pai_app/core/constants/app_constants.dart';
 import 'package:pai_app/core/theme/app_theme.dart';
 import 'package:pai_app/core/services/pwa_service_export.dart';
@@ -9,12 +8,12 @@ import 'package:pai_app/presentation/pages/splash/splash_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Inicializar servicio PWA para web
   if (kIsWeb) {
     await PWAService().initialize();
   }
-  
+
   // Manejo global de errores de Flutter
   FlutterError.onError = (FlutterErrorDetails details) {
     FlutterError.presentError(details);
@@ -26,19 +25,9 @@ void main() async {
       print('ERROR_DETAILS: ${details.exception.toString()}');
     }
   };
-  
-  try {
-    await Supabase.initialize(
-      url: 'https://urlbbkpuaiugputhnsqx.supabase.co',
-      anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVybGJia3B1YWl1Z3B1dGhuc3F4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ3NzgyNzgsImV4cCI6MjA4MDM1NDI3OH0.ZgzrG48R8slTh3ZsXiCYeMHa3vrCca4TNJUP7O4slxQ',
-    );
-    print('✅ Supabase initialized successfully');
-  } catch (e, stackTrace) {
-    print('❌ Error initializing Supabase: $e');
-    print('Stack trace: $stackTrace');
-    // Continuar aunque falle Supabase para ver si el problema es otro
-  }
-  
+
+  print('✅ App initialized (PostgreSQL mode - no Supabase)');
+
   runApp(const MyApp());
 }
 

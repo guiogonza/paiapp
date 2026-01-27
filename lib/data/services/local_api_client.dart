@@ -123,6 +123,47 @@ class LocalApiClient {
     print('👋 LocalApiClient: Sesión cerrada');
   }
 
+  /// Verificar si hay una sesión válida guardada
+  Future<bool> hasValidSession() async {
+    await initialize();
+    if (_accessToken == null) return false;
+    
+    // Verificar que el token sea válido haciendo una petición de prueba
+    try {
+      final response = await http.get(
+        Uri.parse('$_baseUrl/auth/me'),
+        headers: _headers,
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      print('⚠️ Error verificando sesión: $e');
+      return false;
+    }
+  }
+
+  /// Obtener el perfil del usuario actual
+  Future<Map<String, dynamic>?> getCurrentProfile() async {
+    await initialize();
+    if (_accessToken == null) return null;
+    
+    try {
+      final response = await http.get(
+        Uri.parse('$_baseUrl/auth/me'),
+        headers: _headers,
+      );
+      
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        _currentUser = data['user'] ?? data;
+        return _currentUser;
+      }
+      return null;
+    } catch (e) {
+      print('❌ Error obteniendo perfil: $e');
+      return null;
+    }
+  }
+
   // =====================================================
   // OPERACIONES CRUD GENÉRICAS
   // =====================================================
