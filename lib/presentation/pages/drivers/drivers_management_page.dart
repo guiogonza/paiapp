@@ -5,7 +5,7 @@ import 'package:pai_app/core/theme/app_colors.dart';
 import 'package:pai_app/data/repositories/profile_repository_impl.dart';
 import 'package:pai_app/data/repositories/vehicle_repository_impl.dart';
 import 'package:pai_app/data/services/fleet_sync_service.dart';
-import 'package:pai_app/data/services/gps_auth_service.dart';
+import 'package:pai_app/data/providers/gps_vehicle_provider.dart';
 import 'package:pai_app/domain/entities/vehicle_entity.dart';
 
 class DriversManagementPage extends StatefulWidget {
@@ -19,7 +19,7 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
   final _profileRepository = ProfileRepositoryImpl();
   final _vehicleRepository = VehicleRepositoryImpl();
   final _fleetSyncService = FleetSyncService();
-  final _gpsAuthService = GPSAuthService();
+  final _gpsVehicleProvider = GPSVehicleProvider();
   final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -60,29 +60,14 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
     });
 
     try {
-      // Cargar SIEMPRE directamente del GPS (es la fuente de verdad)
-      print('📡 Cargando vehículos del API GPS...');
-      final gpsDevices = await _gpsAuthService.getDevicesFromGPS();
+      // Cargar SIEMPRE directamente del GPS usando el provider centralizado
+      debugPrint('📡 Cargando vehículos del API GPS...');
+      final gpsVehicles = await _gpsVehicleProvider.getVehicles();
 
-      if (gpsDevices.isNotEmpty) {
-        final gpsVehicles = gpsDevices.map((device) {
-          return VehicleEntity(
-            id: device['id']?.toString() ?? '',
-            placa:
-                device['name']?.toString() ??
-                device['label']?.toString() ??
-                device['plate']?.toString() ??
-                'Sin placa',
-            marca: 'GPS',
-            modelo: 'Sincronizado',
-            ano: DateTime.now().year,
-            gpsDeviceId: device['id']?.toString(),
-          );
-        }).toList();
-
-        print('✅ ${gpsVehicles.length} vehículos cargados del GPS:');
-        for (var v in gpsVehicles) {
-          print('   - ${v.placa} (ID: ${v.id})');
+      if (gpsVehicles.isNotEmpty) {
+        debugPrint('✅ ${gpsVehicles.length} vehículos cargados del GPS:');
+        for (var v in gpsVehicles.take(5)) {
+          debugPrint('   - ${v.placa} (ID: ${v.id})');
         }
 
         if (mounted) {
@@ -92,7 +77,7 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
           });
         }
       } else {
-        print('⚠️ El API GPS no devolvió dispositivos');
+        debugPrint('⚠️ El API GPS no devolvió dispositivos');
         if (mounted) {
           setState(() {
             _isLoadingVehicles = false;
@@ -100,7 +85,7 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
         }
       }
     } catch (e) {
-      print('❌ Error al cargar del GPS: $e');
+      debugPrint('❌ Error al cargar del GPS: $e');
       if (mounted) {
         setState(() {
           _isLoadingVehicles = false;
@@ -632,51 +617,39 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
             builder: (ctx) => const Center(child: CircularProgressIndicator()),
           );
 
-          // Cargar vehículos directamente del GPS
+          // Cargar vehículos directamente del GPS usando provider centralizado
           List<VehicleEntity> vehiculosParaModal = [];
           try {
-            print('═══════════════════════════════════════════════');
-            print('🚗 INICIANDO CARGA DE VEHÍCULOS PARA MODAL');
-            print('═══════════════════════════════════════════════');
+            debugPrint('═══════════════════════════════════════════════');
+            debugPrint('🚗 INICIANDO CARGA DE VEHÍCULOS PARA MODAL');
+            debugPrint('═══════════════════════════════════════════════');
 
-            print('📡 Llamando a _gpsAuthService.getDevicesFromGPS()...');
-            final gpsDevices = await _gpsAuthService.getDevicesFromGPS();
-            print('📦 Respuesta recibida: ${gpsDevices.length} dispositivos');
-            print('📦 Tipo de respuesta: ${gpsDevices.runtimeType}');
+            debugPrint('📡 Llamando a GPSVehicleProvider.getVehicles()...');
+            vehiculosParaModal = await _gpsVehicleProvider.getVehicles(
+              forceRefresh: true,
+            );
+            debugPrint(
+              '📦 Respuesta recibida: ${vehiculosParaModal.length} vehículos',
+            );
 
-            if (gpsDevices.isNotEmpty) {
-              vehiculosParaModal = gpsDevices.map((device) {
-                return VehicleEntity(
-                  id: device['id']?.toString() ?? '',
-                  placa:
-                      device['name']?.toString() ??
-                      device['label']?.toString() ??
-                      device['plate']?.toString() ??
-                      'Sin placa',
-                  marca: 'GPS',
-                  modelo: 'Sincronizado',
-                  ano: DateTime.now().year,
-                  gpsDeviceId: device['id']?.toString(),
-                );
-              }).toList();
-
-              print(
+            if (vehiculosParaModal.isNotEmpty) {
+              debugPrint(
                 '✅ ${vehiculosParaModal.length} vehículos listos para el modal:',
               );
-              for (var v in vehiculosParaModal) {
-                print('   - ${v.placa} (ID: ${v.id})');
+              for (var v in vehiculosParaModal.take(5)) {
+                debugPrint('   - ${v.placa} (ID: ${v.id})');
               }
             }
           } catch (e, stackTrace) {
-            print('❌ Error cargando vehículos: $e');
-            print('📍 Stack trace: $stackTrace');
+            debugPrint('❌ Error cargando vehículos: $e');
+            debugPrint('📍 Stack trace: $stackTrace');
           }
 
-          print('═══════════════════════════════════════════════');
-          print(
+          debugPrint('═══════════════════════════════════════════════');
+          debugPrint(
             '📊 RESUMEN: ${vehiculosParaModal.length} vehículos para el modal',
           );
-          print('═══════════════════════════════════════════════');
+          debugPrint('═══════════════════════════════════════════════');
 
           // Cerrar loading
           if (mounted) Navigator.of(context).pop();
@@ -709,18 +682,20 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
 
   Widget _buildDriverFormSheet({required List<VehicleEntity> loadedVehicles}) {
     // Usar los vehículos pasados como parámetro para evitar problemas de estado
-    print('═══════════════════════════════════════════════');
-    print('📱 CONSTRUYENDO MODAL DE CREAR CONDUCTOR');
-    print('═══════════════════════════════════════════════');
-    print('📊 Vehículos recibidos: ${loadedVehicles.length}');
-    print('📊 Lista vacía: ${loadedVehicles.isEmpty}');
+    debugPrint('═══════════════════════════════════════════════');
+    debugPrint('📱 CONSTRUYENDO MODAL DE CREAR CONDUCTOR');
+    debugPrint('═══════════════════════════════════════════════');
+    debugPrint('📊 Vehículos recibidos: ${loadedVehicles.length}');
+    debugPrint('📊 Lista vacía: ${loadedVehicles.isEmpty}');
     if (loadedVehicles.isNotEmpty) {
-      print('📋 Lista de vehículos:');
-      for (var v in loadedVehicles) {
-        print('   ✓ Placa: ${v.placa}, ID: ${v.id}, GPS ID: ${v.gpsDeviceId}');
+      debugPrint('📋 Lista de vehículos:');
+      for (var v in loadedVehicles.take(5)) {
+        debugPrint(
+          '   ✓ Placa: ${v.placa}, ID: ${v.id}, GPS ID: ${v.gpsDeviceId}',
+        );
       }
     } else {
-      print('⚠️ NO HAY VEHÍCULOS - El dropdown estará vacío!');
+      debugPrint('⚠️ NO HAY VEHÍCULOS - El dropdown estará vacío!');
     }
 
     return DraggableScrollableSheet(

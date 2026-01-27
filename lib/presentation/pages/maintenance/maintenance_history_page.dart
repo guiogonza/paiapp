@@ -7,7 +7,7 @@ import 'package:pai_app/core/theme/app_colors.dart';
 import 'package:pai_app/core/constants/maintenance_rules.dart';
 import 'package:pai_app/data/repositories/maintenance_repository_impl.dart';
 import 'package:pai_app/data/repositories/vehicle_repository_impl.dart';
-import 'package:pai_app/data/services/gps_auth_service.dart';
+import 'package:pai_app/data/providers/gps_vehicle_provider.dart';
 import 'package:pai_app/domain/entities/maintenance_entity.dart';
 import 'package:pai_app/domain/entities/vehicle_entity.dart';
 
@@ -23,7 +23,7 @@ class MaintenanceHistoryPage extends StatefulWidget {
 class _MaintenanceHistoryPageState extends State<MaintenanceHistoryPage> {
   final _maintenanceRepository = MaintenanceRepositoryImpl();
   final _vehicleRepository = VehicleRepositoryImpl();
-  final _gpsAuthService = GPSAuthService();
+  final _gpsVehicleProvider = GPSVehicleProvider();
 
   List<MaintenanceEntity> _allMaintenanceList = [];
   List<MaintenanceEntity> _filteredMaintenanceList = [];
@@ -65,31 +65,13 @@ class _MaintenanceHistoryPageState extends State<MaintenanceHistoryPage> {
       },
     );
 
-    // 2) Si no hay vehículos locales, cargar desde GPS
+    // 2) Si no hay vehículos locales, cargar desde GPS usando el provider centralizado
     List<VehicleEntity> vehiclesToUse = localVehicles;
     if (vehiclesToUse.isEmpty) {
-      try {
-        final gpsDevices = await _gpsAuthService.getDevicesFromGPS();
-        vehiclesToUse = gpsDevices.map((device) {
-          return VehicleEntity(
-            id: device['id']?.toString() ?? '',
-            placa:
-                device['name']?.toString() ??
-                device['label']?.toString() ??
-                device['plate']?.toString() ??
-                'Sin placa',
-            marca: 'GPS',
-            modelo: 'Sincronizado',
-            ano: DateTime.now().year,
-            gpsDeviceId: device['id']?.toString(),
-          );
-        }).toList();
-        debugPrint(
-          '🛰️ Vehículos cargados desde GPS (mantenimiento): ${vehiclesToUse.length}',
-        );
-      } catch (e) {
-        debugPrint('❌ Error cargando vehículos desde GPS: $e');
-      }
+      vehiclesToUse = await _gpsVehicleProvider.getVehicles();
+      debugPrint(
+        '🛰️ Vehículos cargados desde GPS (mantenimiento): ${vehiclesToUse.length}',
+      );
     }
 
     if (mounted) {
@@ -102,6 +84,22 @@ class _MaintenanceHistoryPageState extends State<MaintenanceHistoryPage> {
           );
         }
       });
+      _logVehicleState('loadVehicles');
+    }
+  }
+
+  void _logVehicleState(String origin) {
+    final selected = _selectedVehicle?.placa ?? 'sin vehículo seleccionado';
+    debugPrint(
+      '[maintenance:$origin] vehículos disponibles: ${_vehicles.length}, seleccionado: $selected, tipo servicio: $_selectedServiceType',
+    );
+
+    if (_vehicles.isNotEmpty) {
+      final sample = _vehicles
+          .take(3)
+          .map((v) => '${v.id}:${v.placa}')
+          .join(', ');
+      debugPrint('[maintenance:$origin] primeros vehículos: $sample');
     }
   }
 
@@ -456,6 +454,7 @@ class _MaintenanceHistoryPageState extends State<MaintenanceHistoryPage> {
                     setState(() {
                       _selectedVehicle = vehicle;
                     });
+                    _logVehicleState('vehicleFilterChanged');
                     if (vehicle == null) {
                       _loadAllHistory();
                     } else {
