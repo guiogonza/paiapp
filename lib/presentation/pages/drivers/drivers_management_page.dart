@@ -638,7 +638,7 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
             print('═══════════════════════════════════════════════');
             print('🚗 INICIANDO CARGA DE VEHÍCULOS PARA MODAL');
             print('═══════════════════════════════════════════════');
-            
+
             print('📡 Llamando a _gpsAuthService.getDevicesFromGPS()...');
             final gpsDevices = await _gpsAuthService.getDevicesFromGPS();
             print('📦 Respuesta recibida: ${gpsDevices.length} dispositivos');
@@ -671,9 +671,11 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
             print('❌ Error cargando vehículos: $e');
             print('📍 Stack trace: $stackTrace');
           }
-          
+
           print('═══════════════════════════════════════════════');
-          print('📊 RESUMEN: ${vehiculosParaModal.length} vehículos para el modal');
+          print(
+            '📊 RESUMEN: ${vehiculosParaModal.length} vehículos para el modal',
+          );
           print('═══════════════════════════════════════════════');
 
           // Cerrar loading
@@ -772,7 +774,7 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
                   builder: (context) {
                     print('🔧 Construyendo DropdownButtonFormField...');
                     print('🔧 Items a agregar: ${loadedVehicles.length + 1}');
-                    
+
                     final items = <DropdownMenuItem<String>>[
                       const DropdownMenuItem<String>(
                         value: 'sin_vehiculo',
@@ -788,11 +790,13 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
                         );
                       }),
                     ];
-                    
+
                     print('🔧 Total items en dropdown: ${items.length}');
-                    
+
                     return DropdownButtonFormField<String>(
-                      key: ValueKey('dropdown_${loadedVehicles.length}_${DateTime.now().millisecondsSinceEpoch}'),
+                      key: ValueKey(
+                        'dropdown_${loadedVehicles.length}_${DateTime.now().millisecondsSinceEpoch}',
+                      ),
                       value: 'sin_vehiculo',
                       decoration: InputDecoration(
                         labelText: 'Vehículo asignado (Opcional)',

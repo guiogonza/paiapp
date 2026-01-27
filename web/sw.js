@@ -1,5 +1,5 @@
 // Service Worker para PAI App PWA
-const CACHE_NAME = 'pai-app-v1';
+const CACHE_NAME = 'pai-app-v2-20260127';
 const urlsToCache = [
   '/',
   '/index.html',
