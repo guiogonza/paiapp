@@ -813,6 +813,7 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
                         print('📝 Vehículo seleccionado: $value');
                         _selectedVehicleIdForNewDriver = value;
                       },
+                      validator: (_) => null,
                     );
                   },
                 ),
