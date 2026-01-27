@@ -127,7 +127,7 @@ class LocalApiClient {
   Future<bool> hasValidSession() async {
     await initialize();
     if (_accessToken == null) return false;
-    
+
     // Verificar que el token sea válido haciendo una petición de prueba
     try {
       final response = await http.get(
@@ -145,13 +145,13 @@ class LocalApiClient {
   Future<Map<String, dynamic>?> getCurrentProfile() async {
     await initialize();
     if (_accessToken == null) return null;
-    
+
     try {
       final response = await http.get(
         Uri.parse('$_baseUrl/auth/me'),
         headers: _headers,
       );
-      
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         _currentUser = data['user'] ?? data;

@@ -635,8 +635,14 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
           // Cargar vehículos directamente del GPS
           List<VehicleEntity> vehiculosParaModal = [];
           try {
-            print('🚗 Cargando vehículos para el modal...');
+            print('═══════════════════════════════════════════════');
+            print('🚗 INICIANDO CARGA DE VEHÍCULOS PARA MODAL');
+            print('═══════════════════════════════════════════════');
+            
+            print('📡 Llamando a _gpsAuthService.getDevicesFromGPS()...');
             final gpsDevices = await _gpsAuthService.getDevicesFromGPS();
+            print('📦 Respuesta recibida: ${gpsDevices.length} dispositivos');
+            print('📦 Tipo de respuesta: ${gpsDevices.runtimeType}');
 
             if (gpsDevices.isNotEmpty) {
               vehiculosParaModal = gpsDevices.map((device) {
@@ -661,9 +667,14 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
                 print('   - ${v.placa} (ID: ${v.id})');
               }
             }
-          } catch (e) {
+          } catch (e, stackTrace) {
             print('❌ Error cargando vehículos: $e');
+            print('📍 Stack trace: $stackTrace');
           }
+          
+          print('═══════════════════════════════════════════════');
+          print('📊 RESUMEN: ${vehiculosParaModal.length} vehículos para el modal');
+          print('═══════════════════════════════════════════════');
 
           // Cerrar loading
           if (mounted) Navigator.of(context).pop();
@@ -696,9 +707,18 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
 
   Widget _buildDriverFormSheet({required List<VehicleEntity> loadedVehicles}) {
     // Usar los vehículos pasados como parámetro para evitar problemas de estado
-    print('📱 Modal construido con ${loadedVehicles.length} vehículos:');
-    for (var v in loadedVehicles) {
-      print('   - ${v.placa} (ID: ${v.id})');
+    print('═══════════════════════════════════════════════');
+    print('📱 CONSTRUYENDO MODAL DE CREAR CONDUCTOR');
+    print('═══════════════════════════════════════════════');
+    print('📊 Vehículos recibidos: ${loadedVehicles.length}');
+    print('📊 Lista vacía: ${loadedVehicles.isEmpty}');
+    if (loadedVehicles.isNotEmpty) {
+      print('📋 Lista de vehículos:');
+      for (var v in loadedVehicles) {
+        print('   ✓ Placa: ${v.placa}, ID: ${v.id}, GPS ID: ${v.gpsDeviceId}');
+      }
+    } else {
+      print('⚠️ NO HAY VEHÍCULOS - El dropdown estará vacío!');
     }
 
     return DraggableScrollableSheet(
@@ -747,41 +767,49 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
                 ),
                 const SizedBox(height: 16),
 
-                // Vehículo asignado (obligatorio)
-                DropdownButtonFormField<String>(
-                  key: ValueKey('dropdown_${loadedVehicles.length}'),
-                  decoration: InputDecoration(
-                    labelText: 'Vehículo asignado *',
-                    hintText: loadedVehicles.isEmpty
-                        ? 'No hay vehículos disponibles'
-                        : 'Selecciona un vehículo',
-                    prefixIcon: const Icon(Icons.directions_car),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  items: [
-                    const DropdownMenuItem<String>(
+                // Vehículo asignado (OPCIONAL)
+                Builder(
+                  builder: (context) {
+                    print('🔧 Construyendo DropdownButtonFormField...');
+                    print('🔧 Items a agregar: ${loadedVehicles.length + 1}');
+                    
+                    final items = <DropdownMenuItem<String>>[
+                      const DropdownMenuItem<String>(
+                        value: 'sin_vehiculo',
+                        child: Text('Sin vehículo asignado'),
+                      ),
+                      ...loadedVehicles.map((vehicle) {
+                        print('   ➕ Agregando: ${vehicle.placa}');
+                        return DropdownMenuItem<String>(
+                          value: vehicle.id,
+                          child: Text(
+                            '${vehicle.placa} - ${vehicle.marca} ${vehicle.modelo}',
+                          ),
+                        );
+                      }),
+                    ];
+                    
+                    print('🔧 Total items en dropdown: ${items.length}');
+                    
+                    return DropdownButtonFormField<String>(
+                      key: ValueKey('dropdown_${loadedVehicles.length}_${DateTime.now().millisecondsSinceEpoch}'),
                       value: 'sin_vehiculo',
-                      child: Text('Sin vehículo asignado'),
-                    ),
-                    ...loadedVehicles.map((vehicle) {
-                      return DropdownMenuItem<String>(
-                        value: vehicle.id,
-                        child: Text(
-                          '${vehicle.placa} - ${vehicle.marca} ${vehicle.modelo}',
+                      decoration: InputDecoration(
+                        labelText: 'Vehículo asignado (Opcional)',
+                        hintText: loadedVehicles.isEmpty
+                            ? 'No hay vehículos disponibles'
+                            : 'Selecciona un vehículo',
+                        prefixIcon: const Icon(Icons.directions_car),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                      );
-                    }),
-                  ],
-                  onChanged: (value) {
-                    _selectedVehicleIdForNewDriver = value;
-                  },
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Debes asignar un vehículo';
-                    }
-                    return null;
+                      ),
+                      items: items,
+                      onChanged: (value) {
+                        print('📝 Vehículo seleccionado: $value');
+                        _selectedVehicleIdForNewDriver = value;
+                      },
+                    );
                   },
                 ),
                 const SizedBox(height: 16),
