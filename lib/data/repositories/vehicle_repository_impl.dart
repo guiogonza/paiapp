@@ -27,9 +27,11 @@ class VehicleRepositoryImpl implements VehicleRepository {
     } catch (e) {
       final errorMsg = e.toString();
       if (errorMsg.contains('Sesión expirada') || errorMsg.contains('401')) {
-        return Left(ValidationFailure(
-          'No tienes permisos. Asegúrate de estar autenticado correctamente.'
-        ));
+        return Left(
+          ValidationFailure(
+            'No tienes permisos. Asegúrate de estar autenticado correctamente.',
+          ),
+        );
       }
       return Left(UnknownFailure(_mapGenericError(e)));
     }
@@ -37,7 +39,8 @@ class VehicleRepositoryImpl implements VehicleRepository {
 
   @override
   Future<Either<VehicleFailure, VehicleEntity>> getVehicleById(
-      String id) async {
+    String id,
+  ) async {
     try {
       final response = await _localApi.getVehicleById(id);
 
@@ -60,7 +63,8 @@ class VehicleRepositoryImpl implements VehicleRepository {
 
   @override
   Future<Either<VehicleFailure, VehicleEntity>> createVehicle(
-      VehicleEntity vehicle) async {
+    VehicleEntity vehicle,
+  ) async {
     try {
       final model = VehicleModel.fromEntity(vehicle);
       final json = model.toJson();
@@ -75,9 +79,11 @@ class VehicleRepositoryImpl implements VehicleRepository {
     } catch (e) {
       final errorMsg = e.toString();
       if (errorMsg.contains('Sesión expirada') || errorMsg.contains('401')) {
-        return Left(ValidationFailure(
-          'No tienes permisos. Asegúrate de estar autenticado correctamente.'
-        ));
+        return Left(
+          ValidationFailure(
+            'No tienes permisos. Asegúrate de estar autenticado correctamente.',
+          ),
+        );
       }
       return Left(UnknownFailure(_mapGenericError(e)));
     }
@@ -85,7 +91,8 @@ class VehicleRepositoryImpl implements VehicleRepository {
 
   @override
   Future<Either<VehicleFailure, VehicleEntity>> updateVehicle(
-      VehicleEntity vehicle) async {
+    VehicleEntity vehicle,
+  ) async {
     try {
       if (vehicle.id == null) {
         return const Left(ValidationFailure('El ID del vehículo es requerido'));

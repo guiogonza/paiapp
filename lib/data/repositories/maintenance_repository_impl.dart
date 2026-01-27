@@ -140,7 +140,7 @@ class MaintenanceRepositoryImpl implements MaintenanceRepository {
         vehicleId: maintenance.vehicleId,
         serviceType: maintenance.serviceType,
         excludeId: maintenanceResponse['id'] as String,
-        tirePosition: maintenance.tirePosition,
+        tirePosition: maintenance.tirePosition?.toString(),
       );
 
       print(
@@ -465,7 +465,7 @@ class MaintenanceRepositoryImpl implements MaintenanceRepository {
 
       // Obtener alertas pendientes
       final alertsResult = await getPendingAlerts();
-      
+
       return alertsResult.fold(
         (failure) => Left(failure),
         (alerts) => Right(alerts.length),

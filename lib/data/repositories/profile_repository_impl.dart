@@ -317,8 +317,10 @@ class ProfileRepositoryImpl implements ProfileRepository {
       print('✅ Conductor creado en PostgreSQL: ${userData['email']}');
 
       // Convertir a ProfileEntity
+      final String odId = userData['id'] ?? '';
       final profile = ProfileEntity(
-        id: userData['id'] ?? '',
+        id: odId,
+        userId: odId, // En PostgreSQL local, id == userId
         email: userData['email'] ?? username,
         fullName: userData['full_name'] ?? fullName ?? '',
         role: userData['role'] ?? 'driver',
