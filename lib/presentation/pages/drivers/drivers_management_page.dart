@@ -34,7 +34,8 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
   bool _isCreating = false;
   Timer? _rateLimitTimer;
   int _rateLimitSeconds = 0;
-  String? _selectedVehicleIdForNewDriver;
+  String _selectedVehicleIdForNewDriver =
+      'sin_vehiculo'; // Por defecto sin vehículo
 
   @override
   void initState() {
@@ -360,27 +361,17 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
       return false;
     }
 
-    if (_selectedVehicleIdForNewDriver == null ||
-        _selectedVehicleIdForNewDriver!.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Debes seleccionar una opción de vehículo'),
-          backgroundColor: Colors.red,
-          duration: Duration(seconds: 3),
-        ),
-      );
-      return false;
-    }
-
-    // Determinar si es sin vehículo
-    final sinVehiculo = _selectedVehicleIdForNewDriver == 'sin_vehiculo';
+    // Determinar si es sin vehículo (por defecto o seleccionado)
+    final sinVehiculo =
+        _selectedVehicleIdForNewDriver == 'sin_vehiculo' ||
+        _selectedVehicleIdForNewDriver.isEmpty;
     final vehicleIdToAssign = sinVehiculo
         ? null
         : _selectedVehicleIdForNewDriver;
 
     // Validar si el vehículo ya está asignado a otro conductor (solo si tiene vehículo)
     if (!sinVehiculo) {
-      final selectedVehicleId = _selectedVehicleIdForNewDriver!;
+      final selectedVehicleId = _selectedVehicleIdForNewDriver;
       String? conflictingDriverId;
       _assignedVehicleByDriver.forEach((driverId, vehicleId) {
         if (vehicleId == selectedVehicleId && conflictingDriverId == null) {
