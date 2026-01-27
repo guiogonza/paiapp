@@ -1,17 +1,20 @@
 import 'package:flutter/foundation.dart';
 import 'package:pai_app/data/models/gps_device_model.dart';
 import 'package:pai_app/data/services/gps_auth_service.dart';
+import 'package:pai_app/data/services/vehicle_location_service.dart';
 import 'package:pai_app/domain/entities/vehicle_entity.dart';
 
 /// Proveedor centralizado de vehículos GPS
-/// Usa GPSAuthService para obtener dispositivos y los convierte a VehicleEntity
-/// Esto asegura consistencia en cómo se mapean las placas en toda la app
+/// Usa VehicleLocationService para obtener dispositivos (mismas credenciales que el mapa)
+/// Esto asegura consistencia en cómo se cargan los vehículos en toda la app
 class GPSVehicleProvider {
   static final GPSVehicleProvider _instance = GPSVehicleProvider._internal();
   factory GPSVehicleProvider() => _instance;
   GPSVehicleProvider._internal();
 
   final GPSAuthService _gpsAuthService = GPSAuthService();
+  final VehicleLocationService _vehicleLocationService =
+      VehicleLocationService();
 
   // Cache de vehículos para evitar llamadas repetidas
   List<VehicleEntity>? _cachedVehicles;
@@ -19,11 +22,17 @@ class GPSVehicleProvider {
   static const Duration _cacheDuration = Duration(minutes: 5);
 
   /// Obtiene los vehículos del GPS como VehicleEntity
-  /// Usa cache de 5 minutos para evitar llamadas excesivas
+  /// Usa VehicleLocationService (mismas credenciales que el mapa)
+  /// Cache de 5 minutos para evitar llamadas excesivas
   Future<List<VehicleEntity>> getVehicles({bool forceRefresh = false}) async {
-    // Verificar cache
+    debugPrint(
+      '[GPSVehicleProvider] getVehicles llamado (forceRefresh: $forceRefresh)',
+    );
+
+    // Verificar cache (solo si tiene datos)
     if (!forceRefresh &&
         _cachedVehicles != null &&
+        _cachedVehicles!.isNotEmpty &&
         _cacheTime != null &&
         DateTime.now().difference(_cacheTime!) < _cacheDuration) {
       debugPrint(
@@ -33,39 +42,33 @@ class GPSVehicleProvider {
     }
 
     try {
-      debugPrint('[GPSVehicleProvider] Obteniendo vehículos del GPS...');
-      final gpsDevices = await _gpsAuthService.getDevicesFromGPS();
+      debugPrint(
+        '[GPSVehicleProvider] Obteniendo vehículos del GPS usando VehicleLocationService...',
+      );
 
-      if (gpsDevices.isEmpty) {
+      // Usar VehicleLocationService que es el que funciona en el mapa
+      final vehicleLocations = await _vehicleLocationService
+          .getVehicleLocations();
+      debugPrint(
+        '[GPSVehicleProvider] VehicleLocationService retornó: ${vehicleLocations.length} vehículos',
+      );
+
+      if (vehicleLocations.isEmpty) {
         debugPrint(
-          '[GPSVehicleProvider] No se obtuvieron dispositivos del GPS',
+          '[GPSVehicleProvider] ⚠️ No se obtuvieron vehículos - NO se guarda en cache',
         );
         return [];
       }
 
-      // Convertir a modelos tipados
-      final devices = gpsDevices
-          .map((d) => GPSDeviceModel.fromJson(d))
-          .toList();
-
-      // Log de estructura del primer dispositivo para debug
-      if (gpsDevices.isNotEmpty) {
-        debugPrint('[GPSVehicleProvider] Estructura del primer dispositivo:');
-        final first = gpsDevices.first;
-        first.forEach((key, value) {
-          debugPrint('  $key: $value (${value.runtimeType})');
-        });
-      }
-
-      // Convertir a VehicleEntity
-      final vehicles = devices.map((device) {
+      // Convertir VehicleLocationEntity a VehicleEntity
+      final vehicles = vehicleLocations.map((location) {
         return VehicleEntity(
-          id: device.id,
-          placa: device.placa, // Usa la lógica del modelo: name > label > plate
+          id: location.id,
+          placa: location.plate, // plate viene del name del GPS
           marca: 'GPS',
           modelo: 'Sincronizado',
           ano: DateTime.now().year,
-          gpsDeviceId: device.id,
+          gpsDeviceId: location.id,
         );
       }).toList();
 
@@ -73,7 +76,9 @@ class GPSVehicleProvider {
       _cachedVehicles = vehicles;
       _cacheTime = DateTime.now();
 
-      debugPrint('[GPSVehicleProvider] ${vehicles.length} vehículos cargados:');
+      debugPrint(
+        '[GPSVehicleProvider] ✅ ${vehicles.length} vehículos cargados:',
+      );
       for (var v in vehicles.take(5)) {
         debugPrint('  - ${v.placa} (ID: ${v.id})');
       }

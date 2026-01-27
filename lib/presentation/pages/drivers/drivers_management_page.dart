@@ -777,7 +777,8 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
                       items: items,
                       onChanged: (value) {
                         print('📝 Vehículo seleccionado: $value');
-                        _selectedVehicleIdForNewDriver = value ?? 'sin_vehiculo';
+                        _selectedVehicleIdForNewDriver =
+                            value ?? 'sin_vehiculo';
                       },
                       validator: (_) => null,
                     );

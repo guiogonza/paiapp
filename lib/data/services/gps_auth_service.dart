@@ -152,10 +152,15 @@ class GPSAuthService {
       print('🔍 INICIANDO DEBUG GPS STRUCTURE');
       print('🔍 ==========================================');
 
-      // Paso 1: Login
+      // Paso 1: Login con credenciales del usuario
       print('\n📡 PASO 1: Realizando login...');
-      final email = 'luisr@rastrear.com.co';
-      final password = '2023';
+      final credentials = await getGpsCredentialsLocally();
+      if (credentials == null) {
+        print('❌ No hay credenciales GPS guardadas');
+        return;
+      }
+      final email = credentials['email']!;
+      final password = credentials['password']!;
 
       final uri = Uri.parse(_loginUrl);
       print('📡 URL: $uri');
