@@ -649,9 +649,7 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
       maxChildSize: 0.95,
       builder: (context, scrollController) {
         // Los vehículos ya fueron cargados antes de abrir el modal
-        print(
-          '📱 Modal abierto: ${_vehicles.length} vehículos disponibles',
-        );
+        print('📱 Modal abierto: ${_vehicles.length} vehículos disponibles');
         for (var v in _vehicles) {
           print('   - ${v.placa} (ID: ${v.id})');
         }
@@ -661,157 +659,153 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
           padding: const EdgeInsets.all(16.0),
           child: Form(
             key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
-                    Row(
-                      children: [
-                        Icon(Icons.person_add, color: AppColors.primary),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Crear Nuevo Conductor',
-                          style: Theme.of(context).textTheme.titleLarge
-                              ?.copyWith(fontWeight: FontWeight.bold),
-                        ),
-                        const Spacer(),
-                        IconButton(
-                          icon: const Icon(Icons.close),
-                          onPressed: () => Navigator.of(context).pop(),
-                        ),
-                      ],
+                    Icon(Icons.person_add, color: AppColors.primary),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Crear Nuevo Conductor',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                     ),
-                    const SizedBox(height: 24),
-
-                    // Nombre completo (opcional)
-                    TextFormField(
-                      controller: _fullNameController,
-                      decoration: InputDecoration(
-                        labelText: 'Nombre Completo (Opcional)',
-                        hintText: 'Este campo es completamente opcional',
-                        prefixIcon: const Icon(Icons.badge),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.of(context).pop(),
                     ),
-                    const SizedBox(height: 16),
+                  ],
+                ),
+                const SizedBox(height: 24),
 
-                    // Vehículo asignado (obligatorio)
-                    DropdownButtonFormField<String>(
-                      key: ValueKey('dropdown_${_vehicles.length}'),
-                      decoration: InputDecoration(
-                        labelText: 'Vehículo asignado *',
-                        hintText: _vehicles.isEmpty
-                            ? 'No hay vehículos disponibles'
-                            : 'Selecciona un vehículo',
-                        prefixIcon: const Icon(Icons.directions_car),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      items: [
-                        const DropdownMenuItem<String>(
-                          value: 'sin_vehiculo',
-                          child: Text('Sin vehículo asignado'),
-                        ),
-                        ..._vehicles.map((vehicle) {
-                          return DropdownMenuItem<String>(
-                            value: vehicle.id,
-                            child: Text(
-                              '${vehicle.placa} - ${vehicle.marca} ${vehicle.modelo}',
-                            ),
-                          );
-                        }),
-                      ],
-                      onChanged: (value) {
-                        // Actualizar el estado de la página
-                        setState(() {
-                          _selectedVehicleIdForNewDriver = value;
-                        });
-                      },
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Debes asignar un vehículo';
-                        }
-                        return null;
-                      },
+                // Nombre completo (opcional)
+                TextFormField(
+                  controller: _fullNameController,
+                  decoration: InputDecoration(
+                    labelText: 'Nombre Completo (Opcional)',
+                    hintText: 'Este campo es completamente opcional',
+                    prefixIcon: const Icon(Icons.badge),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    const SizedBox(height: 16),
+                  ),
+                ),
+                const SizedBox(height: 16),
 
-                    // Usuario
-                    TextFormField(
-                      controller: _usernameController,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      decoration: InputDecoration(
-                        labelText: 'Usuario *',
-                        prefixIcon: const Icon(Icons.person),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        helperText: 'Solo números (ej: número de cédula)',
-                      ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'El usuario es requerido';
-                        }
-                        if (!RegExp(r'^\d+$').hasMatch(value.trim())) {
-                          return 'El usuario debe contener solo números';
-                        }
-                        return null;
-                      },
+                // Vehículo asignado (obligatorio)
+                DropdownButtonFormField<String>(
+                  key: ValueKey('dropdown_${_vehicles.length}'),
+                  decoration: InputDecoration(
+                    labelText: 'Vehículo asignado *',
+                    hintText: _vehicles.isEmpty
+                        ? 'No hay vehículos disponibles'
+                        : 'Selecciona un vehículo',
+                    prefixIcon: const Icon(Icons.directions_car),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    const SizedBox(height: 16),
-
-                    // Contraseña
-                    TextFormField(
-                      controller: _passwordController,
-                      obscureText: true,
-                      decoration: InputDecoration(
-                        labelText: 'Contraseña *',
-                        prefixIcon: const Icon(Icons.lock),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        helperText: 'Mínimo 6 caracteres',
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'La contraseña es requerida';
-                        }
-                        if (value.length < 6) {
-                          return 'La contraseña debe tener al menos 6 caracteres';
-                        }
-                        return null;
-                      },
+                  ),
+                  items: [
+                    const DropdownMenuItem<String>(
+                      value: 'sin_vehiculo',
+                      child: Text('Sin vehículo asignado'),
                     ),
-                    const SizedBox(height: 24),
-
-                    // Botón crear
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton(
-                        onPressed: (_isCreating || _rateLimitSeconds > 0)
-                            ? null
-                            : () async {
-                                final success = await _handleCreateDriver();
-                                if (mounted && success) {
-                                  Navigator.of(context).pop(); // Cerrar modal
-                                  _usernameController.clear();
-                                  _passwordController.clear();
-                                  _fullNameController.clear();
-                                }
-                              },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          foregroundColor: Colors.white,
+                    ..._vehicles.map((vehicle) {
+                      return DropdownMenuItem<String>(
+                        value: vehicle.id,
+                        child: Text(
+                          '${vehicle.placa} - ${vehicle.marca} ${vehicle.modelo}',
                         ),
-                        child: _isCreating
-                            ? const CircularProgressIndicator(
-                                color: Colors.white,
-                              )
-                            : _rateLimitSeconds > 0
+                      );
+                    }),
+                  ],
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedVehicleIdForNewDriver = value;
+                    });
+                  },
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Debes asignar un vehículo';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // Usuario
+                TextFormField(
+                  controller: _usernameController,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  decoration: InputDecoration(
+                    labelText: 'Usuario *',
+                    prefixIcon: const Icon(Icons.person),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    helperText: 'Solo números (ej: número de cédula)',
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'El usuario es requerido';
+                    }
+                    if (!RegExp(r'^\d+$').hasMatch(value.trim())) {
+                      return 'El usuario debe contener solo números';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // Contraseña
+                TextFormField(
+                  controller: _passwordController,
+                  obscureText: true,
+                  decoration: InputDecoration(
+                    labelText: 'Contraseña *',
+                    prefixIcon: const Icon(Icons.lock),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    helperText: 'Mínimo 6 caracteres',
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'La contraseña es requerida';
+                    }
+                    if (value.length < 6) {
+                      return 'La contraseña debe tener al menos 6 caracteres';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 24),
+
+                // Botón crear
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: (_isCreating || _rateLimitSeconds > 0)
+                        ? null
+                        : () async {
+                            final success = await _handleCreateDriver();
+                            if (mounted && success) {
+                              Navigator.of(context).pop();
+                              _usernameController.clear();
+                              _passwordController.clear();
+                              _fullNameController.clear();
+                            }
+                          },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: _isCreating
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : _rateLimitSeconds > 0
                             ? Text(
                                 'ESPERAR $_rateLimitSeconds SEGUNDOS',
                                 style: const TextStyle(
@@ -826,13 +820,11 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-            );
-          },
+              ],
+            ),
+          ),
         );
       },
     );

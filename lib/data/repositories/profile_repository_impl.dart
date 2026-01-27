@@ -214,7 +214,6 @@ class ProfileRepositoryImpl implements ProfileRepository {
 
       print('📋 Total de conductores en el mapa: ${driversMap.length}');
       return Right(driversMap);
-
     } on SocketException catch (_) {
       print('❌ Error de red al obtener conductores');
       return const Left(NetworkFailure());
