@@ -632,20 +632,44 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
             builder: (ctx) => const Center(child: CircularProgressIndicator()),
           );
 
-          // Cargar vehículos antes de abrir el modal
-          await _loadVehicles();
+          // Cargar vehículos directamente del GPS
+          List<VehicleEntity> vehiculosParaModal = [];
+          try {
+            print('🚗 Cargando vehículos para el modal...');
+            final gpsDevices = await _gpsAuthService.getDevicesFromGPS();
+
+            if (gpsDevices.isNotEmpty) {
+              vehiculosParaModal = gpsDevices.map((device) {
+                return VehicleEntity(
+                  id: device['id']?.toString() ?? '',
+                  placa:
+                      device['name']?.toString() ??
+                      device['label']?.toString() ??
+                      device['plate']?.toString() ??
+                      'Sin placa',
+                  marca: 'GPS',
+                  modelo: 'Sincronizado',
+                  ano: DateTime.now().year,
+                  gpsDeviceId: device['id']?.toString(),
+                );
+              }).toList();
+
+              print(
+                '✅ ${vehiculosParaModal.length} vehículos listos para el modal:',
+              );
+              for (var v in vehiculosParaModal) {
+                print('   - ${v.placa} (ID: ${v.id})');
+              }
+            }
+          } catch (e) {
+            print('❌ Error cargando vehículos: $e');
+          }
 
           // Cerrar loading
           if (mounted) Navigator.of(context).pop();
           if (!mounted) return;
 
-          // Mostrar resultado
-          print('🚗 Vehículos cargados para el modal: ${_vehicles.length}');
-          for (var v in _vehicles) {
-            print('   - ${v.placa} (ID: ${v.id})');
-          }
-
-          if (_vehicles.isEmpty) {
+          if (vehiculosParaModal.isEmpty) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text(
@@ -656,12 +680,12 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
             );
           }
 
-          // Mostrar diálogo de creación
+          // Mostrar diálogo de creación con los vehículos cargados
           showModalBottomSheet(
             context: context,
             isScrollControlled: true,
             builder: (context) =>
-                _buildDriverFormSheet(loadedVehicles: List.from(_vehicles)),
+                _buildDriverFormSheet(loadedVehicles: vehiculosParaModal),
           );
         },
         icon: const Icon(Icons.add),
