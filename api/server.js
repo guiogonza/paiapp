@@ -373,7 +373,7 @@ app.post('/rest/v1/documents', authenticateToken, async (req, res) => {
 });
 
 // =====================================================
-// RUTAS DE TRIPS
+// RUTAS DE TRIPS (VIAJES)
 // =====================================================
 
 app.get('/rest/v1/trips', authenticateToken, async (req, res) => {
@@ -403,15 +403,36 @@ app.get('/rest/v1/trips', authenticateToken, async (req, res) => {
   }
 });
 
+app.get('/rest/v1/trips/:id', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM trips WHERE id = $1', [req.params.id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Viaje no encontrado' });
+    }
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('❌ Error obteniendo viaje:', error);
+    res.status(500).json({ error: 'Error del servidor' });
+  }
+});
+
 app.post('/rest/v1/trips', authenticateToken, async (req, res) => {
   try {
-    const { vehicle_id, start_latitude, start_longitude, start_address } = req.body;
+    const { 
+      vehicle_id, start_latitude, start_longitude, start_address,
+      end_latitude, end_longitude, end_address, start_location, end_location,
+      budget_amount, status 
+    } = req.body;
 
     const result = await pool.query(
-      `INSERT INTO trips (vehicle_id, driver_id, start_time, start_latitude, start_longitude, start_address, status)
-       VALUES ($1, $2, CURRENT_TIMESTAMP, $3, $4, $5, 'in_progress')
+      `INSERT INTO trips (vehicle_id, driver_id, start_time, start_latitude, start_longitude, 
+        start_address, end_latitude, end_longitude, end_address, start_location, end_location,
+        budget_amount, status)
+       VALUES ($1, $2, CURRENT_TIMESTAMP, $3, $4, $5, $6, $7, $8, $9, $10, $11, COALESCE($12, 'in_progress'))
        RETURNING *`,
-      [vehicle_id, req.user.id, start_latitude, start_longitude, start_address]
+      [vehicle_id, req.user.id, start_latitude, start_longitude, start_address,
+       end_latitude, end_longitude, end_address, start_location, end_location,
+       budget_amount, status]
     );
 
     res.status(201).json(result.rows[0]);
@@ -421,15 +442,78 @@ app.post('/rest/v1/trips', authenticateToken, async (req, res) => {
   }
 });
 
+app.patch('/rest/v1/trips/:id', authenticateToken, async (req, res) => {
+  try {
+    const { 
+      end_time, end_latitude, end_longitude, end_address, 
+      status, total_distance, notes, end_location 
+    } = req.body;
+
+    const result = await pool.query(
+      `UPDATE trips SET 
+        end_time = COALESCE($1, end_time),
+        end_latitude = COALESCE($2, end_latitude),
+        end_longitude = COALESCE($3, end_longitude),
+        end_address = COALESCE($4, end_address),
+        status = COALESCE($5, status),
+        total_distance = COALESCE($6, total_distance),
+        notes = COALESCE($7, notes),
+        end_location = COALESCE($8, end_location)
+       WHERE id = $9
+       RETURNING *`,
+      [end_time, end_latitude, end_longitude, end_address, status, total_distance, notes, end_location, req.params.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Viaje no encontrado' });
+    }
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('❌ Error actualizando viaje:', error);
+    res.status(500).json({ error: 'Error del servidor' });
+  }
+});
+
+app.delete('/rest/v1/trips/:id', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query('DELETE FROM trips WHERE id = $1 RETURNING id', [req.params.id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Viaje no encontrado' });
+    }
+    res.json({ message: 'Viaje eliminado' });
+  } catch (error) {
+    console.error('❌ Error eliminando viaje:', error);
+    res.status(500).json({ error: 'Error del servidor' });
+  }
+});
+
 // =====================================================
-// RUTAS DE EXPENSES
+// RUTAS DE EXPENSES (GASTOS)
 // =====================================================
 
 app.get('/rest/v1/expenses', authenticateToken, async (req, res) => {
   try {
-    const result = await pool.query(
-      'SELECT * FROM expenses ORDER BY expense_date DESC'
-    );
+    const { trip_id, driver_id, vehicle_id } = req.query;
+    
+    let query = 'SELECT * FROM expenses WHERE 1=1';
+    const params = [];
+
+    if (trip_id) {
+      params.push(trip_id.replace('eq.', ''));
+      query += ` AND trip_id = $${params.length}`;
+    }
+    if (driver_id) {
+      params.push(driver_id.replace('eq.', ''));
+      query += ` AND driver_id = $${params.length}`;
+    }
+    if (vehicle_id) {
+      params.push(vehicle_id.replace('eq.', ''));
+      query += ` AND vehicle_id = $${params.length}`;
+    }
+
+    query += ' ORDER BY expense_date DESC';
+
+    const result = await pool.query(query, params);
     res.json(result.rows);
   } catch (error) {
     console.error('❌ Error obteniendo gastos:', error);
@@ -437,15 +521,32 @@ app.get('/rest/v1/expenses', authenticateToken, async (req, res) => {
   }
 });
 
+app.get('/rest/v1/expenses/:id', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM expenses WHERE id = $1', [req.params.id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Gasto no encontrado' });
+    }
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('❌ Error obteniendo gasto:', error);
+    res.status(500).json({ error: 'Error del servidor' });
+  }
+});
+
 app.post('/rest/v1/expenses', authenticateToken, async (req, res) => {
   try {
-    const { vehicle_id, trip_id, expense_type, amount, description, expense_date } = req.body;
+    const { vehicle_id, trip_id, expense_type, amount, description, expense_date, receipt_url, date, type, category } = req.body;
+    
+    // Normalizar nombres de campos
+    const finalExpenseType = expense_type || type || category || 'Otro';
+    const finalDate = expense_date || date || new Date().toISOString();
 
     const result = await pool.query(
-      `INSERT INTO expenses (vehicle_id, trip_id, driver_id, expense_type, amount, description, expense_date)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO expenses (vehicle_id, trip_id, driver_id, expense_type, amount, description, expense_date, receipt_url)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *`,
-      [vehicle_id, trip_id, req.user.id, expense_type, amount, description, expense_date]
+      [vehicle_id, trip_id, req.user.id, finalExpenseType, amount, description, finalDate, receipt_url]
     );
 
     res.status(201).json(result.rows[0]);
@@ -455,8 +556,47 @@ app.post('/rest/v1/expenses', authenticateToken, async (req, res) => {
   }
 });
 
+app.patch('/rest/v1/expenses/:id', authenticateToken, async (req, res) => {
+  try {
+    const { expense_type, amount, description, expense_date, receipt_url } = req.body;
+
+    const result = await pool.query(
+      `UPDATE expenses SET 
+        expense_type = COALESCE($1, expense_type),
+        amount = COALESCE($2, amount),
+        description = COALESCE($3, description),
+        expense_date = COALESCE($4, expense_date),
+        receipt_url = COALESCE($5, receipt_url)
+       WHERE id = $6
+       RETURNING *`,
+      [expense_type, amount, description, expense_date, receipt_url, req.params.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Gasto no encontrado' });
+    }
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('❌ Error actualizando gasto:', error);
+    res.status(500).json({ error: 'Error del servidor' });
+  }
+});
+
+app.delete('/rest/v1/expenses/:id', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query('DELETE FROM expenses WHERE id = $1 RETURNING id', [req.params.id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Gasto no encontrado' });
+    }
+    res.json({ message: 'Gasto eliminado' });
+  } catch (error) {
+    console.error('❌ Error eliminando gasto:', error);
+    res.status(500).json({ error: 'Error del servidor' });
+  }
+});
+
 // =====================================================
-// RUTAS DE MAINTENANCE
+// RUTAS DE MAINTENANCE (MANTENIMIENTOS)
 // =====================================================
 
 app.get('/rest/v1/maintenance', authenticateToken, async (req, res) => {
@@ -477,6 +617,356 @@ app.get('/rest/v1/maintenance', authenticateToken, async (req, res) => {
     res.json(result.rows);
   } catch (error) {
     console.error('❌ Error obteniendo mantenimientos:', error);
+    res.status(500).json({ error: 'Error del servidor' });
+  }
+});
+
+app.get('/rest/v1/maintenance/:id', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM maintenance WHERE id = $1', [req.params.id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Mantenimiento no encontrado' });
+    }
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('❌ Error obteniendo mantenimiento:', error);
+    res.status(500).json({ error: 'Error del servidor' });
+  }
+});
+
+app.post('/rest/v1/maintenance', authenticateToken, async (req, res) => {
+  try {
+    const { 
+      vehicle_id, service_type, service_date, km_at_service, cost, 
+      next_change_km, alert_date, notes, tire_position, provider 
+    } = req.body;
+
+    const result = await pool.query(
+      `INSERT INTO maintenance (vehicle_id, created_by, service_type, service_date, km_at_service, 
+        cost, next_change_km, alert_date, notes, tire_position, provider)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+       RETURNING *`,
+      [vehicle_id, req.user.id, service_type, service_date, km_at_service, 
+       cost, next_change_km, alert_date, notes, tire_position, provider]
+    );
+
+    // Actualizar kilometraje del vehículo si se proporcionó
+    if (km_at_service && vehicle_id) {
+      await pool.query(
+        'UPDATE vehicles SET current_mileage = $1 WHERE id = $2',
+        [km_at_service, vehicle_id]
+      );
+      console.log(`✅ Kilometraje actualizado: ${km_at_service} km para vehículo ${vehicle_id}`);
+    }
+
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('❌ Error creando mantenimiento:', error);
+    res.status(500).json({ error: 'Error del servidor' });
+  }
+});
+
+app.patch('/rest/v1/maintenance/:id', authenticateToken, async (req, res) => {
+  try {
+    const { 
+      service_type, service_date, km_at_service, cost, 
+      next_change_km, alert_date, notes, tire_position, provider 
+    } = req.body;
+
+    const result = await pool.query(
+      `UPDATE maintenance SET 
+        service_type = COALESCE($1, service_type),
+        service_date = COALESCE($2, service_date),
+        km_at_service = COALESCE($3, km_at_service),
+        cost = COALESCE($4, cost),
+        next_change_km = COALESCE($5, next_change_km),
+        alert_date = COALESCE($6, alert_date),
+        notes = COALESCE($7, notes),
+        tire_position = COALESCE($8, tire_position),
+        provider = COALESCE($9, provider)
+       WHERE id = $10
+       RETURNING *`,
+      [service_type, service_date, km_at_service, cost, next_change_km, 
+       alert_date, notes, tire_position, provider, req.params.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Mantenimiento no encontrado' });
+    }
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('❌ Error actualizando mantenimiento:', error);
+    res.status(500).json({ error: 'Error del servidor' });
+  }
+});
+
+app.delete('/rest/v1/maintenance/:id', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query('DELETE FROM maintenance WHERE id = $1 RETURNING id', [req.params.id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Mantenimiento no encontrado' });
+    }
+    res.json({ message: 'Mantenimiento eliminado' });
+  } catch (error) {
+    console.error('❌ Error eliminando mantenimiento:', error);
+    res.status(500).json({ error: 'Error del servidor' });
+  }
+});
+
+// Limpiar alertas de mantenimiento
+app.post('/rest/v1/maintenance/clear-alerts', authenticateToken, async (req, res) => {
+  try {
+    const { vehicle_id, service_type, exclude_id, tire_position } = req.body;
+
+    let query = `UPDATE maintenance SET next_change_km = NULL, alert_date = NULL 
+                 WHERE vehicle_id = $1 AND service_type = $2`;
+    const params = [vehicle_id, service_type];
+
+    if (exclude_id) {
+      params.push(exclude_id);
+      query += ` AND id != $${params.length}`;
+    }
+
+    if (tire_position) {
+      params.push(tire_position);
+      query += ` AND tire_position = $${params.length}`;
+    }
+
+    await pool.query(query, params);
+    res.json({ message: 'Alertas limpiadas' });
+  } catch (error) {
+    console.error('❌ Error limpiando alertas:', error);
+    res.status(500).json({ error: 'Error del servidor' });
+  }
+});
+
+// =====================================================
+// RUTAS DE REMISIONES
+// =====================================================
+
+app.get('/rest/v1/remisiones', authenticateToken, async (req, res) => {
+  try {
+    const { trip_id, driver_id, vehicle_id, status } = req.query;
+    
+    let query = 'SELECT * FROM remisiones WHERE 1=1';
+    const params = [];
+
+    if (trip_id) {
+      params.push(trip_id.replace('eq.', ''));
+      query += ` AND trip_id = $${params.length}`;
+    }
+    if (driver_id) {
+      params.push(driver_id.replace('eq.', ''));
+      query += ` AND driver_id = $${params.length}`;
+    }
+    if (vehicle_id) {
+      params.push(vehicle_id.replace('eq.', ''));
+      query += ` AND vehicle_id = $${params.length}`;
+    }
+    if (status) {
+      params.push(status.replace('eq.', ''));
+      query += ` AND status = $${params.length}`;
+    }
+
+    query += ' ORDER BY created_at DESC';
+
+    const result = await pool.query(query, params);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('❌ Error obteniendo remisiones:', error);
+    res.status(500).json({ error: 'Error del servidor' });
+  }
+});
+
+app.post('/rest/v1/remisiones', authenticateToken, async (req, res) => {
+  try {
+    const { 
+      trip_id, vehicle_id, driver_id, remision_number, origin, destination,
+      cargo_description, cargo_weight, delivery_date, status, notes, signature_url
+    } = req.body;
+
+    const result = await pool.query(
+      `INSERT INTO remisiones (trip_id, vehicle_id, driver_id, remision_number, origin, destination,
+        cargo_description, cargo_weight, delivery_date, status, notes, signature_url)
+       VALUES ($1, $2, COALESCE($3, $4), $5, $6, $7, $8, $9, $10, COALESCE($11, 'pending'), $12, $13)
+       RETURNING *`,
+      [trip_id, vehicle_id, driver_id || req.user.id, req.user.id, remision_number, origin, destination,
+       cargo_description, cargo_weight, delivery_date, status, notes, signature_url]
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('❌ Error creando remisión:', error);
+    res.status(500).json({ error: 'Error del servidor' });
+  }
+});
+
+app.patch('/rest/v1/remisiones/:id', authenticateToken, async (req, res) => {
+  try {
+    const { status, signature_url, delivery_date, notes } = req.body;
+
+    const result = await pool.query(
+      `UPDATE remisiones SET 
+        status = COALESCE($1, status),
+        signature_url = COALESCE($2, signature_url),
+        delivery_date = COALESCE($3, delivery_date),
+        notes = COALESCE($4, notes)
+       WHERE id = $5
+       RETURNING *`,
+      [status, signature_url, delivery_date, notes, req.params.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Remisión no encontrada' });
+    }
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('❌ Error actualizando remisión:', error);
+    res.status(500).json({ error: 'Error del servidor' });
+  }
+});
+
+// Actualizar vehículo
+app.patch('/rest/v1/vehicles/:id', authenticateToken, async (req, res) => {
+  try {
+    const { placa, marca, modelo, ano, color, tipo, gps_device_id, current_mileage, is_active } = req.body;
+
+    const result = await pool.query(
+      `UPDATE vehicles SET 
+        placa = COALESCE($1, placa),
+        marca = COALESCE($2, marca),
+        modelo = COALESCE($3, modelo),
+        ano = COALESCE($4, ano),
+        color = COALESCE($5, color),
+        tipo = COALESCE($6, tipo),
+        gps_device_id = COALESCE($7, gps_device_id),
+        current_mileage = COALESCE($8, current_mileage),
+        is_active = COALESCE($9, is_active)
+       WHERE id = $10
+       RETURNING *`,
+      [placa, marca, modelo, ano, color, tipo, gps_device_id, current_mileage, is_active, req.params.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Vehículo no encontrado' });
+    }
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('❌ Error actualizando vehículo:', error);
+    res.status(500).json({ error: 'Error del servidor' });
+  }
+});
+
+// Obtener vehículo por ID
+app.get('/rest/v1/vehicles/:id', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM vehicles WHERE id = $1', [req.params.id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Vehículo no encontrado' });
+    }
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('❌ Error obteniendo vehículo:', error);
+    res.status(500).json({ error: 'Error del servidor' });
+  }
+});
+
+// Eliminar vehículo (soft delete)
+app.delete('/rest/v1/vehicles/:id', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'UPDATE vehicles SET is_active = false WHERE id = $1 RETURNING id',
+      [req.params.id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Vehículo no encontrado' });
+    }
+    res.json({ message: 'Vehículo eliminado' });
+  } catch (error) {
+    console.error('❌ Error eliminando vehículo:', error);
+    res.status(500).json({ error: 'Error del servidor' });
+  }
+});
+
+// Actualizar documento
+app.patch('/rest/v1/documents/:id', authenticateToken, async (req, res) => {
+  try {
+    const { document_type, document_number, issue_date, expiry_date, alert_date, document_url, notes, is_archived } = req.body;
+
+    const result = await pool.query(
+      `UPDATE documents SET 
+        document_type = COALESCE($1, document_type),
+        document_number = COALESCE($2, document_number),
+        issue_date = COALESCE($3, issue_date),
+        expiry_date = COALESCE($4, expiry_date),
+        alert_date = COALESCE($5, alert_date),
+        document_url = COALESCE($6, document_url),
+        notes = COALESCE($7, notes),
+        is_archived = COALESCE($8, is_archived)
+       WHERE id = $9
+       RETURNING *`,
+      [document_type, document_number, issue_date, expiry_date, alert_date, document_url, notes, is_archived, req.params.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Documento no encontrado' });
+    }
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('❌ Error actualizando documento:', error);
+    res.status(500).json({ error: 'Error del servidor' });
+  }
+});
+
+app.delete('/rest/v1/documents/:id', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query('DELETE FROM documents WHERE id = $1 RETURNING id', [req.params.id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Documento no encontrado' });
+    }
+    res.json({ message: 'Documento eliminado' });
+  } catch (error) {
+    console.error('❌ Error eliminando documento:', error);
+    res.status(500).json({ error: 'Error del servidor' });
+  }
+});
+
+// =====================================================
+// RUTAS DE GPS CREDENTIALS
+// =====================================================
+
+app.get('/rest/v1/gps_credentials', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM gps_credentials WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1',
+      [req.user.id]
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error('❌ Error obteniendo credenciales GPS:', error);
+    res.status(500).json({ error: 'Error del servidor' });
+  }
+});
+
+app.post('/rest/v1/gps_credentials', authenticateToken, async (req, res) => {
+  try {
+    const { provider, email, password } = req.body;
+
+    // Upsert - actualizar si ya existe para este usuario y proveedor
+    const result = await pool.query(
+      `INSERT INTO gps_credentials (user_id, provider, email, password)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (user_id, provider) DO UPDATE SET 
+         email = EXCLUDED.email, 
+         password = EXCLUDED.password, 
+         updated_at = CURRENT_TIMESTAMP
+       RETURNING *`,
+      [req.user.id, provider || 'sistemagps', email, password]
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('❌ Error guardando credenciales GPS:', error);
     res.status(500).json({ error: 'Error del servidor' });
   }
 });

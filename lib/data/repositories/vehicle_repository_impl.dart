@@ -1,43 +1,36 @@
 import 'dart:io';
 
 import 'package:dartz/dartz.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:pai_app/domain/entities/vehicle_entity.dart';
 import 'package:pai_app/domain/failures/vehicle_failure.dart';
 import 'package:pai_app/domain/repositories/vehicle_repository.dart';
 import 'package:pai_app/data/models/vehicle_model.dart';
+import 'package:pai_app/data/services/local_api_client.dart';
 
 class VehicleRepositoryImpl implements VehicleRepository {
-  final SupabaseClient _supabase = Supabase.instance.client;
+  final LocalApiClient _localApi = LocalApiClient();
   static const String _tableName = 'vehicles';
 
   @override
   Future<Either<VehicleFailure, List<VehicleEntity>>> getVehicles() async {
     try {
-      final response = await _supabase
-          .from(_tableName)
-          .select()
-          .order('created_at', ascending: false);
+      final response = await _localApi.getVehicles();
 
-      final vehicles = (response as List)
+      final vehicles = response
           .map((json) => VehicleModel.fromJson(json))
           .map((model) => model.toEntity())
           .toList();
 
       return Right(vehicles);
-    } on PostgrestException catch (e) {
-      // Si el error es de RLS, dar un mensaje más claro
-      if (e.message.contains('row-level security') || 
-          e.message.contains('policy') ||
-          e.code == 'PGRST301') {
+    } on SocketException catch (_) {
+      return const Left(NetworkFailure());
+    } catch (e) {
+      final errorMsg = e.toString();
+      if (errorMsg.contains('Sesión expirada') || errorMsg.contains('401')) {
         return Left(ValidationFailure(
           'No tienes permisos. Asegúrate de estar autenticado correctamente.'
         ));
       }
-      return Left(DatabaseFailure(_mapPostgrestError(e)));
-    } on SocketException catch (_) {
-      return const Left(NetworkFailure());
-    } catch (e) {
       return Left(UnknownFailure(_mapGenericError(e)));
     }
   }
@@ -46,11 +39,7 @@ class VehicleRepositoryImpl implements VehicleRepository {
   Future<Either<VehicleFailure, VehicleEntity>> getVehicleById(
       String id) async {
     try {
-      final response = await _supabase
-          .from(_tableName)
-          .select()
-          .eq('id', id)
-          .maybeSingle();
+      final response = await _localApi.getVehicleById(id);
 
       if (response == null) {
         return const Left(NotFoundFailure());
@@ -58,14 +47,13 @@ class VehicleRepositoryImpl implements VehicleRepository {
 
       final vehicle = VehicleModel.fromJson(response);
       return Right(vehicle.toEntity());
-    } on PostgrestException catch (e) {
-      if (e.code == 'PGRST116') {
-        return const Left(NotFoundFailure());
-      }
-      return Left(DatabaseFailure(_mapPostgrestError(e)));
     } on SocketException catch (_) {
       return const Left(NetworkFailure());
     } catch (e) {
+      final errorMsg = e.toString();
+      if (errorMsg.contains('404')) {
+        return const Left(NotFoundFailure());
+      }
       return Left(UnknownFailure(_mapGenericError(e)));
     }
   }
@@ -78,28 +66,19 @@ class VehicleRepositoryImpl implements VehicleRepository {
       final json = model.toJson();
       json.remove('id'); // No incluir id en la creación
 
-      final response = await _supabase
-          .from(_tableName)
-          .insert(json)
-          .select()
-          .single();
+      final response = await _localApi.createVehicle(json);
 
-      final createdVehicle =
-          VehicleModel.fromJson(response);
+      final createdVehicle = VehicleModel.fromJson(response);
       return Right(createdVehicle.toEntity());
-    } on PostgrestException catch (e) {
-      // Si el error es de RLS, dar un mensaje más claro
-      if (e.message.contains('row-level security') || 
-          e.message.contains('policy') ||
-          e.code == 'PGRST301') {
+    } on SocketException catch (_) {
+      return const Left(NetworkFailure());
+    } catch (e) {
+      final errorMsg = e.toString();
+      if (errorMsg.contains('Sesión expirada') || errorMsg.contains('401')) {
         return Left(ValidationFailure(
           'No tienes permisos. Asegúrate de estar autenticado correctamente.'
         ));
       }
-      return Left(DatabaseFailure(_mapPostgrestError(e)));
-    } on SocketException catch (_) {
-      return const Left(NetworkFailure());
-    } catch (e) {
       return Left(UnknownFailure(_mapGenericError(e)));
     }
   }
@@ -116,24 +95,17 @@ class VehicleRepositoryImpl implements VehicleRepository {
       final json = model.toJson();
       json.remove('id'); // No actualizar el id
 
-      final response = await _supabase
-          .from(_tableName)
-          .update(json)
-          .eq('id', vehicle.id!)
-          .select()
-          .single();
+      final response = await _localApi.updateVehicle(vehicle.id!, json);
 
-      final updatedVehicle =
-          VehicleModel.fromJson(response);
+      final updatedVehicle = VehicleModel.fromJson(response);
       return Right(updatedVehicle.toEntity());
-    } on PostgrestException catch (e) {
-      if (e.code == 'PGRST116') {
-        return const Left(NotFoundFailure());
-      }
-      return Left(DatabaseFailure(_mapPostgrestError(e)));
     } on SocketException catch (_) {
       return const Left(NetworkFailure());
     } catch (e) {
+      final errorMsg = e.toString();
+      if (errorMsg.contains('404')) {
+        return const Left(NotFoundFailure());
+      }
       return Left(UnknownFailure(_mapGenericError(e)));
     }
   }
@@ -141,34 +113,17 @@ class VehicleRepositoryImpl implements VehicleRepository {
   @override
   Future<Either<VehicleFailure, void>> deleteVehicle(String id) async {
     try {
-      await _supabase.from(_tableName).delete().eq('id', id);
-
+      await _localApi.deleteVehicle(id);
       return const Right(null);
-    } on PostgrestException catch (e) {
-      if (e.code == 'PGRST116') {
-        return const Left(NotFoundFailure());
-      }
-      return Left(DatabaseFailure(_mapPostgrestError(e)));
     } on SocketException catch (_) {
       return const Left(NetworkFailure());
     } catch (e) {
+      final errorMsg = e.toString();
+      if (errorMsg.contains('404')) {
+        return const Left(NotFoundFailure());
+      }
       return Left(UnknownFailure(_mapGenericError(e)));
     }
-  }
-
-  /// Mapea errores de Postgrest a mensajes amigables
-  String _mapPostgrestError(PostgrestException e) {
-    // Errores comunes de Supabase/Postgrest
-    if (e.code == '23505') {
-      return 'Ya existe un vehículo con esta placa';
-    }
-    if (e.code == '23503') {
-      return 'Error de integridad de datos';
-    }
-    if (e.code == 'PGRST301') {
-      return 'No tienes permisos para realizar esta acción';
-    }
-    return e.message.isNotEmpty ? e.message : 'Error en la base de datos';
   }
 
   /// Mapea errores genéricos a mensajes amigables
@@ -182,6 +137,6 @@ class VehicleRepositoryImpl implements VehicleRepository {
     if (errorString.contains('timeout')) {
       return 'La operación tardó demasiado. Intenta nuevamente';
     }
-    return 'Ocurrió un error inesperado';
+    return 'Ocurrió un error inesperado: ${e.toString()}';
   }
 }

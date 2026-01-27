@@ -387,6 +387,152 @@ class LocalApiClient {
     return result.cast<Map<String, dynamic>>();
   }
 
+  /// Crear mantenimiento
+  Future<Map<String, dynamic>> createMaintenance(
+    Map<String, dynamic> maintenanceData,
+  ) async {
+    return await post('/rest/v1/maintenance', maintenanceData);
+  }
+
+  /// Actualizar mantenimiento
+  Future<Map<String, dynamic>> updateMaintenance(
+    String id,
+    Map<String, dynamic> maintenanceData,
+  ) async {
+    return await patch('/rest/v1/maintenance', id, maintenanceData);
+  }
+
+  /// Limpiar alertas de mantenimiento
+  Future<void> clearMaintenanceAlerts({
+    required String vehicleId,
+    required String serviceType,
+    String? excludeId,
+    String? tirePosition,
+  }) async {
+    await post('/rest/v1/maintenance/clear-alerts', {
+      'vehicle_id': vehicleId,
+      'service_type': serviceType,
+      if (excludeId != null) 'exclude_id': excludeId,
+      if (tirePosition != null) 'tire_position': tirePosition,
+    });
+  }
+
+  /// Actualizar gasto
+  Future<Map<String, dynamic>> updateExpense(
+    String id,
+    Map<String, dynamic> expenseData,
+  ) async {
+    return await patch('/rest/v1/expenses', id, expenseData);
+  }
+
+  /// Eliminar gasto
+  Future<bool> deleteExpense(String id) async {
+    return await delete('/rest/v1/expenses', id);
+  }
+
+  /// Obtener viaje por ID
+  Future<Map<String, dynamic>?> getTripById(String id) async {
+    return await getOne('/rest/v1/trips', id);
+  }
+
+  /// Crear viaje
+  Future<Map<String, dynamic>> createTrip(Map<String, dynamic> tripData) async {
+    return await post('/rest/v1/trips', tripData);
+  }
+
+  /// Actualizar viaje
+  Future<Map<String, dynamic>> updateTrip(
+    String id,
+    Map<String, dynamic> tripData,
+  ) async {
+    return await patch('/rest/v1/trips', id, tripData);
+  }
+
+  /// Eliminar viaje
+  Future<bool> deleteTrip(String id) async {
+    return await delete('/rest/v1/trips', id);
+  }
+
+  /// Obtener vehículo por ID
+  Future<Map<String, dynamic>?> getVehicleById(String id) async {
+    return await getOne('/rest/v1/vehicles', id);
+  }
+
+  /// Actualizar vehículo
+  Future<Map<String, dynamic>> updateVehicle(
+    String id,
+    Map<String, dynamic> vehicleData,
+  ) async {
+    return await patch('/rest/v1/vehicles', id, vehicleData);
+  }
+
+  /// Eliminar vehículo
+  Future<bool> deleteVehicle(String id) async {
+    return await delete('/rest/v1/vehicles', id);
+  }
+
+  /// Actualizar documento
+  Future<Map<String, dynamic>> updateDocument(
+    String id,
+    Map<String, dynamic> documentData,
+  ) async {
+    return await patch('/rest/v1/documents', id, documentData);
+  }
+
+  /// Eliminar documento
+  Future<bool> deleteDocument(String id) async {
+    return await delete('/rest/v1/documents', id);
+  }
+
+  /// Obtener remisiones
+  Future<List<Map<String, dynamic>>> getRemisiones({
+    String? tripId,
+    String? vehicleId,
+    String? status,
+  }) async {
+    final queryParams = <String, String>{};
+    if (tripId != null) queryParams['trip_id'] = 'eq.$tripId';
+    if (vehicleId != null) queryParams['vehicle_id'] = 'eq.$vehicleId';
+    if (status != null) queryParams['status'] = 'eq.$status';
+
+    final result = await get('/rest/v1/remisiones', queryParams: queryParams);
+    return result.cast<Map<String, dynamic>>();
+  }
+
+  /// Crear remisión
+  Future<Map<String, dynamic>> createRemision(
+    Map<String, dynamic> remisionData,
+  ) async {
+    return await post('/rest/v1/remisiones', remisionData);
+  }
+
+  /// Actualizar remisión
+  Future<Map<String, dynamic>> updateRemision(
+    String id,
+    Map<String, dynamic> remisionData,
+  ) async {
+    return await patch('/rest/v1/remisiones', id, remisionData);
+  }
+
+  /// Obtener credenciales GPS
+  Future<List<Map<String, dynamic>>> getGpsCredentials() async {
+    final result = await get('/rest/v1/gps_credentials');
+    return result.cast<Map<String, dynamic>>();
+  }
+
+  /// Guardar credenciales GPS
+  Future<Map<String, dynamic>> saveGpsCredentials({
+    required String email,
+    required String password,
+    String provider = 'sistemagps',
+  }) async {
+    return await post('/rest/v1/gps_credentials', {
+      'email': email,
+      'password': password,
+      'provider': provider,
+    });
+  }
+
   /// Health check
   Future<bool> healthCheck() async {
     try {

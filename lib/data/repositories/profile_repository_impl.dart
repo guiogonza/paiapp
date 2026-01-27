@@ -6,9 +6,11 @@ import 'package:pai_app/domain/entities/profile_entity.dart';
 import 'package:pai_app/domain/failures/profile_failure.dart';
 import 'package:pai_app/domain/repositories/profile_repository.dart';
 import 'package:pai_app/data/models/profile_model.dart';
+import 'package:pai_app/data/services/local_api_client.dart';
 
 class ProfileRepositoryImpl implements ProfileRepository {
   final SupabaseClient _supabase = Supabase.instance.client;
+  final LocalApiClient _localApi = LocalApiClient();
   static const String _tableName = 'profiles';
 
   @override
@@ -299,168 +301,47 @@ class ProfileRepositoryImpl implements ProfileRepository {
     String? assignedVehicleId,
   }) async {
     try {
-      print('🔨 Creando nuevo conductor: usuario=$username');
-
-      // Normalizar el username para Supabase
-      final supabaseEmail = _normalizeUsernameForSupabase(username);
-      print('   Email normalizado para Supabase: $supabaseEmail');
-
-      // Paso 1: Crear usuario en auth.users usando signUp
-      final signUpResponse = await _supabase.auth.signUp(
-        email: supabaseEmail,
-        password: password,
-        data: {
-          if (fullName != null && fullName.isNotEmpty) 'full_name': fullName,
-          'role': 'driver',
-          'original_username': username, // Guardar el username original
-        },
+      print(
+        '🔨 Creando nuevo conductor en PostgreSQL local: usuario=$username',
       );
 
-      if (signUpResponse.user == null) {
-        print('❌ Error: No se pudo crear el usuario en auth');
-        return Left(DatabaseFailure('No se pudo crear el usuario'));
-      }
+      // Usar la API local de PostgreSQL en lugar de Supabase
+      final result = await _localApi.createDriver(
+        username: username,
+        password: password,
+        fullName: fullName,
+        assignedVehicleId: assignedVehicleId,
+      );
 
-      final userId = signUpResponse.user!.id;
-      print('✅ Usuario creado en auth: id=$userId');
+      final userData = result['user'] as Map<String, dynamic>;
+      print('✅ Conductor creado en PostgreSQL: ${userData['email']}');
 
-      // Paso 2: Crear perfil en profiles con role='driver'
-      // profiles ahora tiene las columnas email y full_name (agregadas manualmente)
-      // Nota: Si hay un trigger que crea el perfil automáticamente, esto podría fallar
-      // En ese caso, intentar obtener el perfil creado por el trigger y actualizar el role
-      try {
-        final profileData = {
-          'id': userId,
-          'role': 'driver',
-          'email':
-              username, // CRÍTICO: Guardar el username original (puede ser cualquier texto)
-          'full_name':
-              fullName ??
-              '', // CRÍTICO: Guardar full_name (vacío si no se proporciona)
-          if (assignedVehicleId != null)
-            'assigned_vehicle_id': assignedVehicleId,
-          'created_at': DateTime.now().toIso8601String(),
-        };
+      // Convertir a ProfileEntity
+      final profile = ProfileEntity(
+        id: userData['id'] ?? '',
+        email: userData['email'] ?? username,
+        fullName: userData['full_name'] ?? fullName ?? '',
+        role: userData['role'] ?? 'driver',
+        assignedVehicleId: userData['assigned_vehicle_id'],
+        createdAt: userData['created_at'] != null
+            ? DateTime.tryParse(userData['created_at'])
+            : DateTime.now(),
+      );
 
-        print('📝 Intentando insertar perfil: $profileData');
-
-        final profileResponse = await _supabase
-            .from(_tableName)
-            .insert(profileData)
-            .select()
-            .single();
-
-        print('✅ Perfil creado en profiles: ${profileResponse['id']}');
-        print('   Role en perfil creado: ${profileResponse['role']}');
-
-        final profile = ProfileModel.fromJson(profileResponse);
-
-        // Verificar que el role sea 'driver'
-        if (profile.role != 'driver') {
-          print('⚠️ El role no es "driver", actualizando...');
-          await _supabase
-              .from(_tableName)
-              .update({'role': 'driver'})
-              .eq('id', userId);
-          // Obtener el perfil actualizado
-          final updatedProfile = await getProfileByUserId(userId);
-          return updatedProfile.fold(
-            (failure) =>
-                Right(profile.toEntity()), // Retornar el original si falla
-            (updated) => Right(updated),
-          );
-        }
-
-        return Right(profile.toEntity());
-      } on PostgrestException catch (e) {
-        // Si el perfil ya existe (creado por trigger), intentar obtenerlo y actualizar el role, email y full_name
-        if (e.code == '23505' ||
-            e.message.contains('duplicate') ||
-            e.message.contains('already exists')) {
-          print('⚠️ Perfil ya existe, obteniendo y actualizando datos...');
-          try {
-            // Actualizar role, email (username original) y full_name
-            final updateData = {
-              'role': 'driver',
-              'email': username, // Guardar el username original
-              'full_name': fullName ?? '',
-            };
-            await _supabase
-                .from(_tableName)
-                .update(updateData)
-                .eq('id', userId);
-
-            print(
-              '✅ Datos actualizados: role=driver, email=$username, full_name=${fullName ?? ""}',
-            );
-
-            // Luego obtener el perfil actualizado
-            final existingProfile = await getProfileByUserId(userId);
-            return existingProfile.fold(
-              (failure) => Left(
-                DatabaseFailure(
-                  'Perfil existe pero no se pudo obtener: ${failure.message}',
-                ),
-              ),
-              (profile) {
-                print('✅ Perfil obtenido con role: ${profile.role}');
-                // Verificar nuevamente que el role sea 'driver'
-                if (profile.role != 'driver') {
-                  print(
-                    '⚠️ El role aún no es "driver" después de actualizar, intentando nuevamente...',
-                  );
-                  // Intentar actualizar nuevamente de forma asíncrona (no bloqueante)
-                  _supabase
-                      .from(_tableName)
-                      .update({'role': 'driver'})
-                      .eq('id', userId)
-                      .then((_) => print('✅ Role actualizado a "driver"'))
-                      .catchError(
-                        (e) => print('⚠️ Error al actualizar role: $e'),
-                      );
-                }
-                return Right(profile);
-              },
-            );
-          } catch (getError) {
-            print('❌ Error al obtener/actualizar perfil existente: $getError');
-            return Left(
-              DatabaseFailure('Error al obtener perfil existente: $getError'),
-            );
-          }
-        }
-        print('❌ Error al insertar perfil: ${e.message}');
-        rethrow;
-      }
-    } on AuthException catch (e) {
-      print('❌ Error AuthException al crear conductor: ${e.message}');
-      if (e.message.contains('already registered') ||
-          e.message.contains('already exists') ||
-          e.message.contains('User already registered')) {
-        return Left(DatabaseFailure('Este usuario ya está registrado'));
-      }
-      // Manejo de rate limiting - mensaje amigable
-      if (e.message.contains('security purposes') ||
-          e.message.contains('rate limit') ||
-          e.message.contains('too many requests')) {
-        final match = RegExp(r'after (\d+) seconds?').firstMatch(e.message);
-        final seconds = match != null ? match.group(1) : 'unos';
-        return Left(
-          DatabaseFailure(
-            'Por seguridad, espera $seconds segundos antes de crear otro conductor.',
-          ),
-        );
-      }
-      return Left(DatabaseFailure('Error al crear usuario: ${e.message}'));
-    } on PostgrestException catch (e) {
-      print('❌ Error PostgrestException al crear perfil: ${e.message}');
-      return Left(DatabaseFailure(_mapPostgrestError(e)));
+      return Right(profile);
     } on SocketException catch (_) {
       print('❌ Error de red al crear conductor');
       return const Left(NetworkFailure());
     } catch (e) {
-      print('❌ Error desconocido al crear conductor: $e');
-      return Left(UnknownFailure(_mapGenericError(e)));
+      print('❌ Error al crear conductor en PostgreSQL: $e');
+      final errorMsg = e.toString();
+
+      if (errorMsg.contains('ya existe') ||
+          errorMsg.contains('already exists')) {
+        return Left(DatabaseFailure('Este usuario ya está registrado'));
+      }
+
+      return Left(DatabaseFailure('Error al crear conductor: $errorMsg'));
     }
   }
 

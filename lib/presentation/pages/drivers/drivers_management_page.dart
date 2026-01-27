@@ -664,38 +664,33 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
   }
 
   Widget _buildDriverFormSheet() {
-    // Variables locales para el estado del dropdown dentro del modal
-    String? localSelectedVehicle = _selectedVehicleIdForNewDriver;
-    List<VehicleEntity> localVehicles = List.from(_vehicles);
-    bool localIsLoading =
-        _vehicles.isEmpty; // Si no hay vehículos, está cargando
-    bool hasTriedLoading = false;
-
     return DraggableScrollableSheet(
       initialChildSize: 0.7,
       minChildSize: 0.5,
       maxChildSize: 0.95,
       builder: (context, scrollController) {
+        // Variables de estado local para el modal
+        String? localSelectedVehicle = _selectedVehicleIdForNewDriver;
+        List<VehicleEntity> localVehicles = List.from(_vehicles);
+        bool localIsLoading = _isLoadingVehicles;
+
         return StatefulBuilder(
           builder: (context, setModalState) {
-            // Siempre intentar cargar vehículos si no hay y no hemos intentado
-            if (localVehicles.isEmpty && !hasTriedLoading) {
-              hasTriedLoading = true;
-              localIsLoading = true;
-
-              // Cargar vehículos del GPS
+            // Si no hay vehículos y no estamos cargando, cargar ahora
+            if (localVehicles.isEmpty && !localIsLoading) {
               Future.microtask(() async {
+                setModalState(() => localIsLoading = true);
                 print('📱 Modal: Cargando vehículos para dropdown...');
                 await _loadVehicles();
-                print('📱 Modal: Vehículos cargados: ${_vehicles.length}');
                 if (mounted) {
                   setModalState(() {
                     localVehicles = List.from(_vehicles);
                     localIsLoading = false;
-                    print(
-                      '📱 Modal: Dropdown actualizado con ${localVehicles.length} vehículos',
-                    );
                   });
+                  print('📱 Modal: ${localVehicles.length} vehículos cargados');
+                  for (var v in localVehicles) {
+                    print('   - ${v.placa} (ID: ${v.id})');
+                  }
                 }
               });
             }
