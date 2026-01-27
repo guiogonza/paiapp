@@ -53,91 +53,66 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
   }
 
   Future<void> _loadVehicles() async {
+    if (!mounted) return;
+    
     setState(() {
       _isLoadingVehicles = true;
     });
 
-    bool loadedFromSupabase = false;
+    try {
+      // Cargar SIEMPRE directamente del GPS (es la fuente de verdad)
+      print('📡 Cargando vehículos del API GPS...');
+      final gpsDevices = await _gpsAuthService.getDevicesFromGPS();
 
-    // Intentar cargar de Supabase primero
-    final result = await _vehicleRepository.getVehicles();
-    result.fold(
-      (failure) {
-        print('⚠️ No se pudo cargar de Supabase: ${failure.message}');
-        print('📡 Intentando cargar directamente del GPS...');
-      },
-      (vehicles) {
-        if (vehicles.isNotEmpty) {
-          print('✅ Vehículos cargados de Supabase: ${vehicles.length}');
-          for (var v in vehicles) {
-            print('   - ${v.placa} (${v.marca} ${v.modelo}) - ID: ${v.id}');
-          }
-          if (mounted) {
-            setState(() {
-              _vehicles = vehicles;
-            });
-          }
-          loadedFromSupabase = true;
-        } else {
-          print('⚠️ Supabase devolvió 0 vehículos, intentando GPS...');
-        }
-      },
-    );
-
-    // Si no se cargaron de Supabase, cargar directamente del GPS
-    if (!loadedFromSupabase || _vehicles.isEmpty) {
-      try {
-        print('📡 Cargando vehículos directamente del API GPS...');
-        final gpsDevices = await _gpsAuthService.getDevicesFromGPS();
-
-        if (gpsDevices.isNotEmpty) {
-          final gpsVehicles = gpsDevices.map((device) {
-            return VehicleEntity(
-              id: device['id']?.toString() ?? '',
-              placa:
-                  device['name']?.toString() ??
-                  device['label']?.toString() ??
-                  device['plate']?.toString() ??
-                  'Sin placa',
-              marca: 'GPS',
-              modelo: 'Sincronizado',
-              ano: DateTime.now().year,
-              gpsDeviceId: device['id']?.toString(),
-            );
-          }).toList();
-
-          print('✅ Vehículos cargados del GPS: ${gpsVehicles.length}');
-          for (var v in gpsVehicles) {
-            print('   - ${v.placa} - GPS ID: ${v.gpsDeviceId}');
-          }
-
-          if (mounted) {
-            setState(() {
-              _vehicles = gpsVehicles;
-            });
-          }
-        } else {
-          print('⚠️ El API GPS no devolvió dispositivos');
-        }
-      } catch (e) {
-        print('❌ Error al cargar del GPS: $e');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('No se pudieron cargar los vehículos'),
-              backgroundColor: Colors.red,
-              duration: Duration(seconds: 4),
-            ),
+      if (gpsDevices.isNotEmpty) {
+        final gpsVehicles = gpsDevices.map((device) {
+          return VehicleEntity(
+            id: device['id']?.toString() ?? '',
+            placa:
+                device['name']?.toString() ??
+                device['label']?.toString() ??
+                device['plate']?.toString() ??
+                'Sin placa',
+            marca: 'GPS',
+            modelo: 'Sincronizado',
+            ano: DateTime.now().year,
+            gpsDeviceId: device['id']?.toString(),
           );
+        }).toList();
+
+        print('✅ ${gpsVehicles.length} vehículos cargados del GPS:');
+        for (var v in gpsVehicles) {
+          print('   - ${v.placa} (ID: ${v.id})');
+        }
+
+        if (mounted) {
+          setState(() {
+            _vehicles = gpsVehicles;
+            _isLoadingVehicles = false;
+          });
+        }
+      } else {
+        print('⚠️ El API GPS no devolvió dispositivos');
+        if (mounted) {
+          setState(() {
+            _isLoadingVehicles = false;
+          });
         }
       }
-    }
-
-    if (mounted) {
-      setState(() {
-        _isLoadingVehicles = false;
-      });
-      print('📝 Total vehículos en dropdown: ${_vehicles.length}');
+    } catch (e) {
+      print('❌ Error al cargar del GPS: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingVehicles = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al cargar vehículos: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
     }
   }
 
@@ -664,6 +639,9 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
   }
 
   Widget _buildDriverFormSheet() {
+    // Forzar recarga de vehículos cada vez que se abre el modal
+    Future.microtask(() => _loadVehicles());
+    
     return DraggableScrollableSheet(
       initialChildSize: 0.7,
       minChildSize: 0.5,
@@ -671,36 +649,7 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
       builder: (context, scrollController) {
         return StatefulBuilder(
           builder: (context, setModalState) {
-            // Variables de estado que se sincronizan con el widget padre
-            String? localSelectedVehicle = _selectedVehicleIdForNewDriver;
-            List<VehicleEntity> localVehicles = List.from(_vehicles);
-            bool localIsLoading = _isLoadingVehicles;
-
-            print(
-              '📱 Modal rebuild: ${localVehicles.length} vehículos, loading: $localIsLoading',
-            );
-
-            // Si no hay vehículos y no estamos cargando, cargar ahora
-            if (localVehicles.isEmpty && !localIsLoading) {
-              Future.microtask(() async {
-                print('📱 Modal: Iniciando carga de vehículos...');
-                setState(() => _isLoadingVehicles = true);
-                setModalState(() {});
-
-                await _loadVehicles();
-
-                if (mounted) {
-                  print(
-                    '📱 Modal: Carga completada, ${_vehicles.length} vehículos',
-                  );
-                  for (var v in _vehicles) {
-                    print('   - ${v.placa} (ID: ${v.id})');
-                  }
-                  setState(() => _isLoadingVehicles = false);
-                  setModalState(() {});
-                }
-              });
-            }
+            print('📱 Modal: ${_vehicles.length} vehículos, cargando: $_isLoadingVehicles');
 
             return SingleChildScrollView(
               controller: scrollController,
@@ -790,13 +739,11 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
                       onChanged: _isLoadingVehicles
                           ? null
                           : (value) {
-                              setModalState(() {
-                                localSelectedVehicle = value;
-                              });
-                              // También actualizar el estado de la página
+                              // Actualizar el estado de la página
                               setState(() {
                                 _selectedVehicleIdForNewDriver = value;
                               });
+                              setModalState(() {});
                             },
                       validator: (value) {
                         if (!_isLoadingVehicles &&
