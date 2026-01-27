@@ -5,6 +5,7 @@ import 'package:pai_app/core/theme/app_colors.dart';
 import 'package:pai_app/core/constants/maintenance_rules.dart';
 import 'package:pai_app/data/repositories/maintenance_repository_impl.dart';
 import 'package:pai_app/data/repositories/vehicle_repository_impl.dart';
+import 'package:pai_app/data/providers/gps_vehicle_provider.dart';
 import 'package:pai_app/domain/entities/maintenance_entity.dart';
 import 'package:pai_app/domain/entities/vehicle_entity.dart';
 import 'package:pai_app/presentation/widgets/tire_selector.dart';
@@ -14,7 +15,7 @@ class MaintenanceFormPage extends StatefulWidget {
   final String? preSelectedVehicleId;
   final String? preSelectedServiceType;
   final int? preSelectedTirePosition;
-  
+
   const MaintenanceFormPage({
     super.key,
     this.preSelectedVehicleId,
@@ -30,7 +31,8 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
   final _formKey = GlobalKey<FormState>();
   final _maintenanceRepository = MaintenanceRepositoryImpl();
   final _vehicleRepository = VehicleRepositoryImpl();
-  
+  final _gpsVehicleProvider = GPSVehicleProvider();
+
   List<VehicleEntity> _vehicles = [];
   VehicleEntity? _selectedVehicle;
   String? _selectedType;
@@ -39,10 +41,10 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
   int? _selectedTirePosition; // Posición de llanta (1-22, solo para "Llantas")
   double? _currentMileage; // Kilometraje actual (readonly, desde GPS)
   DateTime? _serviceDate;
-  DateTime? _alertDate; // Fecha de aviso (opcional para estándar, obligatorio para "Otro")
+  DateTime?
+  _alertDate; // Fecha de aviso (opcional para estándar, obligatorio para "Otro")
   bool _isLoading = false;
   bool _isLoadingMileage = false;
-  
 
   static const List<String> _maintenanceTypes = [
     'Aceite',
@@ -58,11 +60,12 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
     super.initState();
     _serviceDate = DateTime.now();
     _loadVehicles();
-    
+
     // Pre-llenar campos si vienen desde alertas
     if (widget.preSelectedServiceType != null) {
       _selectedType = widget.preSelectedServiceType;
-      if (widget.preSelectedServiceType == 'Llantas' && widget.preSelectedTirePosition != null) {
+      if (widget.preSelectedServiceType == 'Llantas' &&
+          widget.preSelectedTirePosition != null) {
         _selectedTirePosition = widget.preSelectedTirePosition;
       }
     }
@@ -76,52 +79,77 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
   }
 
   Future<void> _loadVehicles() async {
+    debugPrint('🚗 [MaintenanceForm] Cargando vehículos...');
+
+    // 1) Intentar obtener vehículos del repositorio local
     final result = await _vehicleRepository.getVehicles();
+    List<VehicleEntity> localVehicles = [];
+
     result.fold(
       (failure) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error al cargar vehículos: ${failure.message}'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
+        debugPrint(
+          '⚠️ [MaintenanceForm] Error en repo local: ${failure.message}',
+        );
       },
       (vehicles) {
-        if (mounted) {
-          setState(() {
-            _vehicles = vehicles;
-            
-            // Pre-seleccionar vehículo si viene desde alertas
-            if (widget.preSelectedVehicleId != null) {
-              try {
-                _selectedVehicle = vehicles.firstWhere(
-                  (v) => v.id == widget.preSelectedVehicleId,
-                );
-                if (_selectedVehicle != null) {
-                  _loadGpsMileage();
-                }
-              } catch (e) {
-                // Si no se encuentra, usar el primero disponible
-                if (vehicles.isNotEmpty) {
-                  _selectedVehicle = vehicles.first;
-                  _loadGpsMileage();
-                }
-              }
-            }
-          });
-        }
+        localVehicles = vehicles;
+        debugPrint(
+          '📦 [MaintenanceForm] Vehículos locales: ${vehicles.length}',
+        );
       },
     );
+
+    // 2) Si no hay vehículos locales, cargar desde GPS
+    List<VehicleEntity> vehiclesToUse = localVehicles;
+    if (vehiclesToUse.isEmpty) {
+      debugPrint(
+        '🛰️ [MaintenanceForm] Sin vehículos locales, cargando desde GPS...',
+      );
+      vehiclesToUse = await _gpsVehicleProvider.getVehicles();
+      debugPrint('✅ [MaintenanceForm] Vehículos GPS: ${vehiclesToUse.length}');
+    }
+
+    if (mounted) {
+      setState(() {
+        _vehicles = vehiclesToUse;
+
+        // Pre-seleccionar vehículo si viene desde alertas
+        if (widget.preSelectedVehicleId != null && _vehicles.isNotEmpty) {
+          try {
+            _selectedVehicle = _vehicles.firstWhere(
+              (v) => v.id == widget.preSelectedVehicleId,
+            );
+            if (_selectedVehicle != null) {
+              _loadGpsMileage();
+            }
+          } catch (e) {
+            // Si no se encuentra, usar el primero disponible
+            _selectedVehicle = _vehicles.first;
+            _loadGpsMileage();
+          }
+        }
+      });
+
+      debugPrint(
+        '📊 [MaintenanceForm] Total vehículos en dropdown: ${_vehicles.length}',
+      );
+      for (var v in _vehicles.take(5)) {
+        debugPrint('   - ${v.placa} (ID: ${v.id})');
+      }
+    }
   }
 
   Future<void> _loadGpsMileage() async {
-    print('🔍 _loadGpsMileage llamado para vehículo: ${_selectedVehicle?.placa}');
+    print(
+      '🔍 _loadGpsMileage llamado para vehículo: ${_selectedVehicle?.placa}',
+    );
     print('🔍 GPS Device ID: ${_selectedVehicle?.gpsDeviceId}');
-    
-    if (_selectedVehicle?.gpsDeviceId == null || _selectedVehicle!.gpsDeviceId!.isEmpty) {
-      print('⚠️ No hay GPS Device ID en BD, usando current_mileage del vehículo');
+
+    if (_selectedVehicle?.gpsDeviceId == null ||
+        _selectedVehicle!.gpsDeviceId!.isEmpty) {
+      print(
+        '⚠️ No hay GPS Device ID en BD, usando current_mileage del vehículo',
+      );
       // Si no hay GPS Device ID, NO intentar buscar en todos los dispositivos
       // Esto previene el bug de datos cruzados
       if (_selectedVehicle?.currentMileage != null) {
@@ -142,10 +170,14 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
       _isLoadingMileage = true;
     });
 
-    print('🔍 Llamando getLiveGpsMileage con deviceId: ${_selectedVehicle!.gpsDeviceId}');
-    final result = await _maintenanceRepository.getLiveGpsMileage(_selectedVehicle!.gpsDeviceId!);
+    print(
+      '🔍 Llamando getLiveGpsMileage con deviceId: ${_selectedVehicle!.gpsDeviceId}',
+    );
+    final result = await _maintenanceRepository.getLiveGpsMileage(
+      _selectedVehicle!.gpsDeviceId!,
+    );
     print('🔍 Resultado recibido: ${result.isRight() ? "Right" : "Left"}');
-    
+
     result.fold(
       (failure) {
         if (mounted) {
@@ -168,7 +200,9 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
           } else {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('Usando kilometraje guardado: ${_currentMileage!.toStringAsFixed(1)} km'),
+                content: Text(
+                  'Usando kilometraje guardado: ${_currentMileage!.toStringAsFixed(1)} km',
+                ),
                 backgroundColor: Colors.orange,
                 duration: const Duration(seconds: 2),
               ),
@@ -185,10 +219,14 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
           });
           print('🔍 Estado actualizado, _currentMileage: $_currentMileage');
           if (mileage != null) {
-            print('✅ Mostrando mensaje de éxito con kilometraje: ${mileage.toStringAsFixed(1)} km');
+            print(
+              '✅ Mostrando mensaje de éxito con kilometraje: ${mileage.toStringAsFixed(1)} km',
+            );
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('Kilometraje GPS cargado: ${mileage.toStringAsFixed(1)} km'),
+                content: Text(
+                  'Kilometraje GPS cargado: ${mileage.toStringAsFixed(1)} km',
+                ),
                 backgroundColor: Colors.green,
                 duration: const Duration(seconds: 2),
               ),
@@ -199,7 +237,9 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
               // Si mileage es null pero hay currentMileage del vehículo, usar ese
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('Usando kilometraje guardado: ${_currentMileage!.toStringAsFixed(1)} km'),
+                  content: Text(
+                    'Usando kilometraje guardado: ${_currentMileage!.toStringAsFixed(1)} km',
+                  ),
                   backgroundColor: Colors.orange,
                   duration: const Duration(seconds: 2),
                 ),
@@ -216,32 +256,43 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
   /// Calcula el km de próximo cambio basado en las reglas (SIN umbral)
   double? _calculateNextChangeKm() {
     if (_selectedType == null || _currentMileage == null) return null;
-    return MaintenanceRules.calculateNextChangeKm(_currentMileage!, _selectedType!);
+    return MaintenanceRules.calculateNextChangeKm(
+      _currentMileage!,
+      _selectedType!,
+    );
   }
-
 
   /// Obtiene el texto informativo para tipos estándar
   String? _getInfoText() {
     if (_selectedType == null || _currentMileage == null) return null;
-    
+
     if (!MaintenanceRules.isStandardType(_selectedType!)) return null;
-    
+
     final kmInterval = MaintenanceRules.getKmInterval(_selectedType!);
     if (kmInterval != null) {
       final nextChangeKm = _calculateNextChangeKm();
-      final alertKm = MaintenanceRules.calculateAlertKm(_currentMileage!, _selectedType!);
+      final alertKm = MaintenanceRules.calculateAlertKm(
+        _currentMileage!,
+        _selectedType!,
+      );
       return 'Próximo cambio: ${nextChangeKm?.toStringAsFixed(0) ?? 'N/A'} km. Alerta a los ${alertKm?.toStringAsFixed(0) ?? 'N/A'} km (${MaintenanceRules.alertKmThreshold} km antes)';
     }
-    
+
     final yearInterval = MaintenanceRules.getYearInterval(_selectedType!);
     if (yearInterval != null) {
-      final nextChangeDate = MaintenanceRules.calculateNextChangeDate(_serviceDate ?? DateTime.now(), _selectedType!);
-      final alertDate = MaintenanceRules.calculateAlertDate(_serviceDate ?? DateTime.now(), _selectedType!);
+      final nextChangeDate = MaintenanceRules.calculateNextChangeDate(
+        _serviceDate ?? DateTime.now(),
+        _selectedType!,
+      );
+      final alertDate = MaintenanceRules.calculateAlertDate(
+        _serviceDate ?? DateTime.now(),
+        _selectedType!,
+      );
       if (nextChangeDate != null && alertDate != null) {
         return 'Próximo cambio: ${DateFormat('dd/MM/yyyy').format(nextChangeDate)} (+$yearInterval años). Alerta: ${DateFormat('dd/MM/yyyy').format(alertDate)} (${MaintenanceRules.alertDaysThreshold} días antes)';
       }
     }
-    
+
     return null;
   }
 
@@ -273,7 +324,9 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
     if (_currentMileage == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Carga el kilometraje desde GPS o selecciona un vehículo con kilometraje'),
+          content: Text(
+            'Carga el kilometraje desde GPS o selecciona un vehículo con kilometraje',
+          ),
           backgroundColor: Colors.red,
         ),
       );
@@ -318,8 +371,11 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
     } else {
       // Para tipos estándar, calcular automáticamente
       // next_change_km = km actual + intervalo (SIN umbral)
-      nextChangeKm = MaintenanceRules.calculateNextChangeKm(_currentMileage!, _selectedType!);
-      
+      nextChangeKm = MaintenanceRules.calculateNextChangeKm(
+        _currentMileage!,
+        _selectedType!,
+      );
+
       // alert_date: Si el usuario proporcionó fecha manual, calcular alerta 30 días antes
       // Si no, calcular automáticamente desde serviceDate
       if (_alertDate != null) {
@@ -327,15 +383,21 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
         alertDate = MaintenanceRules.calculateAlertDateFromManual(_alertDate!);
       } else {
         // Fecha automática: calcular desde serviceDate y restar 30 días
-        alertDate = MaintenanceRules.calculateAlertDate(_serviceDate ?? DateTime.now(), _selectedType!);
+        alertDate = MaintenanceRules.calculateAlertDate(
+          _serviceDate ?? DateTime.now(),
+          _selectedType!,
+        );
       }
     }
 
     // Validar campos específicos
-    if (_selectedType == 'Otro' && _customServiceNameController.text.trim().isEmpty) {
+    if (_selectedType == 'Otro' &&
+        _customServiceNameController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('El nombre del servicio es obligatorio para tipo "Otro"'),
+          content: Text(
+            'El nombre del servicio es obligatorio para tipo "Otro"',
+          ),
           backgroundColor: Colors.red,
         ),
       );
@@ -344,7 +406,7 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
       });
       return;
     }
-    
+
     if (_selectedType == 'Llantas' && _selectedTirePosition == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -361,25 +423,34 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
     // Para "Otro", el serviceType debe ser "Otro" y el nombre personalizado va en customServiceName
     final maintenance = MaintenanceEntity(
       vehicleId: _selectedVehicle!.id!,
-      serviceType: _selectedType!, // Siempre el tipo seleccionado (incluye "Otro")
+      serviceType:
+          _selectedType!, // Siempre el tipo seleccionado (incluye "Otro")
       serviceDate: _serviceDate ?? DateTime.now(),
       kmAtService: _currentMileage!,
-      nextChangeKm: nextChangeKm, // KM donde se debe hacer el cambio (sin umbral)
-      alertDate: alertDate, // Fecha de alerta anticipada (con umbral de 30 días)
+      nextChangeKm:
+          nextChangeKm, // KM donde se debe hacer el cambio (sin umbral)
+      alertDate:
+          alertDate, // Fecha de alerta anticipada (con umbral de 30 días)
       cost: cost,
-      customServiceName: _selectedType == 'Otro' ? _customServiceNameController.text.trim() : null,
+      customServiceName: _selectedType == 'Otro'
+          ? _customServiceNameController.text.trim()
+          : null,
       tirePosition: _selectedType == 'Llantas' ? _selectedTirePosition : null,
       createdBy: currentUser.id,
     );
 
-    final result = await _maintenanceRepository.registerMaintenance(maintenance);
+    final result = await _maintenanceRepository.registerMaintenance(
+      maintenance,
+    );
 
     result.fold(
       (failure) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Error al registrar mantenimiento: ${failure.toString()}'),
+              content: Text(
+                'Error al registrar mantenimiento: ${failure.toString()}',
+              ),
               backgroundColor: Colors.red,
             ),
           );
@@ -405,7 +476,9 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
   @override
   Widget build(BuildContext context) {
     final isOtherType = _selectedType == 'Otro';
-    final isStandardType = _selectedType != null && MaintenanceRules.isStandardType(_selectedType!);
+    final isStandardType =
+        _selectedType != null &&
+        MaintenanceRules.isStandardType(_selectedType!);
     final infoText = _getInfoText();
 
     return Scaffold(
@@ -439,18 +512,27 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
                 }).toList(),
                 onChanged: (vehicle) async {
                   if (vehicle == null) return;
-                  
+
                   // DEBUG CRÍTICO: Verificar datos del vehículo seleccionado
-                  debugPrint('--- [DEBUG CRÍTICO] Vehículo seleccionado: ${vehicle.placa} ---');
-                  debugPrint('--- [DEBUG CRÍTICO] ID del vehículo: ${vehicle.id} ---');
-                  debugPrint('--- [DEBUG CRÍTICO] GPS Device ID desde objeto: ${vehicle.gpsDeviceId} ---');
-                  
+                  debugPrint(
+                    '--- [DEBUG CRÍTICO] Vehículo seleccionado: ${vehicle.placa} ---',
+                  );
+                  debugPrint(
+                    '--- [DEBUG CRÍTICO] ID del vehículo: ${vehicle.id} ---',
+                  );
+                  debugPrint(
+                    '--- [DEBUG CRÍTICO] GPS Device ID desde objeto: ${vehicle.gpsDeviceId} ---',
+                  );
+
                   // Relectura del vehículo desde BD para asegurar datos completos
                   if (vehicle.id != null) {
-                    final vehicleResult = await _vehicleRepository.getVehicleById(vehicle.id!);
+                    final vehicleResult = await _vehicleRepository
+                        .getVehicleById(vehicle.id!);
                     vehicleResult.fold(
                       (failure) {
-                        debugPrint('--- [DEBUG CRÍTICO] Error al releer vehículo: ${failure.message} ---');
+                        debugPrint(
+                          '--- [DEBUG CRÍTICO] Error al releer vehículo: ${failure.message} ---',
+                        );
                         // Si falla la relectura, usar el vehículo seleccionado
                         setState(() {
                           _selectedVehicle = vehicle;
@@ -459,19 +541,27 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
                         _loadGpsMileage();
                       },
                       (freshVehicle) {
-                        debugPrint('--- [DEBUG CRÍTICO] ID LEÍDO DESDE BD: ${freshVehicle.gpsDeviceId} ---');
-                        debugPrint('--- [DEBUG CRÍTICO] Current Mileage desde BD: ${freshVehicle.currentMileage} ---');
-                        
+                        debugPrint(
+                          '--- [DEBUG CRÍTICO] ID LEÍDO DESDE BD: ${freshVehicle.gpsDeviceId} ---',
+                        );
+                        debugPrint(
+                          '--- [DEBUG CRÍTICO] Current Mileage desde BD: ${freshVehicle.currentMileage} ---',
+                        );
+
                         setState(() {
-                          _selectedVehicle = freshVehicle; // Usar vehículo recién leído
+                          _selectedVehicle =
+                              freshVehicle; // Usar vehículo recién leído
                           _currentMileage = null; // Resetear kilometraje
                         });
-                        
+
                         // Solo cargar GPS si tiene gpsDeviceId
-                        if (freshVehicle.gpsDeviceId != null && freshVehicle.gpsDeviceId!.isNotEmpty) {
+                        if (freshVehicle.gpsDeviceId != null &&
+                            freshVehicle.gpsDeviceId!.isNotEmpty) {
                           _loadGpsMileage();
                         } else {
-                          debugPrint('--- [DEBUG CRÍTICO] Vehículo NO tiene gpsDeviceId, usando currentMileage ---');
+                          debugPrint(
+                            '--- [DEBUG CRÍTICO] Vehículo NO tiene gpsDeviceId, usando currentMileage ---',
+                          );
                           if (freshVehicle.currentMileage != null) {
                             setState(() {
                               _currentMileage = freshVehicle.currentMileage;
@@ -505,7 +595,9 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
                   decoration: BoxDecoration(
                     color: AppColors.lightGray.withOpacity(0.3),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.royalBlue.withOpacity(0.3)),
+                    border: Border.all(
+                      color: AppColors.royalBlue.withOpacity(0.3),
+                    ),
                   ),
                   child: Row(
                     children: [
@@ -533,13 +625,16 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
                           ],
                         ),
                       ),
-                      if (_selectedVehicle?.gpsDeviceId != null && _selectedVehicle!.gpsDeviceId!.isNotEmpty)
+                      if (_selectedVehicle?.gpsDeviceId != null &&
+                          _selectedVehicle!.gpsDeviceId!.isNotEmpty)
                         IconButton(
                           icon: _isLoadingMileage
                               ? const SizedBox(
                                   width: 20,
                                   height: 20,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
                                 )
                               : const Icon(Icons.refresh),
                           onPressed: _isLoadingMileage ? null : _loadGpsMileage,
@@ -605,22 +700,24 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
               // Selector de Posición solo para "Llantas"
               if (_selectedType == 'Llantas') ...[
                 // Mostrar dibujo del camión con TireSelector si hay vehículo seleccionado y tiene tipo
-                if (_selectedVehicle != null && _selectedVehicle!.vehicleType != null) ...[
+                if (_selectedVehicle != null &&
+                    _selectedVehicle!.vehicleType != null) ...[
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: AppColors.lightGray,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                      border: Border.all(
+                        color: AppColors.primary.withOpacity(0.3),
+                      ),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           'Selecciona la posición de la llanta:',
-                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 16),
                         Center(
@@ -653,9 +750,8 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
                         Expanded(
                           child: Text(
                             'Selecciona un vehículo para ver el dibujo del camión',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: Colors.orange[900],
-                                ),
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: Colors.orange[900]),
                           ),
                         ),
                       ],
@@ -673,10 +769,12 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
                       ),
                     ),
                     items: List.generate(22, (index) => index + 1)
-                        .map((position) => DropdownMenuItem(
-                              value: position,
-                              child: Text('Posición $position'),
-                            ))
+                        .map(
+                          (position) => DropdownMenuItem(
+                            value: position,
+                            child: Text('Posición $position'),
+                          ),
+                        )
                         .toList(),
                     onChanged: (value) {
                       setState(() {
@@ -702,10 +800,12 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
                       ),
                     ),
                     items: List.generate(22, (index) => index + 1)
-                        .map((position) => DropdownMenuItem(
-                              value: position,
-                              child: Text('Posición $position'),
-                            ))
+                        .map(
+                          (position) => DropdownMenuItem(
+                            value: position,
+                            child: Text('Posición $position'),
+                          ),
+                        )
                         .toList(),
                     onChanged: (value) {
                       setState(() {
@@ -722,7 +822,7 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
                 ],
                 const SizedBox(height: 16),
               ],
-              
+
               // Campo "Nombre del Servicio" solo para "Otro" (obligatorio)
               if (isOtherType)
                 TextFormField(
@@ -735,7 +835,8 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
                     ),
                   ),
                   validator: (value) {
-                    if (isOtherType && (value == null || value.trim().isEmpty)) {
+                    if (isOtherType &&
+                        (value == null || value.trim().isEmpty)) {
                       return 'El nombre del servicio es obligatorio';
                     }
                     return null;
@@ -750,7 +851,9 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
                   decoration: BoxDecoration(
                     color: AppColors.royalBlue.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.royalBlue.withOpacity(0.3)),
+                    border: Border.all(
+                      color: AppColors.royalBlue.withOpacity(0.3),
+                    ),
                   ),
                   child: Row(
                     children: [
@@ -765,7 +868,8 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
                     ],
                   ),
                 ),
-              if (isStandardType && infoText != null) const SizedBox(height: 16),
+              if (isStandardType && infoText != null)
+                const SizedBox(height: 16),
 
               // Costo
               TextFormField(
@@ -828,7 +932,9 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
                 onTap: () async {
                   final picked = await showDatePicker(
                     context: context,
-                    initialDate: _alertDate ?? DateTime.now().add(const Duration(days: 30)),
+                    initialDate:
+                        _alertDate ??
+                        DateTime.now().add(const Duration(days: 30)),
                     firstDate: DateTime.now(),
                     lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
                   );
@@ -845,15 +951,16 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    helperText: 'Opcional: Define cuándo quieres que te avisemos',
+                    helperText:
+                        'Opcional: Define cuándo quieres que te avisemos',
                   ),
                   child: Text(
                     _alertDate != null
                         ? DateFormat('dd/MM/yyyy').format(_alertDate!)
                         : 'Opcional: Selecciona una fecha',
                     style: TextStyle(
-                      color: _alertDate != null 
-                          ? AppColors.textPrimary 
+                      color: _alertDate != null
+                          ? AppColors.textPrimary
                           : AppColors.textSecondary,
                     ),
                   ),
@@ -878,7 +985,9 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
                         width: 20,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white,
+                          ),
                         ),
                       )
                     : const Text(
