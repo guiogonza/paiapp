@@ -10,15 +10,15 @@ class AuthRepositoryImpl implements AuthRepository {
 
   /// Convierte cualquier texto de usuario a un formato válido para Supabase Auth
   /// Si ya tiene formato de email, lo devuelve tal cual
-  /// Si no, lo convierte a usuario@local.pai
+  /// Si no, lo convierte a usuario@conductor.app (dominio válido)
   String _normalizeUsernameForSupabase(String username) {
     final trimmed = username.trim();
     // Si ya tiene formato de email (contiene @), usarlo tal cual
     if (trimmed.contains('@')) {
       return trimmed;
     }
-    // Si no tiene formato de email, convertirlo a usuario@local.pai
-    return '$trimmed@local.pai';
+    // Si no tiene formato de email, convertirlo a usuario@conductor.app
+    return '$trimmed@conductor.app';
   }
 
   @override

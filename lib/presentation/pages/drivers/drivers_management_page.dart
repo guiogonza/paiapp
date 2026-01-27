@@ -664,10 +664,12 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
   }
 
   Widget _buildDriverFormSheet() {
-    // Variable local para el estado del dropdown dentro del modal
+    // Variables locales para el estado del dropdown dentro del modal
     String? localSelectedVehicle = _selectedVehicleIdForNewDriver;
     List<VehicleEntity> localVehicles = List.from(_vehicles);
-    bool localIsLoading = _isLoadingVehicles;
+    bool localIsLoading =
+        _vehicles.isEmpty; // Si no hay vehículos, está cargando
+    bool hasTriedLoading = false;
 
     return DraggableScrollableSheet(
       initialChildSize: 0.7,
@@ -676,22 +678,26 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
       builder: (context, scrollController) {
         return StatefulBuilder(
           builder: (context, setModalState) {
-            // Si aún está cargando, intentar cargar vehículos
-            if (localIsLoading && _vehicles.isEmpty) {
-              // Recargar vehículos si no hay
+            // Siempre intentar cargar vehículos si no hay y no hemos intentado
+            if (localVehicles.isEmpty && !hasTriedLoading) {
+              hasTriedLoading = true;
+              localIsLoading = true;
+
+              // Cargar vehículos del GPS
               Future.microtask(() async {
+                print('📱 Modal: Cargando vehículos para dropdown...');
                 await _loadVehicles();
+                print('📱 Modal: Vehículos cargados: ${_vehicles.length}');
                 if (mounted) {
                   setModalState(() {
                     localVehicles = List.from(_vehicles);
-                    localIsLoading = _isLoadingVehicles;
+                    localIsLoading = false;
+                    print(
+                      '📱 Modal: Dropdown actualizado con ${localVehicles.length} vehículos',
+                    );
                   });
                 }
               });
-            } else if (localVehicles.isEmpty && _vehicles.isNotEmpty) {
-              // Sincronizar si la página ya tiene vehículos
-              localVehicles = List.from(_vehicles);
-              localIsLoading = false;
             }
 
             return SingleChildScrollView(

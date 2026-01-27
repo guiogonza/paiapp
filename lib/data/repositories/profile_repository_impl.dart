@@ -35,9 +35,7 @@ class ProfileRepositoryImpl implements ProfileRepository {
     String? vehicleId,
   }) async {
     try {
-      final updateData = <String, dynamic>{
-        'assigned_vehicle_id': vehicleId,
-      };
+      final updateData = <String, dynamic>{'assigned_vehicle_id': vehicleId};
 
       await _supabase.from(_tableName).update(updateData).eq('id', driverId);
 
@@ -53,7 +51,7 @@ class ProfileRepositoryImpl implements ProfileRepository {
 
   @override
   Future<Either<ProfileFailure, List<ProfileEntity>>>
-      getDriversWithAssignedVehicle() async {
+  getDriversWithAssignedVehicle() async {
     try {
       final response = await _supabase
           .from(_tableName)
@@ -78,7 +76,8 @@ class ProfileRepositoryImpl implements ProfileRepository {
 
   @override
   Future<Either<ProfileFailure, ProfileEntity>> getProfileByUserId(
-      String userId) async {
+    String userId,
+  ) async {
     try {
       // En profiles, el id es la clave primaria que coincide con auth.uid()
       final response = await _supabase
@@ -120,7 +119,7 @@ class ProfileRepositoryImpl implements ProfileRepository {
       print('🔍 Buscando conductores en la tabla profiles...');
       print('   Tabla: $_tableName');
       print('   Filtro: role = "driver"');
-      
+
       // Select simple: profiles ahora tiene las columnas email y full_name
       final response = await _supabase
           .from(_tableName)
@@ -128,9 +127,11 @@ class ProfileRepositoryImpl implements ProfileRepository {
           .eq('role', 'driver')
           .order('email', ascending: true);
 
-      print('📊 Respuesta de Supabase: ${response.length} registros encontrados');
+      print(
+        '📊 Respuesta de Supabase: ${response.length} registros encontrados',
+      );
       print('📊 Tipo de respuesta: ${response.runtimeType}');
-      
+
       // Debug: mostrar la respuesta completa
       if (response.isNotEmpty) {
         print('📋 Primer registro de ejemplo: ${response[0]}');
@@ -140,52 +141,60 @@ class ProfileRepositoryImpl implements ProfileRepository {
       }
 
       final driversMap = <String, String>{};
-      
+
       // Asegurar que response sea una List
       final profilesList = response as List;
       print('📋 Procesando ${profilesList.length} perfiles...');
-      
+
       // Buscar específicamente pepe@pai.com para diagnóstico
       bool foundPepe = false;
-      
+
       for (var index = 0; index < profilesList.length; index++) {
         final profileRaw = profilesList[index];
-        
+
         // Asegurar que profile sea un Map
         if (profileRaw is! Map<String, dynamic>) {
-          print('⚠️ Perfil en índice $index no es un Map: ${profileRaw.runtimeType}');
+          print(
+            '⚠️ Perfil en índice $index no es un Map: ${profileRaw.runtimeType}',
+          );
           print('   Contenido: $profileRaw');
           continue;
         }
-        
+
         final profile = profileRaw;
-        
+
         // Extraer campos directamente del Map
         // profiles ahora tiene las columnas email y full_name
         final profileId = profile['id']?.toString();
         final email = profile['email']?.toString();
         final fullName = profile['full_name']?.toString();
         final role = profile['role']?.toString();
-        
+
         // Diagnóstico especial para pepe@pai.com
         if (email != null && email.toLowerCase().contains('pepe')) {
           foundPepe = true;
-          print('🔍 ENCONTRADO PEPE: id="$profileId", email="$email", role="$role"');
+          print(
+            '🔍 ENCONTRADO PEPE: id="$profileId", email="$email", role="$role"',
+          );
           print('   Tipo de role: ${role.runtimeType}');
           print('   Role normalizado: "${role?.trim().toLowerCase()}"');
-          print('   Comparación con "driver": ${role?.trim().toLowerCase() == 'driver'}');
+          print(
+            '   Comparación con "driver": ${role?.trim().toLowerCase() == 'driver'}',
+          );
         }
-        
-        print('👤 Perfil[$index]: id="$profileId", email="$email", full_name="$fullName", role="$role"');
-        
+
+        print(
+          '👤 Perfil[$index]: id="$profileId", email="$email", full_name="$fullName", role="$role"',
+        );
+
         // Validación: normalizar el role (trim y lowercase) para comparación robusta
         final normalizedRole = role?.trim().toLowerCase();
-        
+
         // Validación estricta: debe tener id, email y role='driver'
-        if (profileId != null && 
+        if (profileId != null &&
             profileId.isNotEmpty &&
-            email != null && 
-            email.isNotEmpty && 
+            email != null &&
+            email.isNotEmpty &&
             normalizedRole == 'driver') {
           // Usar email como valor mostrado, pero el id como clave
           // Si hay full_name, mostrarlo junto con el email
@@ -195,7 +204,9 @@ class ProfileRepositoryImpl implements ProfileRepository {
           driversMap[profileId] = displayName;
           print('✅ Conductor agregado al mapa: $displayName (id: $profileId)');
         } else {
-          print('⚠️ Perfil[$index] ignorado: id="$profileId", email="$email", role="$role" (normalized: "$normalizedRole")');
+          print(
+            '⚠️ Perfil[$index] ignorado: id="$profileId", email="$email", role="$role" (normalized: "$normalizedRole")',
+          );
           if (profileId == null || profileId.isEmpty) {
             print('   Razón: ID faltante o vacío');
           } else if (email == null || email.isEmpty) {
@@ -205,7 +216,7 @@ class ProfileRepositoryImpl implements ProfileRepository {
           }
         }
       }
-      
+
       if (!foundPepe) {
         print('⚠️ PEPE NO ENCONTRADO en la respuesta de Supabase');
         print('   Esto puede indicar:');
@@ -221,30 +232,41 @@ class ProfileRepositoryImpl implements ProfileRepository {
       print('   Código: ${e.code}');
       print('   Detalles: ${e.details}');
       print('   Hint: ${e.hint}');
-      
+
       // Si hay error de columna faltante, proporcionar mensaje claro
-      if (e.message.contains('column') && e.message.contains('does not exist')) {
+      if (e.message.contains('column') &&
+          e.message.contains('does not exist')) {
         print('⚠️ ERROR: Columna no existe en la tabla profiles');
-        print('   Solución: Verificar que las columnas email y full_name existen en la tabla profiles');
-        return Left(DatabaseFailure(
-          'Error de esquema: La tabla profiles no contiene todas las columnas esperadas (email, full_name). '
-          'Verifica la estructura de la tabla en Supabase.'
-        ));
+        print(
+          '   Solución: Verificar que las columnas email y full_name existen en la tabla profiles',
+        );
+        return Left(
+          DatabaseFailure(
+            'Error de esquema: La tabla profiles no contiene todas las columnas esperadas (email, full_name). '
+            'Verifica la estructura de la tabla en Supabase.',
+          ),
+        );
       }
-      
+
       // Si es un error de RLS, proporcionar mensaje más claro
-      if (e.message.contains('row-level security') || 
+      if (e.message.contains('row-level security') ||
           e.message.contains('policy') ||
           e.code == 'PGRST301' ||
           e.message.contains('permission denied')) {
-        print('⚠️ ERROR DE RLS: El usuario no tiene permisos para ejecutar la función');
-        print('   Solución: Verificar que la función tenga GRANT EXECUTE para authenticated');
-        return Left(DatabaseFailure(
-          'Error de permisos: No tienes acceso para leer perfiles de conductores. '
-          'Contacta al administrador o verifica las políticas RLS en Supabase.'
-        ));
+        print(
+          '⚠️ ERROR DE RLS: El usuario no tiene permisos para ejecutar la función',
+        );
+        print(
+          '   Solución: Verificar que la función tenga GRANT EXECUTE para authenticated',
+        );
+        return Left(
+          DatabaseFailure(
+            'Error de permisos: No tienes acceso para leer perfiles de conductores. '
+            'Contacta al administrador o verifica las políticas RLS en Supabase.',
+          ),
+        );
       }
-      
+
       return Left(DatabaseFailure(_mapPostgrestError(e)));
     } on SocketException catch (_) {
       print('❌ Error de red al obtener conductores');
@@ -258,15 +280,15 @@ class ProfileRepositoryImpl implements ProfileRepository {
 
   /// Convierte cualquier texto de usuario a un formato válido para Supabase Auth
   /// Si ya tiene formato de email, lo devuelve tal cual
-  /// Si no, lo convierte a usuario@local.pai
+  /// Si no, lo convierte a usuario@conductor.app (dominio válido)
   String _normalizeUsernameForSupabase(String username) {
     final trimmed = username.trim();
     // Si ya tiene formato de email (contiene @), usarlo tal cual
     if (trimmed.contains('@')) {
       return trimmed;
     }
-    // Si no tiene formato de email, convertirlo a usuario@local.pai
-    return '$trimmed@local.pai';
+    // Si no tiene formato de email, convertirlo a usuario@conductor.app
+    return '$trimmed@conductor.app';
   }
 
   @override
@@ -278,11 +300,11 @@ class ProfileRepositoryImpl implements ProfileRepository {
   }) async {
     try {
       print('🔨 Creando nuevo conductor: usuario=$username');
-      
+
       // Normalizar el username para Supabase
       final supabaseEmail = _normalizeUsernameForSupabase(username);
       print('   Email normalizado para Supabase: $supabaseEmail');
-      
+
       // Paso 1: Crear usuario en auth.users usando signUp
       final signUpResponse = await _supabase.auth.signUp(
         email: supabaseEmail,
@@ -310,9 +332,13 @@ class ProfileRepositoryImpl implements ProfileRepository {
         final profileData = {
           'id': userId,
           'role': 'driver',
-          'email': username, // CRÍTICO: Guardar el username original (puede ser cualquier texto)
-          'full_name': fullName ?? '', // CRÍTICO: Guardar full_name (vacío si no se proporciona)
-          if (assignedVehicleId != null) 'assigned_vehicle_id': assignedVehicleId,
+          'email':
+              username, // CRÍTICO: Guardar el username original (puede ser cualquier texto)
+          'full_name':
+              fullName ??
+              '', // CRÍTICO: Guardar full_name (vacío si no se proporciona)
+          if (assignedVehicleId != null)
+            'assigned_vehicle_id': assignedVehicleId,
           'created_at': DateTime.now().toIso8601String(),
         };
 
@@ -328,7 +354,7 @@ class ProfileRepositoryImpl implements ProfileRepository {
         print('   Role en perfil creado: ${profileResponse['role']}');
 
         final profile = ProfileModel.fromJson(profileResponse);
-        
+
         // Verificar que el role sea 'driver'
         if (profile.role != 'driver') {
           print('⚠️ El role no es "driver", actualizando...');
@@ -339,15 +365,18 @@ class ProfileRepositoryImpl implements ProfileRepository {
           // Obtener el perfil actualizado
           final updatedProfile = await getProfileByUserId(userId);
           return updatedProfile.fold(
-            (failure) => Right(profile.toEntity()), // Retornar el original si falla
+            (failure) =>
+                Right(profile.toEntity()), // Retornar el original si falla
             (updated) => Right(updated),
           );
         }
-        
+
         return Right(profile.toEntity());
       } on PostgrestException catch (e) {
         // Si el perfil ya existe (creado por trigger), intentar obtenerlo y actualizar el role, email y full_name
-        if (e.code == '23505' || e.message.contains('duplicate') || e.message.contains('already exists')) {
+        if (e.code == '23505' ||
+            e.message.contains('duplicate') ||
+            e.message.contains('already exists')) {
           print('⚠️ Perfil ya existe, obteniendo y actualizando datos...');
           try {
             // Actualizar role, email (username original) y full_name
@@ -360,32 +389,44 @@ class ProfileRepositoryImpl implements ProfileRepository {
                 .from(_tableName)
                 .update(updateData)
                 .eq('id', userId);
-            
-            print('✅ Datos actualizados: role=driver, email=$username, full_name=${fullName ?? ""}');
-            
+
+            print(
+              '✅ Datos actualizados: role=driver, email=$username, full_name=${fullName ?? ""}',
+            );
+
             // Luego obtener el perfil actualizado
             final existingProfile = await getProfileByUserId(userId);
             return existingProfile.fold(
-              (failure) => Left(DatabaseFailure('Perfil existe pero no se pudo obtener: ${failure.message}')),
+              (failure) => Left(
+                DatabaseFailure(
+                  'Perfil existe pero no se pudo obtener: ${failure.message}',
+                ),
+              ),
               (profile) {
                 print('✅ Perfil obtenido con role: ${profile.role}');
                 // Verificar nuevamente que el role sea 'driver'
                 if (profile.role != 'driver') {
-                  print('⚠️ El role aún no es "driver" después de actualizar, intentando nuevamente...');
+                  print(
+                    '⚠️ El role aún no es "driver" después de actualizar, intentando nuevamente...',
+                  );
                   // Intentar actualizar nuevamente de forma asíncrona (no bloqueante)
                   _supabase
                       .from(_tableName)
                       .update({'role': 'driver'})
                       .eq('id', userId)
                       .then((_) => print('✅ Role actualizado a "driver"'))
-                      .catchError((e) => print('⚠️ Error al actualizar role: $e'));
+                      .catchError(
+                        (e) => print('⚠️ Error al actualizar role: $e'),
+                      );
                 }
                 return Right(profile);
               },
             );
           } catch (getError) {
             print('❌ Error al obtener/actualizar perfil existente: $getError');
-            return Left(DatabaseFailure('Error al obtener perfil existente: $getError'));
+            return Left(
+              DatabaseFailure('Error al obtener perfil existente: $getError'),
+            );
           }
         }
         print('❌ Error al insertar perfil: ${e.message}');
@@ -393,20 +434,22 @@ class ProfileRepositoryImpl implements ProfileRepository {
       }
     } on AuthException catch (e) {
       print('❌ Error AuthException al crear conductor: ${e.message}');
-      if (e.message.contains('already registered') || 
+      if (e.message.contains('already registered') ||
           e.message.contains('already exists') ||
           e.message.contains('User already registered')) {
         return Left(DatabaseFailure('Este usuario ya está registrado'));
       }
       // Manejo de rate limiting - mensaje amigable
-      if (e.message.contains('security purposes') || 
+      if (e.message.contains('security purposes') ||
           e.message.contains('rate limit') ||
           e.message.contains('too many requests')) {
         final match = RegExp(r'after (\d+) seconds?').firstMatch(e.message);
         final seconds = match != null ? match.group(1) : 'unos';
-        return Left(DatabaseFailure(
-          'Por seguridad, espera $seconds segundos antes de crear otro conductor.'
-        ));
+        return Left(
+          DatabaseFailure(
+            'Por seguridad, espera $seconds segundos antes de crear otro conductor.',
+          ),
+        );
       }
       return Left(DatabaseFailure('Error al crear usuario: ${e.message}'));
     } on PostgrestException catch (e) {
@@ -425,4 +468,3 @@ class ProfileRepositoryImpl implements ProfileRepository {
     return e.toString().isNotEmpty ? e.toString() : 'Error desconocido';
   }
 }
-
