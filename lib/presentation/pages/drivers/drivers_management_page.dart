@@ -625,15 +625,43 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
             ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
+          // Mostrar loading mientras carga vehículos
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (ctx) => const Center(child: CircularProgressIndicator()),
+          );
+
           // Cargar vehículos antes de abrir el modal
           await _loadVehicles();
+
+          // Cerrar loading
+          if (mounted) Navigator.of(context).pop();
           if (!mounted) return;
-          
+
+          // Mostrar resultado
+          print('🚗 Vehículos cargados para el modal: ${_vehicles.length}');
+          for (var v in _vehicles) {
+            print('   - ${v.placa} (ID: ${v.id})');
+          }
+
+          if (_vehicles.isEmpty) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'No se pudieron cargar los vehículos del GPS. Verifica tu conexión.',
+                ),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
+
           // Mostrar diálogo de creación
           showModalBottomSheet(
             context: context,
             isScrollControlled: true,
-            builder: (context) => _buildDriverFormSheet(),
+            builder: (context) =>
+                _buildDriverFormSheet(loadedVehicles: List.from(_vehicles)),
           );
         },
         icon: const Icon(Icons.add),
@@ -642,18 +670,18 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
     );
   }
 
-  Widget _buildDriverFormSheet() {
+  Widget _buildDriverFormSheet({required List<VehicleEntity> loadedVehicles}) {
+    // Usar los vehículos pasados como parámetro para evitar problemas de estado
+    print('📱 Modal construido con ${loadedVehicles.length} vehículos:');
+    for (var v in loadedVehicles) {
+      print('   - ${v.placa} (ID: ${v.id})');
+    }
+
     return DraggableScrollableSheet(
       initialChildSize: 0.7,
       minChildSize: 0.5,
       maxChildSize: 0.95,
       builder: (context, scrollController) {
-        // Los vehículos ya fueron cargados antes de abrir el modal
-        print('📱 Modal abierto: ${_vehicles.length} vehículos disponibles');
-        for (var v in _vehicles) {
-          print('   - ${v.placa} (ID: ${v.id})');
-        }
-
         return SingleChildScrollView(
           controller: scrollController,
           padding: const EdgeInsets.all(16.0),
@@ -668,7 +696,9 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
                     const SizedBox(width: 8),
                     Text(
                       'Crear Nuevo Conductor',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const Spacer(),
                     IconButton(
@@ -695,10 +725,10 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
 
                 // Vehículo asignado (obligatorio)
                 DropdownButtonFormField<String>(
-                  key: ValueKey('dropdown_${_vehicles.length}'),
+                  key: ValueKey('dropdown_${loadedVehicles.length}'),
                   decoration: InputDecoration(
                     labelText: 'Vehículo asignado *',
-                    hintText: _vehicles.isEmpty
+                    hintText: loadedVehicles.isEmpty
                         ? 'No hay vehículos disponibles'
                         : 'Selecciona un vehículo',
                     prefixIcon: const Icon(Icons.directions_car),
@@ -711,7 +741,7 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
                       value: 'sin_vehiculo',
                       child: Text('Sin vehículo asignado'),
                     ),
-                    ..._vehicles.map((vehicle) {
+                    ...loadedVehicles.map((vehicle) {
                       return DropdownMenuItem<String>(
                         value: vehicle.id,
                         child: Text(
@@ -721,9 +751,7 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
                     }),
                   ],
                   onChanged: (value) {
-                    setState(() {
-                      _selectedVehicleIdForNewDriver = value;
-                    });
+                    _selectedVehicleIdForNewDriver = value;
                   },
                   validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -806,20 +834,20 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
                     child: _isCreating
                         ? const CircularProgressIndicator(color: Colors.white)
                         : _rateLimitSeconds > 0
-                            ? Text(
-                                'ESPERAR $_rateLimitSeconds SEGUNDOS',
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              )
-                            : const Text(
-                                'CREAR CONDUCTOR',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
+                        ? Text(
+                            'ESPERAR $_rateLimitSeconds SEGUNDOS',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          )
+                        : const Text(
+                            'CREAR CONDUCTOR',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                   ),
                 ),
               ],

@@ -1,12 +1,15 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:pai_app/data/services/local_api_client.dart';
 
 /// Servicio de autenticación para la API de GPS
 class GPSAuthService {
   static const String _loginUrl =
       'https://plataforma.sistemagps.online/api/login';
   static const String _apiKeyStorageKey = 'gps_api_key';
+  static const String _gpsEmailKey = 'gps_email';
+  static const String _gpsPasswordKey = 'gps_password';
 
   /// Realiza login y guarda el API key
   /// Usa POST con body x-www-form-urlencoded (NO query string)
@@ -14,7 +17,7 @@ class GPSAuthService {
     try {
       final uri = Uri.parse(_loginUrl);
 
-      print('🔐 Intentando login con: $email');
+      print('🔐 Intentando login GPS con: $email');
       print('📡 URL: $uri');
       print('📡 Método: POST');
       print('📡 Body: email=$email&password=***');
@@ -120,6 +123,25 @@ class GPSAuthService {
   Future<bool> hasApiKey() async {
     final apiKey = await getApiKey();
     return apiKey != null && apiKey.isNotEmpty;
+  }
+
+  /// Guarda las credenciales del GPS localmente
+  Future<void> saveGpsCredentialsLocally(String email, String password) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_gpsEmailKey, email);
+    await prefs.setString(_gpsPasswordKey, password);
+    print('✅ Credenciales GPS guardadas localmente');
+  }
+
+  /// Obtiene las credenciales del GPS guardadas localmente
+  Future<Map<String, String>?> getGpsCredentialsLocally() async {
+    final prefs = await SharedPreferences.getInstance();
+    final email = prefs.getString(_gpsEmailKey);
+    final password = prefs.getString(_gpsPasswordKey);
+    if (email != null && password != null) {
+      return {'email': email, 'password': password};
+    }
+    return null;
   }
 
   /// Función de debug para inspeccionar la estructura JSON del API de GPS
@@ -293,16 +315,44 @@ class GPSAuthService {
         // Intentar usar el API key guardado primero
         apiKey = await getApiKey();
         if (apiKey == null || apiKey.isEmpty) {
-          // Intentar obtener credenciales guardadas de SharedPreferences
+          // Intentar obtener credenciales del GPS desde SharedPreferences
           final prefs = await SharedPreferences.getInstance();
-          final savedEmail = prefs.getString('saved_username');
-          final savedPassword = prefs.getString('saved_password');
+          var gpsEmail = prefs.getString(_gpsEmailKey);
+          var gpsPassword = prefs.getString(_gpsPasswordKey);
 
-          if (savedEmail != null && savedPassword != null) {
-            print('🔐 Usando credenciales guardadas: $savedEmail');
-            apiKey = await login(savedEmail, savedPassword);
+          // Si no hay credenciales locales, intentar obtenerlas del API
+          if (gpsEmail == null || gpsPassword == null) {
+            print('🔍 Buscando credenciales GPS en el API local...');
+            try {
+              final localApi = LocalApiClient();
+              final credentials = await localApi.getGpsCredentials();
+              if (credentials.isNotEmpty) {
+                final cred = credentials.first;
+                gpsEmail = cred['email']?.toString();
+                gpsPassword = cred['password']?.toString();
+
+                // Guardar en SharedPreferences para uso futuro
+                if (gpsEmail != null && gpsPassword != null) {
+                  await prefs.setString(_gpsEmailKey, gpsEmail);
+                  await prefs.setString(_gpsPasswordKey, gpsPassword);
+                  print(
+                    '✅ Credenciales GPS obtenidas del API y guardadas localmente',
+                  );
+                }
+              }
+            } catch (e) {
+              print('⚠️ Error al obtener credenciales del API: $e');
+            }
+          }
+
+          if (gpsEmail != null && gpsPassword != null) {
+            print('🔐 Usando credenciales GPS: $gpsEmail');
+            apiKey = await login(gpsEmail, gpsPassword);
           } else {
-            print('❌ No hay credenciales guardadas disponibles');
+            print('❌ No hay credenciales GPS configuradas');
+            print(
+              '💡 Configura las credenciales GPS en la sección de configuración',
+            );
             return [];
           }
         } else {
