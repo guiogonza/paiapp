@@ -4,10 +4,15 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:pai_app/core/constants/app_constants.dart';
 import 'package:pai_app/core/theme/app_theme.dart';
 import 'package:pai_app/core/services/pwa_service_export.dart';
+import 'package:pai_app/data/services/local_api_client.dart';
 import 'package:pai_app/presentation/pages/splash/splash_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Inicializar el cliente API para restaurar la sesión guardada
+  await LocalApiClient().initialize();
+  print('✅ LocalApiClient inicializado - Sesión restaurada si existe');
 
   // Inicializar servicio PWA para web
   if (kIsWeb) {
