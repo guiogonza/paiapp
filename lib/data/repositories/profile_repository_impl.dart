@@ -117,20 +117,13 @@ class ProfileRepositoryImpl implements ProfileRepository {
   @override
   Future<Either<ProfileFailure, Map<String, String>>> getDriversList() async {
     try {
-      // Log para debugging
-      print('🔍 Buscando conductores en la tabla profiles...');
-      print('   Tabla: $_tableName');
-      print('   Filtro: role = "driver"');
+      // Usar la API local de PostgreSQL
+      print('🔍 Buscando conductores en PostgreSQL local...');
 
-      // Select simple: profiles ahora tiene las columnas email y full_name
-      final response = await _supabase
-          .from(_tableName)
-          .select('*')
-          .eq('role', 'driver')
-          .order('email', ascending: true);
+      final response = await _localApi.getDrivers();
 
       print(
-        '📊 Respuesta de Supabase: ${response.length} registros encontrados',
+        '📊 Respuesta de PostgreSQL: ${response.length} registros encontrados',
       );
       print('📊 Tipo de respuesta: ${response.runtimeType}');
 
@@ -219,63 +212,14 @@ class ProfileRepositoryImpl implements ProfileRepository {
         }
       }
 
-      if (!foundPepe) {
-        print('⚠️ PEPE NO ENCONTRADO en la respuesta de Supabase');
-        print('   Esto puede indicar:');
-        print('   1. El usuario no existe en profiles');
-        print('   2. El role no es "driver"');
-        print('   3. Problema de RLS que impide leer el perfil');
-      }
-
       print('📋 Total de conductores en el mapa: ${driversMap.length}');
       return Right(driversMap);
-    } on PostgrestException catch (e) {
-      print('❌ Error PostgrestException al obtener conductores: ${e.message}');
-      print('   Código: ${e.code}');
-      print('   Detalles: ${e.details}');
-      print('   Hint: ${e.hint}');
 
-      // Si hay error de columna faltante, proporcionar mensaje claro
-      if (e.message.contains('column') &&
-          e.message.contains('does not exist')) {
-        print('⚠️ ERROR: Columna no existe en la tabla profiles');
-        print(
-          '   Solución: Verificar que las columnas email y full_name existen en la tabla profiles',
-        );
-        return Left(
-          DatabaseFailure(
-            'Error de esquema: La tabla profiles no contiene todas las columnas esperadas (email, full_name). '
-            'Verifica la estructura de la tabla en Supabase.',
-          ),
-        );
-      }
-
-      // Si es un error de RLS, proporcionar mensaje más claro
-      if (e.message.contains('row-level security') ||
-          e.message.contains('policy') ||
-          e.code == 'PGRST301' ||
-          e.message.contains('permission denied')) {
-        print(
-          '⚠️ ERROR DE RLS: El usuario no tiene permisos para ejecutar la función',
-        );
-        print(
-          '   Solución: Verificar que la función tenga GRANT EXECUTE para authenticated',
-        );
-        return Left(
-          DatabaseFailure(
-            'Error de permisos: No tienes acceso para leer perfiles de conductores. '
-            'Contacta al administrador o verifica las políticas RLS en Supabase.',
-          ),
-        );
-      }
-
-      return Left(DatabaseFailure(_mapPostgrestError(e)));
     } on SocketException catch (_) {
       print('❌ Error de red al obtener conductores');
       return const Left(NetworkFailure());
     } catch (e) {
-      print('❌ Error desconocido al obtener conductores: $e');
-      print('   Stack trace: ${StackTrace.current}');
+      print('❌ Error al obtener conductores: $e');
       return Left(UnknownFailure(_mapGenericError(e)));
     }
   }

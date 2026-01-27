@@ -54,7 +54,7 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
 
   Future<void> _loadVehicles() async {
     if (!mounted) return;
-    
+
     setState(() {
       _isLoadingVehicles = true;
     });
@@ -624,7 +624,11 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
               ),
             ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
+        onPressed: () async {
+          // Cargar vehículos antes de abrir el modal
+          await _loadVehicles();
+          if (!mounted) return;
+          
           // Mostrar diálogo de creación
           showModalBottomSheet(
             context: context,
@@ -639,23 +643,24 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
   }
 
   Widget _buildDriverFormSheet() {
-    // Forzar recarga de vehículos cada vez que se abre el modal
-    Future.microtask(() => _loadVehicles());
-    
     return DraggableScrollableSheet(
       initialChildSize: 0.7,
       minChildSize: 0.5,
       maxChildSize: 0.95,
       builder: (context, scrollController) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            print('📱 Modal: ${_vehicles.length} vehículos, cargando: $_isLoadingVehicles');
+        // Los vehículos ya fueron cargados antes de abrir el modal
+        print(
+          '📱 Modal abierto: ${_vehicles.length} vehículos disponibles',
+        );
+        for (var v in _vehicles) {
+          print('   - ${v.placa} (ID: ${v.id})');
+        }
 
-            return SingleChildScrollView(
-              controller: scrollController,
-              padding: const EdgeInsets.all(16.0),
-              child: Form(
-                key: _formKey,
+        return SingleChildScrollView(
+          controller: scrollController,
+          padding: const EdgeInsets.all(16.0),
+          child: Form(
+            key: _formKey,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -693,62 +698,40 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
 
                     // Vehículo asignado (obligatorio)
                     DropdownButtonFormField<String>(
-                      key: ValueKey(
-                        'dropdown_${_vehicles.length}_$_isLoadingVehicles',
-                      ),
+                      key: ValueKey('dropdown_${_vehicles.length}'),
                       decoration: InputDecoration(
                         labelText: 'Vehículo asignado *',
-                        hintText: _isLoadingVehicles
-                            ? 'Cargando vehículos...'
-                            : (_vehicles.isEmpty
-                                  ? 'No hay vehículos disponibles'
-                                  : 'Selecciona un vehículo'),
+                        hintText: _vehicles.isEmpty
+                            ? 'No hay vehículos disponibles'
+                            : 'Selecciona un vehículo',
                         prefixIcon: const Icon(Icons.directions_car),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        suffixIcon: _isLoadingVehicles
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: Padding(
-                                  padding: EdgeInsets.all(12.0),
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                ),
-                              )
-                            : null,
                       ),
-                      items: _isLoadingVehicles
-                          ? null
-                          : [
-                              const DropdownMenuItem<String>(
-                                value: 'sin_vehiculo',
-                                child: Text('Sin vehículo asignado'),
-                              ),
-                              ..._vehicles.map((vehicle) {
-                                return DropdownMenuItem<String>(
-                                  value: vehicle.id,
-                                  child: Text(
-                                    '${vehicle.placa} - ${vehicle.marca} ${vehicle.modelo}',
-                                  ),
-                                );
-                              }),
-                            ],
-                      onChanged: _isLoadingVehicles
-                          ? null
-                          : (value) {
-                              // Actualizar el estado de la página
-                              setState(() {
-                                _selectedVehicleIdForNewDriver = value;
-                              });
-                              setModalState(() {});
-                            },
+                      items: [
+                        const DropdownMenuItem<String>(
+                          value: 'sin_vehiculo',
+                          child: Text('Sin vehículo asignado'),
+                        ),
+                        ..._vehicles.map((vehicle) {
+                          return DropdownMenuItem<String>(
+                            value: vehicle.id,
+                            child: Text(
+                              '${vehicle.placa} - ${vehicle.marca} ${vehicle.modelo}',
+                            ),
+                          );
+                        }),
+                      ],
+                      onChanged: (value) {
+                        // Actualizar el estado de la página
+                        setState(() {
+                          _selectedVehicleIdForNewDriver = value;
+                        });
+                      },
                       validator: (value) {
-                        if (!_isLoadingVehicles &&
-                            (value == null || value.isEmpty)) {
-                          return 'Debes seleccionar una opción';
+                        if (value == null || value.isEmpty) {
+                          return 'Debes asignar un vehículo';
                         }
                         return null;
                       },
