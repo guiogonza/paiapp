@@ -1,85 +1,48 @@
-// Service Worker para PAI App PWA
-const CACHE_NAME = 'pai-app-v2-20260127';
-const urlsToCache = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/favicon.png',
-  '/icons/Icon-192.png',
-  '/icons/Icon-512.png',
-  '/icons/Icon-maskable-192.png',
-  '/icons/Icon-maskable-512.png',
-  '/flutter_bootstrap.js',
-  '/main.dart.js'
-];
+// Service Worker DESHABILITADO - Limpia toda la caché
+// Este SW se auto-desregistra para forzar actualizaciones
 
-// Instalación del Service Worker
+const CACHE_VERSION = 'clear-cache-v' + Date.now();
+
+// Al instalarse, eliminar TODO el caché anterior
 self.addEventListener('install', (event) => {
-  console.log('[SW] Installing service worker...');
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => {
-        console.log('[SW] Caching app shell');
-        return cache.addAll(urlsToCache).catch((err) => {
-          console.log('[SW] Some resources failed to cache:', err);
-        });
-      })
-  );
-  self.skipWaiting();
-});
-
-// Activación del Service Worker
-self.addEventListener('activate', (event) => {
-  console.log('[SW] Activating service worker...');
+  console.log('[SW] Instalando - limpiando caché...');
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            console.log('[SW] Deleting old cache:', cacheName);
-            return caches.delete(cacheName);
-          }
+          console.log('[SW] Eliminando caché:', cacheName);
+          return caches.delete(cacheName);
         })
       );
+    }).then(() => {
+      self.skipWaiting();
     })
   );
-  self.clients.claim();
 });
 
-// Estrategia de caché: Network First, fallback to cache
-self.addEventListener('fetch', (event) => {
-  // Ignorar requests que no sean GET
-  if (event.request.method !== 'GET') return;
-  
-  // Ignorar requests de extensiones de Chrome
-  if (event.request.url.startsWith('chrome-extension://')) return;
-  
-  // Ignorar requests a APIs externas (Supabase, etc.)
-  if (event.request.url.includes('supabase.co')) return;
-  
-  event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        // Si la respuesta es válida, guardarla en caché
-        if (response && response.status === 200 && response.type === 'basic') {
-          const responseToCache = response.clone();
-          caches.open(CACHE_NAME)
-            .then((cache) => {
-              cache.put(event.request, responseToCache);
-            });
-        }
-        return response;
-      })
-      .catch(() => {
-        // Si falla la red, intentar desde caché
-        return caches.match(event.request);
-      })
+// Al activarse, tomar control inmediatamente y limpiar
+self.addEventListener('activate', (event) => {
+  console.log('[SW] Activado - tomando control...');
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.map((cacheName) => {
+          console.log('[SW] Eliminando caché viejo:', cacheName);
+          return caches.delete(cacheName);
+        })
+      );
+    }).then(() => {
+      // Desregistrar este service worker
+      return self.registration.unregister();
+    }).then(() => {
+      console.log('[SW] Service Worker desregistrado');
+      return self.clients.claim();
+    })
   );
 });
 
-// Mensaje para actualizar el Service Worker
-self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'SKIP_WAITING') {
-    self.skipWaiting();
-  }
+// NO cachear nada - siempre ir a la red
+self.addEventListener('fetch', (event) => {
+  // Simplemente pasar la petición a la red, sin cachear
+  event.respondWith(fetch(event.request));
 });
