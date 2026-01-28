@@ -9,7 +9,6 @@ import 'package:pai_app/data/providers/gps_vehicle_provider.dart';
 import 'package:pai_app/domain/entities/maintenance_entity.dart';
 import 'package:pai_app/domain/entities/vehicle_entity.dart';
 import 'package:pai_app/presentation/widgets/tire_selector.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 class MaintenanceFormPage extends StatefulWidget {
   final String? preSelectedVehicleId;
@@ -337,21 +336,8 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
       _isLoading = true;
     });
 
-    final currentUser = Supabase.instance.client.auth.currentUser;
-    if (currentUser == null) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Usuario no autenticado'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        setState(() {
-          _isLoading = false;
-        });
-      }
-      return;
-    }
+    // TODO: Reemplazar por usuario actual de API REST PostgreSQL
+    final currentUser = 'user_123456789';
 
     final cost = double.tryParse(_costController.text) ?? 0.0;
 
@@ -436,7 +422,7 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
           ? _customServiceNameController.text.trim()
           : null,
       tirePosition: _selectedType == 'Llantas' ? _selectedTirePosition : null,
-      createdBy: currentUser.id,
+      createdBy: currentUser,
     );
 
     final result = await _maintenanceRepository.registerMaintenance(

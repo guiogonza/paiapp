@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:dartz/dartz.dart';
 import 'package:pai_app/domain/entities/expense_entity.dart';
@@ -10,7 +9,6 @@ import 'package:pai_app/data/services/local_api_client.dart';
 
 class ExpenseRepositoryImpl implements ExpenseRepository {
   final LocalApiClient _localApi = LocalApiClient();
-  static const String _tableName = 'expenses';
 
   @override
   Future<Either<ExpenseFailure, List<ExpenseEntity>>> getExpenses() async {

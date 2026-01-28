@@ -3,8 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:pai_app/core/theme/app_colors.dart';
 import 'package:pai_app/data/repositories/profile_repository_impl.dart';
-import 'package:pai_app/data/repositories/vehicle_repository_impl.dart';
-import 'package:pai_app/data/services/fleet_sync_service.dart';
 import 'package:pai_app/data/providers/gps_vehicle_provider.dart';
 import 'package:pai_app/domain/entities/vehicle_entity.dart';
 
@@ -17,8 +15,6 @@ class DriversManagementPage extends StatefulWidget {
 
 class _DriversManagementPageState extends State<DriversManagementPage> {
   final _profileRepository = ProfileRepositoryImpl();
-  final _vehicleRepository = VehicleRepositoryImpl();
-  final _fleetSyncService = FleetSyncService();
   final _gpsVehicleProvider = GPSVehicleProvider();
   final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
@@ -30,7 +26,6 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
       {}; // id -> vehicleId (nullable)
   List<VehicleEntity> _vehicles = [];
   bool _isLoading = true;
-  bool _isLoadingVehicles = true;
   bool _isCreating = false;
   Timer? _rateLimitTimer;
   int _rateLimitSeconds = 0;
@@ -56,10 +51,6 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
   Future<void> _loadVehicles() async {
     if (!mounted) return;
 
-    setState(() {
-      _isLoadingVehicles = true;
-    });
-
     try {
       // Cargar SIEMPRE directamente del GPS usando el provider centralizado
       debugPrint('📡 Cargando vehículos del API GPS...');
@@ -74,23 +65,14 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
         if (mounted) {
           setState(() {
             _vehicles = gpsVehicles;
-            _isLoadingVehicles = false;
           });
         }
       } else {
         debugPrint('⚠️ El API GPS no devolvió dispositivos');
-        if (mounted) {
-          setState(() {
-            _isLoadingVehicles = false;
-          });
-        }
       }
     } catch (e) {
       debugPrint('❌ Error al cargar del GPS: $e');
       if (mounted) {
-        setState(() {
-          _isLoadingVehicles = false;
-        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error al cargar vehículos: $e'),
@@ -196,7 +178,7 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
   String _getAssignedVehicleLabel(String driverId) {
     final vehicleId = _assignedVehicleByDriver[driverId];
     if (vehicleId == null || vehicleId.isEmpty) {
-      return 'Vehículo asignado: -';
+      return 'Sin vehículo asignado';
     }
 
     VehicleEntity? vehicle;
@@ -208,10 +190,10 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
     }
 
     if (vehicle == null) {
-      return 'Vehículo asignado: -';
+      return 'Vehículo ID: $vehicleId';
     }
 
-    return 'Vehículo asignado: ${vehicle.placa}';
+    return '🚗 ${vehicle.placa} - ${vehicle.marca} ${vehicle.modelo}';
   }
 
   Future<void> _showAssignVehicleDialog(
@@ -467,6 +449,69 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
     return success;
   }
 
+  /// Muestra diálogo de confirmación para eliminar conductor
+  Future<void> _showDeleteDriverDialog(
+    String driverId,
+    String displayName,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.warning, color: Colors.red),
+            SizedBox(width: 8),
+            Text('Eliminar conductor'),
+          ],
+        ),
+        content: Text(
+          '¿Estás seguro de que deseas eliminar a "$displayName"?\n\nEsta acción no se puede deshacer.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    // Eliminar conductor
+    try {
+      await _profileRepository.deleteDriver(driverId);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Conductor "$displayName" eliminado exitosamente'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        // Recargar lista
+        _loadDrivers();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al eliminar conductor: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -566,28 +611,86 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
                                     children: [
                                       Text(
                                         'ID: ${driverId.substring(0, 8)}...',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey[600],
+                                        ),
                                       ),
                                       const SizedBox(height: 4),
-                                      Text(
-                                        vehicleLabel,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w500,
-                                        ),
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            Icons.directions_car,
+                                            size: 16,
+                                            color:
+                                                vehicleLabel.contains(
+                                                  'Sin vehículo',
+                                                )
+                                                ? Colors.grey
+                                                : AppColors.primary,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Expanded(
+                                            child: Text(
+                                              vehicleLabel,
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.w500,
+                                                color:
+                                                    vehicleLabel.contains(
+                                                      'Sin vehículo',
+                                                    )
+                                                    ? Colors.grey
+                                                    : Colors.black87,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ],
                                   ),
-                                  trailing: IconButton(
-                                    icon: const Icon(
-                                      Icons.edit,
-                                      color: AppColors.primary,
-                                    ),
-                                    tooltip: 'Cambiar vehículo asignado',
-                                    onPressed: () {
-                                      _showAssignVehicleDialog(
-                                        driverId,
-                                        displayName,
-                                      );
+                                  trailing: PopupMenuButton<String>(
+                                    icon: const Icon(Icons.more_vert),
+                                    onSelected: (value) {
+                                      if (value == 'edit') {
+                                        _showAssignVehicleDialog(
+                                          driverId,
+                                          displayName,
+                                        );
+                                      } else if (value == 'delete') {
+                                        _showDeleteDriverDialog(
+                                          driverId,
+                                          displayName,
+                                        );
+                                      }
                                     },
+                                    itemBuilder: (context) => [
+                                      const PopupMenuItem(
+                                        value: 'edit',
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              Icons.edit,
+                                              color: AppColors.primary,
+                                            ),
+                                            SizedBox(width: 8),
+                                            Text('Cambiar vehículo'),
+                                          ],
+                                        ),
+                                      ),
+                                      const PopupMenuItem(
+                                        value: 'delete',
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              Icons.delete,
+                                              color: Colors.red,
+                                            ),
+                                            SizedBox(width: 8),
+                                            Text('Eliminar conductor'),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               );
@@ -736,8 +839,8 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
                 const SizedBox(height: 16),
 
                 // Vehículo asignado (OPCIONAL)
-                Builder(
-                  builder: (context) {
+                StatefulBuilder(
+                  builder: (context, setStateDropdown) {
                     print('🔧 Construyendo DropdownButtonFormField...');
                     print('🔧 Items a agregar: ${loadedVehicles.length + 1}');
 
@@ -763,7 +866,7 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
                       key: ValueKey(
                         'dropdown_${loadedVehicles.length}_${DateTime.now().millisecondsSinceEpoch}',
                       ),
-                      value: 'sin_vehiculo',
+                      value: _selectedVehicleIdForNewDriver,
                       decoration: InputDecoration(
                         labelText: 'Vehículo asignado (Opcional)',
                         hintText: loadedVehicles.isEmpty
@@ -777,8 +880,10 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
                       items: items,
                       onChanged: (value) {
                         print('📝 Vehículo seleccionado: $value');
-                        _selectedVehicleIdForNewDriver =
-                            value ?? 'sin_vehiculo';
+                        setStateDropdown(() {
+                          _selectedVehicleIdForNewDriver =
+                              value ?? 'sin_vehiculo';
+                        });
                       },
                       validator: (_) => null,
                     );

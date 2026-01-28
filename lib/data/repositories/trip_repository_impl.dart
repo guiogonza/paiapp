@@ -9,7 +9,6 @@ import 'package:pai_app/data/services/local_api_client.dart';
 
 class TripRepositoryImpl implements TripRepository {
   final LocalApiClient _localApi = LocalApiClient();
-  static const String _tableName = 'trips';
 
   @override
   Future<Either<TripFailure, List<TripEntity>>> getTrips() async {

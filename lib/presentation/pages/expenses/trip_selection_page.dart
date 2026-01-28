@@ -3,7 +3,6 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 
 // Import condicional para web
 import 'dart:html' as html show AnchorElement;
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:pai_app/core/theme/app_colors.dart';
 import 'package:pai_app/data/repositories/profile_repository_impl.dart';
@@ -31,19 +30,22 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
   final _profileRepository = ProfileRepositoryImpl();
   final _expenseRepository = ExpenseRepositoryImpl();
   final _vehicleRepository = VehicleRepositoryImpl();
-  
+
   List<TripEntity> _trips = [];
   List<TripEntity> _filteredTrips = [];
-  final Map<String, List<ExpenseEntity>> _expensesByTrip = {}; // tripId -> expenses
-  final Map<String, Map<String, String>> _driverNamesByTrip = {}; // tripId -> {driverId: name}
+  final Map<String, List<ExpenseEntity>> _expensesByTrip =
+      {}; // tripId -> expenses
+  final Map<String, Map<String, String>> _driverNamesByTrip =
+      {}; // tripId -> {driverId: name}
   bool _isLoading = true;
   String? _userRole;
   String? _userEmail;
   Map<String, VehicleEntity> _vehiclesById = {};
-  
+
   // Controladores de búsqueda
   final TextEditingController _searchController = TextEditingController();
-  String _searchType = 'Todos'; // 'Todos', 'Origen', 'Destino', 'Cliente', 'Conductor'
+  String _searchType =
+      'Todos'; // 'Todos', 'Origen', 'Destino', 'Cliente', 'Conductor'
   String? _selectedDriverFilter; // Para filtro por conductor (dropdown)
   List<String> _availableDrivers = []; // Lista de conductores con historial
 
@@ -79,45 +81,49 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
       case 'Origen':
         final query = _searchController.text.toLowerCase().trim();
         if (query.isNotEmpty) {
-          filtered = filtered.where((trip) => 
-            trip.origin.toLowerCase().contains(query)
-          ).toList();
+          filtered = filtered
+              .where((trip) => trip.origin.toLowerCase().contains(query))
+              .toList();
         }
         break;
       case 'Destino':
         final query = _searchController.text.toLowerCase().trim();
         if (query.isNotEmpty) {
-          filtered = filtered.where((trip) => 
-            trip.destination.toLowerCase().contains(query)
-          ).toList();
+          filtered = filtered
+              .where((trip) => trip.destination.toLowerCase().contains(query))
+              .toList();
         }
         break;
       case 'Cliente':
         final query = _searchController.text.toLowerCase().trim();
         if (query.isNotEmpty) {
-          filtered = filtered.where((trip) => 
-            trip.clientName.toLowerCase().contains(query)
-          ).toList();
+          filtered = filtered
+              .where((trip) => trip.clientName.toLowerCase().contains(query))
+              .toList();
         }
         break;
       case 'Conductor':
         // Usar el dropdown seleccionado
-        if (_selectedDriverFilter != null && _selectedDriverFilter!.isNotEmpty) {
-          filtered = filtered.where((trip) => 
-            trip.driverName == _selectedDriverFilter
-          ).toList();
+        if (_selectedDriverFilter != null &&
+            _selectedDriverFilter!.isNotEmpty) {
+          filtered = filtered
+              .where((trip) => trip.driverName == _selectedDriverFilter)
+              .toList();
         }
         break;
       case 'Todos':
       default:
         final query = _searchController.text.toLowerCase().trim();
         if (query.isNotEmpty) {
-          filtered = filtered.where((trip) => 
-            trip.origin.toLowerCase().contains(query) ||
-            trip.destination.toLowerCase().contains(query) ||
-            trip.clientName.toLowerCase().contains(query) ||
-            trip.driverName.toLowerCase().contains(query)
-          ).toList();
+          filtered = filtered
+              .where(
+                (trip) =>
+                    trip.origin.toLowerCase().contains(query) ||
+                    trip.destination.toLowerCase().contains(query) ||
+                    trip.clientName.toLowerCase().contains(query) ||
+                    trip.driverName.toLowerCase().contains(query),
+              )
+              .toList();
         }
         break;
     }
@@ -151,7 +157,7 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
     try {
       // Obtener perfil del usuario para determinar el rol
       final profileResult = await _profileRepository.getCurrentUserProfile();
-      
+
       profileResult.fold(
         (failure) {
           if (mounted) {
@@ -165,13 +171,14 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
         },
         (profile) {
           _userRole = profile.role;
-          _userEmail = Supabase.instance.client.auth.currentUser?.email;
+          _userEmail =
+              'user@example.com'; // TODO: Reemplazar por usuario actual de API REST PostgreSQL
         },
       );
 
       // Cargar todos los viajes
       final tripsResult = await _tripRepository.getTrips();
-      
+
       tripsResult.fold(
         (failure) {
           if (mounted) {
@@ -196,7 +203,7 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
             // Owner: Todos los viajes
             _trips = trips;
           }
-          
+
           _filteredTrips = _trips;
 
           // Cargar vehículos para mostrar placa
@@ -210,10 +217,7 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -225,18 +229,21 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
     }
   }
 
-
   Future<void> _loadExpensesForTrips(List<TripEntity> trips) async {
-    final currentUserId = Supabase.instance.client.auth.currentUser?.id;
-    
+    final currentUserId =
+        'user@example.com'; // TODO: Reemplazar por usuario actual de API REST PostgreSQL
+
     for (final trip in trips) {
       if (trip.id == null) continue;
-      
+
       try {
-        final expensesResult = _userRole == 'driver' && currentUserId != null
-            ? await _expenseRepository.getExpensesByTripIdAndDriver(trip.id!, currentUserId)
+        final expensesResult = _userRole == 'driver'
+            ? await _expenseRepository.getExpensesByTripIdAndDriver(
+                trip.id!,
+                currentUserId,
+              )
             : await _expenseRepository.getExpensesByTripId(trip.id!);
-        
+
         expensesResult.fold(
           (failure) {
             // Ignorar errores, simplemente no mostrar gastos
@@ -246,7 +253,7 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
               setState(() {
                 _expensesByTrip[trip.id!] = expenses;
               });
-              
+
               // Si es owner, cargar nombres de conductores
               if (_userRole == 'owner') {
                 _loadDriverNamesForTrip(trip.id!, expenses);
@@ -278,7 +285,10 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
     );
   }
 
-  Future<void> _loadDriverNamesForTrip(String tripId, List<ExpenseEntity> expenses) async {
+  Future<void> _loadDriverNamesForTrip(
+    String tripId,
+    List<ExpenseEntity> expenses,
+  ) async {
     final driverIds = expenses
         .where((e) => e.driverId != null)
         .map((e) => e.driverId!)
@@ -298,19 +308,21 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
     for (final driverId in driverIds) {
       try {
         // Primero intentar obtener desde profiles
-        final profileResponse = await Supabase.instance.client
-            .from('profiles')
-            .select('full_name')
-            .eq('id', driverId)
-            .maybeSingle();
+        // TODO: Obtener perfil desde backend
+        // Comentado temporalmente hasta tener acceso al cliente de Supabase
+        // final profileResponse = await supabase
+        //     .from('profiles')
+        //     .select('full_name')
+        //     .eq('id', driverId)
+        //     .maybeSingle();
 
-        if (profileResponse != null) {
-          final name = profileResponse['full_name'] as String?;
-          if (name != null && name.isNotEmpty) {
-            driverNames[driverId] = name;
-            continue;
-          }
-        }
+        // if (profileResponse != null) {
+        //   final name = profileResponse['full_name'] as String?;
+        //   if (name != null && name.isNotEmpty) {
+        //     driverNames[driverId] = name;
+        //     continue;
+        //   }
+        // }
 
         // Si no hay nombre en profiles, usar el driver_name del viaje
         // Generalmente todos los gastos de un viaje son del mismo conductor asignado
@@ -320,13 +332,12 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
         }
 
         // Si el driverId es el usuario actual, usar su email
-        final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+        // TODO: Obtener ID de usuario actual desde backend
+        const currentUserId = 'user@example.com';
         if (currentUserId == driverId) {
-          final currentUserEmail = Supabase.instance.client.auth.currentUser?.email;
-          if (currentUserEmail != null) {
-            driverNames[driverId] = currentUserEmail;
-            continue;
-          }
+          const currentUserEmail = 'user@example.com';
+          driverNames[driverId] = currentUserEmail;
+          continue;
         }
 
         // Si nada funciona, usar un mensaje genérico
@@ -344,14 +355,18 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
     }
   }
 
-  void _downloadReceiptImage(String imageUrl, String expenseType, DateTime expenseDate) {
+  void _downloadReceiptImage(
+    String imageUrl,
+    String expenseType,
+    DateTime expenseDate,
+  ) {
     if (kIsWeb) {
       final dateStr = DateFormat('yyyy-MM-dd').format(expenseDate);
       final fileName = 'recibo_${expenseType}_$dateStr.jpg';
       html.AnchorElement(href: imageUrl)
         ..setAttribute('download', fileName)
         ..click();
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Descarga iniciada'),
@@ -363,14 +378,14 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
   }
 
   void _navigateToExpenseForm(String tripId) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => ExpenseFormPage(tripId: tripId),
-      ),
-    ).then((_) {
-      // Recargar gastos después de registrar uno nuevo
-      _loadExpensesForTrips(_filteredTrips);
-    });
+    Navigator.of(context)
+        .push(
+          MaterialPageRoute(builder: (_) => ExpenseFormPage(tripId: tripId)),
+        )
+        .then((_) {
+          // Recargar gastos después de registrar uno nuevo
+          _loadExpensesForTrips(_filteredTrips);
+        });
   }
 
   String _buildVehicleLabel(String vehicleId) {
@@ -411,14 +426,23 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
                   ),
                   items: const [
-                    DropdownMenuItem(value: 'Todos', child: Text('Todos los campos')),
+                    DropdownMenuItem(
+                      value: 'Todos',
+                      child: Text('Todos los campos'),
+                    ),
                     DropdownMenuItem(value: 'Origen', child: Text('Origen')),
                     DropdownMenuItem(value: 'Destino', child: Text('Destino')),
                     DropdownMenuItem(value: 'Cliente', child: Text('Cliente')),
-                    DropdownMenuItem(value: 'Conductor', child: Text('Conductor')),
+                    DropdownMenuItem(
+                      value: 'Conductor',
+                      child: Text('Conductor'),
+                    ),
                   ],
                   onChanged: (value) {
                     if (value != null) {
@@ -443,7 +467,10 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
                         ),
                         items: [
                           const DropdownMenuItem(
@@ -481,14 +508,17 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
                         ),
                         onChanged: (_) => _applySearch(),
                       ),
               ],
             ),
           ),
-          
+
           // Indicador de filtro activo
           if (_userRole == 'driver')
             Container(
@@ -502,10 +532,7 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
                   Expanded(
                     child: Text(
                       'Mostrando solo viajes asignados a ti o sin asignar',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.accent,
-                      ),
+                      style: TextStyle(fontSize: 12, color: AppColors.accent),
                     ),
                   ),
                 ],
@@ -517,51 +544,47 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : _filteredTrips.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.inbox,
-                              size: 64,
-                              color: Colors.grey[400],
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              _trips.isEmpty
-                                  ? 'No hay viajes disponibles'
-                                  : 'No se encontraron viajes',
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.inbox, size: 64, color: Colors.grey[400]),
+                        const SizedBox(height: 16),
+                        Text(
+                          _trips.isEmpty
+                              ? 'No hay viajes disponibles'
+                              : 'No se encontraron viajes',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        if (_trips.isEmpty && _userRole == 'driver')
+                          const Padding(
+                            padding: EdgeInsets.only(top: 8),
+                            child: Text(
+                              'Los viajes aparecerán cuando te sean asignados',
                               style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.grey[600],
+                                fontSize: 12,
+                                color: Colors.grey,
                               ),
+                              textAlign: TextAlign.center,
                             ),
-                            if (_trips.isEmpty && _userRole == 'driver')
-                              const Padding(
-                                padding: EdgeInsets.only(top: 8),
-                                child: Text(
-                                  'Los viajes aparecerán cuando te sean asignados',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                              ),
-                          ],
-                        ),
-                      )
-                    : RefreshIndicator(
-                        onRefresh: _loadUserProfileAndTrips,
-                        child: ListView.builder(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: _filteredTrips.length,
-                          itemBuilder: (context, index) {
-                            final trip = _filteredTrips[index];
-                            return _buildTripCard(trip);
-                          },
-                        ),
-                      ),
+                          ),
+                      ],
+                    ),
+                  )
+                : RefreshIndicator(
+                    onRefresh: _loadUserProfileAndTrips,
+                    child: ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: _filteredTrips.length,
+                      itemBuilder: (context, index) {
+                        final trip = _filteredTrips[index];
+                        return _buildTripCard(trip);
+                      },
+                    ),
+                  ),
           ),
         ],
       ),
@@ -572,13 +595,11 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
     final dateFormat = DateFormat('dd/MM/yyyy');
     final isAssigned = trip.driverName.isNotEmpty;
     final vehicleLabel = _buildVehicleLabel(trip.vehicleId);
-    
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
         onTap: () => _navigateToExpenseForm(trip.id ?? ''),
         borderRadius: BorderRadius.circular(12),
@@ -603,9 +624,9 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
                   ),
                 ],
               ),
-              
+
               const SizedBox(height: 12),
-              
+
               // Cliente
               if (trip.clientName.isNotEmpty)
                 Padding(
@@ -616,15 +637,12 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
                       const SizedBox(width: 8),
                       Text(
                         'Cliente: ${trip.clientName}',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[700],
-                        ),
+                        style: TextStyle(fontSize: 14, color: Colors.grey[700]),
                       ),
                     ],
                   ),
                 ),
-              
+
               // Conductor
               Row(
                 children: [
@@ -642,15 +660,17 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
                       style: TextStyle(
                         fontSize: 14,
                         color: isAssigned ? Colors.grey[700] : Colors.grey[500],
-                        fontStyle: isAssigned ? FontStyle.normal : FontStyle.italic,
+                        fontStyle: isAssigned
+                            ? FontStyle.normal
+                            : FontStyle.italic,
                       ),
                     ),
                   ),
                 ],
               ),
-              
+
               const SizedBox(height: 4),
-              
+
               // Vehículo
               Row(
                 children: [
@@ -658,36 +678,35 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
                   const SizedBox(width: 8),
                   Text(
                     'Vehículo: $vehicleLabel',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey[700],
-                    ),
+                    style: TextStyle(fontSize: 13, color: Colors.grey[700]),
                   ),
                 ],
               ),
-              
+
               const SizedBox(height: 8),
-              
+
               // Fecha
               if (trip.startDate != null)
                 Row(
                   children: [
-                    Icon(Icons.calendar_today, size: 16, color: Colors.grey[600]),
+                    Icon(
+                      Icons.calendar_today,
+                      size: 16,
+                      color: Colors.grey[600],
+                    ),
                     const SizedBox(width: 8),
                     Text(
                       dateFormat.format(trip.startDate!),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[600],
-                      ),
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                     ),
                   ],
                 ),
-              
+
               const SizedBox(height: 12),
-              
+
               // Gastos registrados
-              if (_expensesByTrip.containsKey(trip.id) && _expensesByTrip[trip.id]!.isNotEmpty) ...[
+              if (_expensesByTrip.containsKey(trip.id) &&
+                  _expensesByTrip[trip.id]!.isNotEmpty) ...[
                 const Divider(),
                 const SizedBox(height: 8),
                 Row(
@@ -708,9 +727,11 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
                 ..._expensesByTrip[trip.id]!.take(3).map((expense) {
                   String? driverName;
                   if (_userRole == 'owner' && expense.driverId != null) {
-                    driverName = _driverNamesByTrip[trip.id!]?[expense.driverId] ?? 'Desconocido';
+                    driverName =
+                        _driverNamesByTrip[trip.id!]?[expense.driverId] ??
+                        'Desconocido';
                   }
-                  
+
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Card(
@@ -730,7 +751,8 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
                               children: [
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         expense.type,
@@ -742,13 +764,16 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
                                       ),
                                       const SizedBox(height: 2),
                                       Text(
-                                        DateFormat('dd/MM/yyyy').format(expense.date),
+                                        DateFormat(
+                                          'dd/MM/yyyy',
+                                        ).format(expense.date),
                                         style: TextStyle(
                                           fontSize: 11,
                                           color: Colors.grey[600],
                                         ),
                                       ),
-                                      if (_userRole == 'owner' && driverName != null) ...[
+                                      if (_userRole == 'owner' &&
+                                          driverName != null) ...[
                                         const SizedBox(height: 2),
                                         Text(
                                           'Conductor: $driverName',
@@ -766,17 +791,25 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Text(
-                                      NumberFormat.currency(symbol: '\$', decimalDigits: 0).format(expense.amount),
+                                      NumberFormat.currency(
+                                        symbol: '\$',
+                                        decimalDigits: 0,
+                                      ).format(expense.amount),
                                       style: TextStyle(
                                         fontSize: 12,
                                         fontWeight: FontWeight.bold,
                                         color: AppColors.accent,
                                       ),
                                     ),
-                                    if (_userRole == 'owner' && expense.receiptUrl != null && expense.receiptUrl!.isNotEmpty) ...[
+                                    if (_userRole == 'owner' &&
+                                        expense.receiptUrl != null &&
+                                        expense.receiptUrl!.isNotEmpty) ...[
                                       const SizedBox(width: 4),
                                       IconButton(
-                                        icon: const Icon(Icons.download, size: 16),
+                                        icon: const Icon(
+                                          Icons.download,
+                                          size: 16,
+                                        ),
                                         onPressed: () => _downloadReceiptImage(
                                           expense.receiptUrl!,
                                           expense.type,
@@ -820,7 +853,10 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
                       ),
                     ),
                     Text(
-                      NumberFormat.currency(symbol: '\$', decimalDigits: 0).format(
+                      NumberFormat.currency(
+                        symbol: '\$',
+                        decimalDigits: 0,
+                      ).format(
                         _expensesByTrip[trip.id]!.fold<double>(
                           0.0,
                           (sum, expense) => sum + expense.amount,
@@ -836,7 +872,7 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
                 ),
                 const SizedBox(height: 12),
               ],
-              
+
               // Botón de acción
               Align(
                 alignment: Alignment.centerRight,
@@ -857,4 +893,3 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
     );
   }
 }
-

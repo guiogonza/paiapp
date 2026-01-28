@@ -6,6 +6,7 @@ import 'package:pai_app/core/theme/app_theme.dart';
 import 'package:pai_app/core/services/pwa_service_export.dart';
 import 'package:pai_app/data/services/local_api_client.dart';
 import 'package:pai_app/presentation/pages/splash/splash_page.dart';
+import 'package:pai_app/presentation/widgets/pwa_install_prompt.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -45,6 +46,10 @@ class MyApp extends StatelessWidget {
       title: AppConstants.appName,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
+      builder: (context, child) {
+        if (!kIsWeb) return child ?? const SizedBox.shrink();
+        return PWAInstallPrompt(child: child);
+      },
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,

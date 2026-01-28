@@ -1,0 +1,58 @@
+# Docker Compose para desarrollo local
+# Incluye PostgreSQL y API Node.js
+
+services:
+  # Base de datos PostgreSQL
+  postgres:
+    image: postgres:15-alpine
+    container_name: pai-postgres
+    environment:
+      POSTGRES_USER: paiapp
+      POSTGRES_PASSWORD: paiapp123
+      POSTGRES_DB: paiapp
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/01-init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U paiapp -d paiapp"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - pai-local-network
+
+  # API Node.js
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: pai-api
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: paiapp
+      DB_PASSWORD: paiapp123
+      DB_NAME: paiapp
+      JWT_SECRET: dev-jwt-secret-change-in-production
+      JWT_EXPIRES_IN: 7d
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - pai-local-network
+    volumes:
+      - ./api:/app
+      - /app/node_modules
+
+volumes:
+  postgres-data:
+
+networks:
+  pai-local-network:
+    driver: bridge

@@ -4,6 +4,7 @@ import 'package:pai_app/core/theme/app_colors.dart';
 import 'package:pai_app/core/services/local_auth_service.dart';
 import 'package:pai_app/data/repositories/auth_repository_impl.dart';
 import 'package:pai_app/data/repositories/profile_repository_impl.dart';
+import 'package:pai_app/data/services/gps_auth_service.dart';
 import 'package:pai_app/presentation/pages/owner/owner_dashboard_page.dart';
 import 'package:pai_app/presentation/pages/driver/driver_dashboard_page.dart';
 import 'package:pai_app/presentation/widgets/pwa_install_prompt.dart';
@@ -118,16 +119,33 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     try {
+      print('🔐 Intentando login con API local (PostgreSQL)...');
+      print('   Usuario: ${_usernameController.text.trim()}');
+
       await _authRepository.login(
         _usernameController.text.trim(),
         _passwordController.text,
       );
+
+      print('✅ Login exitoso en API local');
 
       // SIEMPRE guardar credenciales para poder cargar vehículos del GPS
       await _localAuthService.saveCredentials(
         _usernameController.text.trim(),
         _passwordController.text,
       );
+
+      // Guardar credenciales GPS (las mismas que se usan para el login PAI)
+      // Esto permite que los servicios de GPS puedan obtener ubicaciones de vehículos
+      final gpsAuthService = GPSAuthService();
+      print(
+        '💾 Guardando credenciales GPS para: ${_usernameController.text.trim()}',
+      );
+      await gpsAuthService.saveGpsCredentialsLocally(
+        _usernameController.text.trim(),
+        _passwordController.text,
+      );
+      print('✅ Credenciales GPS guardadas localmente');
 
       // Configurar preferencias de "Recordarme" y biometría
       if (_rememberMe) {
@@ -290,6 +308,13 @@ class _LoginPageState extends State<LoginPage> {
       // Después del registro, intentar hacer login automáticamente
       try {
         await _authRepository.login(
+          _usernameController.text.trim(),
+          _passwordController.text,
+        );
+
+        // Guardar credenciales GPS después del login exitoso
+        final gpsAuthService = GPSAuthService();
+        await gpsAuthService.saveGpsCredentialsLocally(
           _usernameController.text.trim(),
           _passwordController.text,
         );

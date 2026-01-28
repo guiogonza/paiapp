@@ -7,7 +7,12 @@ import 'package:pai_app/domain/repositories/vehicle_history_repository.dart';
 import 'package:pai_app/data/models/vehicle_history_model.dart';
 
 class VehicleHistoryRepositoryImpl implements VehicleHistoryRepository {
-  final SupabaseClient _supabase = Supabase.instance.client;
+  // TODO: Remover Supabase - ya no se usa
+  // final SupabaseClient _supabase = Supabase.instance.client;
+
+  // Getter temporal para evitar errores - lanzará error si se usa
+  dynamic get _supabase =>
+      throw UnimplementedError('Supabase ya no se usa - migrado a PostgreSQL');
   static const String _tableName = 'vehicle_history';
 
   @override
@@ -34,12 +39,25 @@ class VehicleHistoryRepositoryImpl implements VehicleHistoryRepository {
       return const Right(null);
     } on PostgrestException catch (e) {
       // Error específico: tabla no existe
-      if (e.code == 'PGRST116' || e.message.contains('does not exist') || (e.message.contains('relation') && e.message.contains('does not exist'))) {
-        return Left(DatabaseFailure('La tabla vehicle_history no existe. Por favor, créala en Supabase usando el script SQL proporcionado.'));
+      if (e.code == 'PGRST116' ||
+          e.message.contains('does not exist') ||
+          (e.message.contains('relation') &&
+              e.message.contains('does not exist'))) {
+        return Left(
+          DatabaseFailure(
+            'La tabla vehicle_history no existe. Por favor, créala en Supabase usando el script SQL proporcionado.',
+          ),
+        );
       }
       // Error de permisos
-      if (e.code == 'PGRST301' || e.message.contains('permission denied') || e.message.contains('RLS')) {
-        return Left(DatabaseFailure('Error de permisos. Verifica las políticas RLS en Supabase.'));
+      if (e.code == 'PGRST301' ||
+          e.message.contains('permission denied') ||
+          e.message.contains('RLS')) {
+        return Left(
+          DatabaseFailure(
+            'Error de permisos. Verifica las políticas RLS en Supabase.',
+          ),
+        );
       }
       return Left(DatabaseFailure(e.message));
     } on SocketException catch (e) {
@@ -47,22 +65,23 @@ class VehicleHistoryRepositoryImpl implements VehicleHistoryRepository {
     } catch (e) {
       final errorMsg = e.toString();
       // Detectar errores de CORS o conexión
-      if (errorMsg.contains('Failed to fetch') || 
-          errorMsg.contains('CORS') || 
+      if (errorMsg.contains('Failed to fetch') ||
+          errorMsg.contains('CORS') ||
           errorMsg.contains('NetworkError') ||
           errorMsg.contains('api.supabase.com')) {
-        return Left(NetworkFailure('Error de conexión con Supabase. Verifica tu conexión a internet y que el proyecto de Supabase esté activo.'));
+        return Left(
+          NetworkFailure(
+            'Error de conexión con Supabase. Verifica tu conexión a internet y que el proyecto de Supabase esté activo.',
+          ),
+        );
       }
       return Left(UnknownFailure(errorMsg));
     }
   }
 
   @override
-  Future<Either<VehicleHistoryFailure, List<VehicleHistoryEntity>>> getVehicleHistory(
-    String vehicleId, {
-    DateTime? from,
-    DateTime? to,
-  }) async {
+  Future<Either<VehicleHistoryFailure, List<VehicleHistoryEntity>>>
+  getVehicleHistory(String vehicleId, {DateTime? from, DateTime? to}) async {
     try {
       var query = _supabase
           .from(_tableName)
@@ -87,12 +106,25 @@ class VehicleHistoryRepositoryImpl implements VehicleHistoryRepository {
       return Right(history);
     } on PostgrestException catch (e) {
       // Error específico: tabla no existe
-      if (e.code == 'PGRST116' || e.message.contains('does not exist') || e.message.contains('relation') && e.message.contains('does not exist')) {
-        return Left(NotFoundFailure('La tabla vehicle_history no existe. Por favor, créala en Supabase usando el script SQL proporcionado.'));
+      if (e.code == 'PGRST116' ||
+          e.message.contains('does not exist') ||
+          e.message.contains('relation') &&
+              e.message.contains('does not exist')) {
+        return Left(
+          NotFoundFailure(
+            'La tabla vehicle_history no existe. Por favor, créala en Supabase usando el script SQL proporcionado.',
+          ),
+        );
       }
       // Error de permisos
-      if (e.code == 'PGRST301' || e.message.contains('permission denied') || e.message.contains('RLS')) {
-        return Left(DatabaseFailure('Error de permisos. Verifica las políticas RLS en Supabase.'));
+      if (e.code == 'PGRST301' ||
+          e.message.contains('permission denied') ||
+          e.message.contains('RLS')) {
+        return Left(
+          DatabaseFailure(
+            'Error de permisos. Verifica las políticas RLS en Supabase.',
+          ),
+        );
       }
       return Left(DatabaseFailure(e.message));
     } on SocketException catch (e) {
@@ -100,25 +132,25 @@ class VehicleHistoryRepositoryImpl implements VehicleHistoryRepository {
     } catch (e) {
       final errorMsg = e.toString();
       // Detectar errores de CORS o conexión
-      if (errorMsg.contains('Failed to fetch') || 
-          errorMsg.contains('CORS') || 
+      if (errorMsg.contains('Failed to fetch') ||
+          errorMsg.contains('CORS') ||
           errorMsg.contains('NetworkError') ||
           errorMsg.contains('api.supabase.com')) {
-        return Left(NetworkFailure('Error de conexión con Supabase. Verifica tu conexión a internet y que el proyecto de Supabase esté activo.'));
+        return Left(
+          NetworkFailure(
+            'Error de conexión con Supabase. Verifica tu conexión a internet y que el proyecto de Supabase esté activo.',
+          ),
+        );
       }
       return Left(UnknownFailure(errorMsg));
     }
   }
 
   @override
-  Future<Either<VehicleHistoryFailure, List<VehicleHistoryEntity>>> getAllVehicleHistory({
-    DateTime? from,
-    DateTime? to,
-  }) async {
+  Future<Either<VehicleHistoryFailure, List<VehicleHistoryEntity>>>
+  getAllVehicleHistory({DateTime? from, DateTime? to}) async {
     try {
-      var query = _supabase
-          .from(_tableName)
-          .select();
+      var query = _supabase.from(_tableName).select();
 
       // Aplicar filtros de fecha si se proporcionan (antes del order)
       if (from != null) {
@@ -145,4 +177,3 @@ class VehicleHistoryRepositoryImpl implements VehicleHistoryRepository {
     }
   }
 }
-

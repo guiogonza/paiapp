@@ -90,7 +90,7 @@ class PWAInstallPrompt extends StatefulWidget {
           ),
           // Mostrar botón de instalar si no está instalada y tenemos prompt nativo
           if (!deviceInfo.isStandalone &&
-              pwaService.hasNativePrompt &&
+              // pwaService.hasNativePrompt &&
               deviceInfo.os != 'iOS')
             ElevatedButton.icon(
               onPressed: () async {

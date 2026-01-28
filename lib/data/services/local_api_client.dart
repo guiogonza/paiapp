@@ -10,10 +10,25 @@ class LocalApiClient {
   factory LocalApiClient() => _instance;
   LocalApiClient._internal();
 
-  // URL base de la API - detectar entorno para evitar contenido mixto en web https
-  static final String _baseUrl = kIsWeb
-      ? '${Uri.base.origin}/api'
-      : 'http://82.208.21.130:3000';
+  // URL base de la API - detectar entorno
+  static final String _baseUrl = _detectApiUrl();
+
+  static String _detectApiUrl() {
+    if (!kIsWeb) {
+      // Mobile/Desktop
+      return 'http://82.208.21.130:3000';
+    }
+
+    final origin = Uri.base.origin;
+
+    // Desarrollo local Flutter (localhost con puerto alto)
+    if (origin.contains('localhost:8') || origin.contains('127.0.0.1:8')) {
+      return 'http://localhost:3000';
+    }
+
+    // Producción (VPS) - usar proxy nginx
+    return '$origin/api';
+  }
 
   String? _accessToken;
   Map<String, dynamic>? _currentUser;
@@ -48,6 +63,8 @@ class LocalApiClient {
   Future<Map<String, dynamic>> login(String email, String password) async {
     try {
       print('🔐 LocalApiClient: Intentando login...');
+      print('   URL: $_baseUrl/auth/login');
+      print('   Email: $email');
 
       final response = await http.post(
         Uri.parse('$_baseUrl/auth/login'),
@@ -55,15 +72,28 @@ class LocalApiClient {
         body: jsonEncode({'email': email, 'password': password}),
       );
 
+      print('📥 Respuesta del servidor:');
+      print('   Status Code: ${response.statusCode}');
+      print('   Body: ${response.body}');
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        _accessToken = data['access_token'];
+        // El backend retorna 'token' en lugar de 'access_token'
+        _accessToken = data['token'] ?? data['access_token'];
         _currentUser = data['user'];
 
         // Guardar en SharedPreferences
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('api_access_token', _accessToken!);
         await prefs.setString('api_current_user', jsonEncode(_currentUser));
+
+        // Guardar el GPS API Key si viene en la respuesta
+        if (data['gpsApiKey'] != null) {
+          await prefs.setString('gps_api_key', data['gpsApiKey']);
+          print(
+            '✅ GPS API Key guardado: ${data['gpsApiKey'].toString().substring(0, 20)}...',
+          );
+        }
 
         print('✅ LocalApiClient: Login exitoso - ${_currentUser?['email']}');
         return data;

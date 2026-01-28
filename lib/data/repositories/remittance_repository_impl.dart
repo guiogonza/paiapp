@@ -10,13 +10,19 @@ import 'package:pai_app/domain/repositories/remittance_repository.dart';
 import 'package:pai_app/data/models/remittance_model.dart';
 
 class RemittanceRepositoryImpl implements RemittanceRepository {
-  final SupabaseClient _supabase = Supabase.instance.client;
+  // TODO: Remover Supabase - ya no se usa
+  // final SupabaseClient _supabase = Supabase.instance.client;
+
+  // Getter temporal para evitar errores - lanzará error si se usa
+  dynamic get _supabase =>
+      throw UnimplementedError('Supabase ya no se usa - migrado a PostgreSQL');
   static const String _tableName = 'remittances';
   // IMPORTANTE: El bucket de storage en Supabase se llama 'signatures' (en plural)
   static const String _storageBucket = 'signatures';
 
   @override
-  Future<Either<RemittanceFailure, List<RemittanceEntity>>> getRemittances() async {
+  Future<Either<RemittanceFailure, List<RemittanceEntity>>>
+  getRemittances() async {
     try {
       final response = await _supabase
           .from(_tableName)
@@ -38,7 +44,8 @@ class RemittanceRepositoryImpl implements RemittanceRepository {
   }
 
   @override
-  Future<Either<RemittanceFailure, List<RemittanceEntity>>> getPendingRemittances() async {
+  Future<Either<RemittanceFailure, List<RemittanceEntity>>>
+  getPendingRemittances() async {
     try {
       final response = await _supabase
           .from(_tableName)
@@ -61,7 +68,8 @@ class RemittanceRepositoryImpl implements RemittanceRepository {
   }
 
   @override
-  Future<Either<RemittanceFailure, List<RemittanceWithRouteEntity>>> getRemittancesWithRoutes() async {
+  Future<Either<RemittanceFailure, List<RemittanceWithRouteEntity>>>
+  getRemittancesWithRoutes() async {
     try {
       // Hacer JOIN con routes usando Supabase
       // NOTA: La FK en remittances se llama trip_id (no route_id)
@@ -86,7 +94,7 @@ class RemittanceRepositoryImpl implements RemittanceRepository {
 
       for (var item in response as List) {
         final remittance = RemittanceModel.fromJson(item).toEntity();
-        
+
         // Extraer datos de route del JOIN
         final routeData = item['routes'] as Map<String, dynamic>?;
         if (routeData != null) {
@@ -106,10 +114,7 @@ class RemittanceRepositoryImpl implements RemittanceRepository {
           );
 
           remittancesWithRoutes.add(
-            RemittanceWithRouteEntity(
-              remittance: remittance,
-              route: route,
-            ),
+            RemittanceWithRouteEntity(remittance: remittance, route: route),
           );
         }
       }
@@ -125,22 +130,27 @@ class RemittanceRepositoryImpl implements RemittanceRepository {
   }
 
   @override
-  Future<Either<RemittanceFailure, List<RemittanceWithRouteEntity>>> getPendingRemittancesWithRoutes() async {
+  Future<Either<RemittanceFailure, List<RemittanceWithRouteEntity>>>
+  getPendingRemittancesWithRoutes() async {
     try {
       // Obtener TODOS los estados: pendiente_completar, pendiente_cobrar, y cobrado
       // IMPORTANTE: La FK se llama trip_id (NO route_id)
       // La columna updated_at ya existe en la tabla
       final remittancesResponse = await _supabase
           .from(_tableName)
-          .select('id, trip_id, receiver_name, status, receipt_url, created_at, updated_at')
-          .or('status.eq.pendiente_completar,status.eq.pendiente_cobrar,status.eq.cobrado')
+          .select(
+            'id, trip_id, receiver_name, status, receipt_url, created_at, updated_at',
+          )
+          .or(
+            'status.eq.pendiente_completar,status.eq.pendiente_cobrar,status.eq.cobrado',
+          )
           .order('created_at', ascending: false);
 
       final remittancesWithRoutes = <RemittanceWithRouteEntity>[];
 
       for (var remittanceData in remittancesResponse as List) {
         final remittance = RemittanceModel.fromJson(remittanceData).toEntity();
-        
+
         // Obtener el route correspondiente usando trip_id
         final tripId = remittance.tripId;
         if (tripId.isEmpty) {
@@ -150,7 +160,9 @@ class RemittanceRepositoryImpl implements RemittanceRepository {
         try {
           final routeResponse = await _supabase
               .from('routes')
-              .select('id, vehicle_id, start_location, end_location, driver_name, client_name, revenue_amount, created_at')
+              .select(
+                'id, vehicle_id, start_location, end_location, driver_name, client_name, revenue_amount, created_at',
+              )
               .eq('id', tripId)
               .maybeSingle();
 
@@ -172,10 +184,7 @@ class RemittanceRepositoryImpl implements RemittanceRepository {
             );
 
             remittancesWithRoutes.add(
-              RemittanceWithRouteEntity(
-                remittance: remittance,
-                route: route,
-              ),
+              RemittanceWithRouteEntity(remittance: remittance, route: route),
             );
           }
         } catch (e) {
@@ -196,7 +205,9 @@ class RemittanceRepositoryImpl implements RemittanceRepository {
   }
 
   @override
-  Future<Either<RemittanceFailure, RemittanceEntity>> getRemittanceById(String id) async {
+  Future<Either<RemittanceFailure, RemittanceEntity>> getRemittanceById(
+    String id,
+  ) async {
     try {
       final response = await _supabase
           .from(_tableName)
@@ -241,11 +252,13 @@ class RemittanceRepositoryImpl implements RemittanceRepository {
   }
 
   @override
-  Future<Either<RemittanceFailure, RemittanceEntity>> createRemittance(RemittanceEntity remittance) async {
+  Future<Either<RemittanceFailure, RemittanceEntity>> createRemittance(
+    RemittanceEntity remittance,
+  ) async {
     try {
       final remittanceData = RemittanceModel.fromEntity(remittance).toJson();
       remittanceData.remove('id'); // No incluir id en la creación
-      
+
       final response = await _supabase
           .from(_tableName)
           .insert(remittanceData)
@@ -264,7 +277,9 @@ class RemittanceRepositoryImpl implements RemittanceRepository {
   }
 
   @override
-  Future<Either<RemittanceFailure, RemittanceEntity?>> getRemittanceByTripId(String tripId) async {
+  Future<Either<RemittanceFailure, RemittanceEntity?>> getRemittanceByTripId(
+    String tripId,
+  ) async {
     try {
       final response = await _supabase
           .from(_tableName)
@@ -288,15 +303,21 @@ class RemittanceRepositoryImpl implements RemittanceRepository {
   }
 
   @override
-  Future<Either<RemittanceFailure, RemittanceEntity>> updateRemittance(RemittanceEntity remittance) async {
+  Future<Either<RemittanceFailure, RemittanceEntity>> updateRemittance(
+    RemittanceEntity remittance,
+  ) async {
     try {
       if (remittance.id == null) {
-        return const Left(ValidationFailure('El ID de la remisión es requerido para actualizar'));
+        return const Left(
+          ValidationFailure(
+            'El ID de la remisión es requerido para actualizar',
+          ),
+        );
       }
 
       final remittanceData = RemittanceModel.fromEntity(remittance).toJson();
       remittanceData.remove('id'); // No actualizar el id
-      
+
       // Actualizar updated_at (la columna updated_at ya existe en la tabla)
       remittanceData['updated_at'] = DateTime.now().toIso8601String();
 
@@ -326,14 +347,17 @@ class RemittanceRepositoryImpl implements RemittanceRepository {
   }
 
   @override
-  Future<Either<RemittanceFailure, List<RemittanceWithRouteEntity>>> getDriverPendingRemittances(String driverName) async {
+  Future<Either<RemittanceFailure, List<RemittanceWithRouteEntity>>>
+  getDriverPendingRemittances(String driverName) async {
     try {
       // Obtener remisiones pendientes sin receipt_url (sin foto adjunta)
       // IMPORTANTE: La columna FK se llama trip_id (NO route_id)
       // La columna updated_at ya existe en la tabla
       final remittancesResponse = await _supabase
           .from(_tableName)
-          .select('id, trip_id, receiver_name, status, receipt_url, created_at, updated_at')
+          .select(
+            'id, trip_id, receiver_name, status, receipt_url, created_at, updated_at',
+          )
           .eq('status', 'pendiente')
           .order('created_at', ascending: false);
 
@@ -341,12 +365,13 @@ class RemittanceRepositoryImpl implements RemittanceRepository {
 
       for (var remittanceData in remittancesResponse as List) {
         final remittance = RemittanceModel.fromJson(remittanceData).toEntity();
-        
+
         // Filtrar por receipt_url NULL (sin foto adjunta)
-        if (remittance.receiptUrl != null && remittance.receiptUrl!.isNotEmpty) {
+        if (remittance.receiptUrl != null &&
+            remittance.receiptUrl!.isNotEmpty) {
           continue;
         }
-        
+
         // Obtener el route correspondiente usando trip_id
         final tripId = remittance.tripId;
         if (tripId.isEmpty) {
@@ -363,11 +388,12 @@ class RemittanceRepositoryImpl implements RemittanceRepository {
           if (routeResponse != null) {
             final routeData = routeResponse;
             final routeDriverName = routeData['driver_name'] as String?;
-            
+
             // Filtrar por driver_name del route (comparación case-insensitive)
             // Permite buscar tanto por email como por nombre completo
-            if (routeDriverName != null && 
-                routeDriverName.toLowerCase().trim() == driverName.toLowerCase().trim()) {
+            if (routeDriverName != null &&
+                routeDriverName.toLowerCase().trim() ==
+                    driverName.toLowerCase().trim()) {
               final route = RouteEntity(
                 id: routeData['id'] as String?,
                 vehicleId: routeData['vehicle_id'] as String,
@@ -384,10 +410,7 @@ class RemittanceRepositoryImpl implements RemittanceRepository {
               );
 
               remittancesWithRoutes.add(
-                RemittanceWithRouteEntity(
-                  remittance: remittance,
-                  route: route,
-                ),
+                RemittanceWithRouteEntity(remittance: remittance, route: route),
               );
             }
           }
@@ -409,33 +432,40 @@ class RemittanceRepositoryImpl implements RemittanceRepository {
   }
 
   @override
-  Future<Either<RemittanceFailure, String>> uploadMemorandumImage(List<int> fileBytes, String fileName) async {
+  Future<Either<RemittanceFailure, String>> uploadMemorandumImage(
+    List<int> fileBytes,
+    String fileName,
+  ) async {
     try {
       // Normalizar el nombre del archivo: eliminar espacios y caracteres especiales
       // Asegurar que el path sea limpio y simple
       final normalizedFileName = fileName
-          .replaceAll(RegExp(r'[^\w\.-]'), '_') // Reemplazar caracteres especiales con _
+          .replaceAll(
+            RegExp(r'[^\w\.-]'),
+            '_',
+          ) // Reemplazar caracteres especiales con _
           .replaceAll(RegExp(r'_+'), '_') // Reemplazar múltiples _ con uno solo
           .toLowerCase(); // Convertir a minúsculas para consistencia
-      
+
       // Determinar el contentType basado en la extensión
       String contentType = 'image/jpeg'; // Por defecto
       if (normalizedFileName.endsWith('.png')) {
         contentType = 'image/png';
-      } else if (normalizedFileName.endsWith('.jpg') || normalizedFileName.endsWith('.jpeg')) {
+      } else if (normalizedFileName.endsWith('.jpg') ||
+          normalizedFileName.endsWith('.jpeg')) {
         contentType = 'image/jpeg';
       }
-      
+
       // Convertir List<int> a Uint8List
       final uint8List = Uint8List.fromList(fileBytes);
-      
+
       // Subir usando uploadBinary con el nombre normalizado
       // IMPORTANTE: Usar el mismo nombre normalizado para subir y obtener la URL
       await _supabase.storage
           .from(_storageBucket)
           .uploadBinary(
             normalizedFileName, // Usar el nombre normalizado
-            uint8List, 
+            uint8List,
             fileOptions: FileOptions(
               upsert: true, // Permitir sobrescribir si existe
               contentType: contentType,
@@ -460,14 +490,14 @@ class RemittanceRepositoryImpl implements RemittanceRepository {
   }
 
   @override
-  Future<Either<RemittanceFailure, void>> deleteMemorandumImage(String imageUrl) async {
+  Future<Either<RemittanceFailure, void>> deleteMemorandumImage(
+    String imageUrl,
+  ) async {
     try {
       // Extraer el nombre del archivo de la URL
       final fileName = imageUrl.split('/').last.split('?').first;
 
-      await _supabase.storage
-          .from(_storageBucket)
-          .remove([fileName]);
+      await _supabase.storage.from(_storageBucket).remove([fileName]);
 
       return const Right(null);
     } on StorageException catch (e) {
@@ -497,4 +527,3 @@ class RemittanceRepositoryImpl implements RemittanceRepository {
     return e.toString().isNotEmpty ? e.toString() : 'Error desconocido';
   }
 }
-

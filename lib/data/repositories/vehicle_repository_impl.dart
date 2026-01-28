@@ -9,7 +9,6 @@ import 'package:pai_app/data/services/local_api_client.dart';
 
 class VehicleRepositoryImpl implements VehicleRepository {
   final LocalApiClient _localApi = LocalApiClient();
-  static const String _tableName = 'vehicles';
 
   @override
   Future<Either<VehicleFailure, List<VehicleEntity>>> getVehicles() async {

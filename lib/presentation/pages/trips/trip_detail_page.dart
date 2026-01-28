@@ -5,7 +5,6 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:html' as html;
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:pai_app/core/theme/app_colors.dart';
 import 'package:pai_app/data/repositories/expense_repository_impl.dart';
 import 'package:pai_app/data/repositories/trip_repository_impl.dart';
@@ -22,10 +21,7 @@ import 'package:pai_app/presentation/pages/expenses/expense_form_page.dart';
 class TripDetailPage extends StatefulWidget {
   final String tripId;
 
-  const TripDetailPage({
-    super.key,
-    required this.tripId,
-  });
+  const TripDetailPage({super.key, required this.tripId});
 
   @override
   State<TripDetailPage> createState() => _TripDetailPageState();
@@ -36,7 +32,7 @@ class _TripDetailPageState extends State<TripDetailPage> {
   final _expenseRepository = ExpenseRepositoryImpl();
   final _remittanceRepository = RemittanceRepositoryImpl();
   final _vehicleRepository = VehicleRepositoryImpl();
-  
+
   TripEntity? _trip;
   RemittanceEntity? _remittance;
   List<ExpenseEntity> _allExpenses = [];
@@ -73,8 +69,9 @@ class _TripDetailPageState extends State<TripDetailPage> {
           _trip = trip;
 
           // Cargar vehículo asociado para mostrar placa
-          final vehicleResult =
-              await _vehicleRepository.getVehicleById(trip.vehicleId);
+          final vehicleResult = await _vehicleRepository.getVehicleById(
+            trip.vehicleId,
+          );
           vehicleResult.fold(
             (failure) {
               _vehicle = null;
@@ -87,7 +84,9 @@ class _TripDetailPageState extends State<TripDetailPage> {
       );
 
       // Cargar todos los gastos del viaje
-      final expensesResult = await _expenseRepository.getExpensesByTripId(widget.tripId);
+      final expensesResult = await _expenseRepository.getExpensesByTripId(
+        widget.tripId,
+      );
       expensesResult.fold(
         (failure) {
           if (mounted) {
@@ -107,7 +106,8 @@ class _TripDetailPageState extends State<TripDetailPage> {
       );
 
       // Cargar la remisión del viaje
-      final remittanceResult = await _remittanceRepository.getRemittanceByTripId(widget.tripId);
+      final remittanceResult = await _remittanceRepository
+          .getRemittanceByTripId(widget.tripId);
       remittanceResult.fold(
         (failure) {
           // No mostrar error, simplemente no hay remisión
@@ -119,10 +119,7 @@ class _TripDetailPageState extends State<TripDetailPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -142,21 +139,10 @@ class _TripDetailPageState extends State<TripDetailPage> {
 
     for (final driverId in driverIds) {
       try {
-        // Intentar obtener desde profiles
-        final profileResponse = await Supabase.instance.client
-            .from('profiles')
-            .select('full_name, email')
-            .eq('id', driverId)
-            .maybeSingle();
-
-        if (profileResponse != null) {
-          final name = profileResponse['full_name'] as String?;
-          final email = profileResponse['email'] as String?;
-          _driverNames[driverId] = name ?? email ?? driverId;
-        } else {
-          // Si no hay perfil, usar el ID como fallback
-          _driverNames[driverId] = driverId;
-        }
+        // TODO: Reemplazar por llamada a API REST PostgreSQL para obtener nombre y email del conductor
+        // Ejemplo: final profile = await apiClient.getProfile(driverId);
+        // _driverNames[driverId] = profile?.fullName ?? profile?.email ?? driverId;
+        _driverNames[driverId] = driverId; // Fallback temporal
       } catch (e) {
         // En caso de error, usar el ID
         _driverNames[driverId] = driverId;
@@ -184,26 +170,23 @@ class _TripDetailPageState extends State<TripDetailPage> {
   Widget build(BuildContext context) {
     if (_isLoading) {
       return Scaffold(
-        appBar: AppBar(
-          title: const Text('Detalle del Viaje'),
-        ),
+        appBar: AppBar(title: const Text('Detalle del Viaje')),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
 
     if (_trip == null) {
       return Scaffold(
-        appBar: AppBar(
-          title: const Text('Detalle del Viaje'),
-        ),
-        body: const Center(
-          child: Text('Viaje no encontrado'),
-        ),
+        appBar: AppBar(title: const Text('Detalle del Viaje')),
+        body: const Center(child: Text('Viaje no encontrado')),
       );
     }
 
     final dateFormat = DateFormat('dd/MM/yyyy');
-    final currencyFormat = NumberFormat.currency(symbol: '\$', decimalDigits: 0);
+    final currencyFormat = NumberFormat.currency(
+      symbol: '\$',
+      decimalDigits: 0,
+    );
     final totalExpenses = _calculateTotalExpenses();
     final profit = _calculateProfit();
 
@@ -239,20 +222,23 @@ class _TripDetailPageState extends State<TripDetailPage> {
                       Text(
                         'Información del Viaje',
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       const SizedBox(height: 12),
                       _buildInfoRow(
-                          'Ruta', '${_trip!.origin} → ${_trip!.destination}'),
+                        'Ruta',
+                        '${_trip!.origin} → ${_trip!.destination}',
+                      ),
                       const SizedBox(height: 8),
                       _buildInfoRow('Cliente', _trip!.clientName),
                       const SizedBox(height: 8),
                       _buildInfoRow(
-                          'Conductor',
-                          _trip!.driverName.isNotEmpty
-                              ? _trip!.driverName
-                              : 'Sin asignar'),
+                        'Conductor',
+                        _trip!.driverName.isNotEmpty
+                            ? _trip!.driverName
+                            : 'Sin asignar',
+                      ),
                       const SizedBox(height: 8),
                       _buildInfoRow(
                         'Vehículo',
@@ -260,11 +246,17 @@ class _TripDetailPageState extends State<TripDetailPage> {
                       ),
                       if (_trip!.startDate != null) ...[
                         const SizedBox(height: 8),
-                        _buildInfoRow('Fecha de Inicio', dateFormat.format(_trip!.startDate!)),
+                        _buildInfoRow(
+                          'Fecha de Inicio',
+                          dateFormat.format(_trip!.startDate!),
+                        ),
                       ],
                       if (_trip!.endDate != null) ...[
                         const SizedBox(height: 8),
-                        _buildInfoRow('Fecha de Fin', dateFormat.format(_trip!.endDate!)),
+                        _buildInfoRow(
+                          'Fecha de Fin',
+                          dateFormat.format(_trip!.endDate!),
+                        ),
                       ],
                     ],
                   ),
@@ -296,25 +288,27 @@ class _TripDetailPageState extends State<TripDetailPage> {
                                 const SizedBox(width: 8),
                                 Text(
                                   'Estado de Remisión',
-                                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                                  style: Theme.of(context).textTheme.titleLarge
+                                      ?.copyWith(fontWeight: FontWeight.bold),
                                 ),
                               ],
                             ),
                             // Botones de ver y descargar remisión (si hay foto y estado es pendiente_cobrar o cobrado)
-                            if ((_remittance!.status == 'pendiente_cobrar' || _remittance!.status == 'cobrado') &&
+                            if ((_remittance!.status == 'pendiente_cobrar' ||
+                                    _remittance!.status == 'cobrado') &&
                                 _remittance!.receiptUrl != null &&
                                 _remittance!.receiptUrl!.isNotEmpty) ...[
                               IconButton(
                                 icon: const Icon(Icons.visibility),
-                                onPressed: () => _viewRemittanceImage(_remittance!),
+                                onPressed: () =>
+                                    _viewRemittanceImage(_remittance!),
                                 tooltip: 'Ver remisión',
                                 color: AppColors.primary,
                               ),
                               IconButton(
                                 icon: const Icon(Icons.download),
-                                onPressed: () => _downloadRemittanceImage(_remittance!),
+                                onPressed: () =>
+                                    _downloadRemittanceImage(_remittance!),
                                 tooltip: 'Descargar remisión',
                                 color: AppColors.accent,
                               ),
@@ -326,7 +320,9 @@ class _TripDetailPageState extends State<TripDetailPage> {
                           width: double.infinity,
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: _getStatusColor(_remittance!.status).withValues(alpha: 0.1),
+                            color: _getStatusColor(
+                              _remittance!.status,
+                            ).withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
                               color: _getStatusColor(_remittance!.status),
@@ -356,7 +352,7 @@ class _TripDetailPageState extends State<TripDetailPage> {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
-                color: profit >= 0 
+                color: profit >= 0
                     ? Colors.green.withValues(alpha: 0.1)
                     : Colors.red.withValues(alpha: 0.1),
                 child: Padding(
@@ -367,15 +363,16 @@ class _TripDetailPageState extends State<TripDetailPage> {
                       Row(
                         children: [
                           Icon(
-                            profit >= 0 ? Icons.trending_up : Icons.trending_down,
+                            profit >= 0
+                                ? Icons.trending_up
+                                : Icons.trending_down,
                             color: profit >= 0 ? Colors.green : Colors.red,
                           ),
                           const SizedBox(width: 8),
                           Text(
                             'Resultado del Viaje',
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(fontWeight: FontWeight.bold),
                           ),
                         ],
                       ),
@@ -425,19 +422,22 @@ class _TripDetailPageState extends State<TripDetailPage> {
                               const SizedBox(width: 8),
                               Text(
                                 'Historial de Gastos',
-                                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                                style: Theme.of(context).textTheme.titleLarge
+                                    ?.copyWith(fontWeight: FontWeight.bold),
                               ),
                             ],
                           ),
                           ElevatedButton.icon(
                             onPressed: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => ExpenseFormPage(tripId: widget.tripId),
-                                ),
-                              ).then((_) => _loadTripAndExpenses());
+                              Navigator.of(context)
+                                  .push(
+                                    MaterialPageRoute(
+                                      builder: (_) => ExpenseFormPage(
+                                        tripId: widget.tripId,
+                                      ),
+                                    ),
+                                  )
+                                  .then((_) => _loadTripAndExpenses());
                             },
                             icon: const Icon(Icons.add, size: 18),
                             label: const Text('Registrar Gasto'),
@@ -473,11 +473,13 @@ class _TripDetailPageState extends State<TripDetailPage> {
                           ),
                         )
                       else
-                        ..._allExpenses.map((expense) => _buildExpenseItem(
-                              expense,
-                              dateFormat,
-                              currencyFormat,
-                            )),
+                        ..._allExpenses.map(
+                          (expense) => _buildExpenseItem(
+                            expense,
+                            dateFormat,
+                            currencyFormat,
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -506,9 +508,7 @@ class _TripDetailPageState extends State<TripDetailPage> {
         Expanded(
           child: Text(
             value,
-            style: const TextStyle(
-              color: AppColors.textPrimary,
-            ),
+            style: const TextStyle(color: AppColors.textPrimary),
           ),
         ),
       ],
@@ -556,9 +556,7 @@ class _TripDetailPageState extends State<TripDetailPage> {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       elevation: 1,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       child: Padding(
         padding: const EdgeInsets.all(12.0),
         child: Column(
@@ -581,12 +579,10 @@ class _TripDetailPageState extends State<TripDetailPage> {
                       const SizedBox(height: 4),
                       Text(
                         dateFormat.format(expense.date),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                       ),
-                      if (expense.description != null && expense.description!.isNotEmpty) ...[
+                      if (expense.description != null &&
+                          expense.description!.isNotEmpty) ...[
                         const SizedBox(height: 4),
                         Text(
                           expense.description!,
@@ -619,20 +615,26 @@ class _TripDetailPageState extends State<TripDetailPage> {
                         color: AppColors.accent,
                       ),
                     ),
-                    if (expense.receiptUrl != null && expense.receiptUrl!.isNotEmpty)
+                    if (expense.receiptUrl != null &&
+                        expense.receiptUrl!.isNotEmpty)
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           IconButton(
                             icon: const Icon(Icons.image, size: 20),
-                            onPressed: () => _showReceiptImage(expense.receiptUrl!),
+                            onPressed: () =>
+                                _showReceiptImage(expense.receiptUrl!),
                             tooltip: 'Ver recibo',
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(),
                           ),
                           IconButton(
                             icon: const Icon(Icons.download, size: 20),
-                            onPressed: () => _downloadReceiptImage(expense.receiptUrl!, expense.type, expense.date),
+                            onPressed: () => _downloadReceiptImage(
+                              expense.receiptUrl!,
+                              expense.type,
+                              expense.date,
+                            ),
                             tooltip: 'Descargar recibo',
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(),
@@ -686,9 +688,7 @@ class _TripDetailPageState extends State<TripDetailPage> {
                   },
                   loadingBuilder: (context, child, loadingProgress) {
                     if (loadingProgress == null) return child;
-                    return const Center(
-                      child: CircularProgressIndicator(),
-                    );
+                    return const Center(child: CircularProgressIndicator());
                   },
                 ),
               ),
@@ -699,7 +699,11 @@ class _TripDetailPageState extends State<TripDetailPage> {
     );
   }
 
-  void _downloadReceiptImage(String imageUrl, String expenseType, DateTime expenseDate) {
+  void _downloadReceiptImage(
+    String imageUrl,
+    String expenseType,
+    DateTime expenseDate,
+  ) {
     if (kIsWeb) {
       // En web, usar dart:html para descargar
       final dateStr = DateFormat('yyyy-MM-dd').format(expenseDate);
@@ -707,7 +711,7 @@ class _TripDetailPageState extends State<TripDetailPage> {
       html.AnchorElement(href: imageUrl)
         ..setAttribute('download', fileName)
         ..click();
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Descarga iniciada'),
@@ -719,7 +723,9 @@ class _TripDetailPageState extends State<TripDetailPage> {
       // En móvil, abrir la URL
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('En dispositivos móviles, toca la imagen para descargarla'),
+          content: Text(
+            'En dispositivos móviles, toca la imagen para descargarla',
+          ),
           backgroundColor: Colors.blue,
           duration: Duration(seconds: 3),
         ),
@@ -805,9 +811,7 @@ class _TripDetailPageState extends State<TripDetailPage> {
                   },
                   loadingBuilder: (context, child, loadingProgress) {
                     if (loadingProgress == null) return child;
-                    return const Center(
-                      child: CircularProgressIndicator(),
-                    );
+                    return const Center(child: CircularProgressIndicator());
                   },
                 ),
               ),
@@ -864,7 +868,10 @@ class _TripDetailPageState extends State<TripDetailPage> {
                 SizedBox(
                   width: 20,
                   height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white)),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
                 ),
                 SizedBox(width: 16),
                 Text('Descargando imagen...'),
@@ -880,7 +887,7 @@ class _TripDetailPageState extends State<TripDetailPage> {
           // Crear un Blob con los bytes
           final blob = html.Blob([response.bodyBytes]);
           final url = html.Url.createObjectUrlFromBlob(blob);
-          
+
           // Crear un elemento anchor y descargar
           final dateStr = remittance.createdAt != null
               ? DateFormat('yyyy-MM-dd').format(remittance.createdAt!)
@@ -889,10 +896,10 @@ class _TripDetailPageState extends State<TripDetailPage> {
           html.AnchorElement(href: url)
             ..setAttribute('download', fileName)
             ..click();
-          
+
           // Limpiar la URL del objeto
           html.Url.revokeObjectUrl(url);
-          
+
           if (mounted) {
             ScaffoldMessenger.of(context).hideCurrentSnackBar();
             ScaffoldMessenger.of(context).showSnackBar(
@@ -928,4 +935,3 @@ class _TripDetailPageState extends State<TripDetailPage> {
     }
   }
 }
-

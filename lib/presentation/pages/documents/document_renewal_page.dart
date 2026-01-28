@@ -7,15 +7,11 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:pai_app/core/theme/app_colors.dart';
 import 'package:pai_app/data/repositories/document_repository_impl.dart';
 import 'package:pai_app/domain/entities/document_entity.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 class DocumentRenewalPage extends StatefulWidget {
   final DocumentEntity document;
 
-  const DocumentRenewalPage({
-    super.key,
-    required this.document,
-  });
+  const DocumentRenewalPage({super.key, required this.document});
 
   @override
   State<DocumentRenewalPage> createState() => _DocumentRenewalPageState();
@@ -34,9 +30,7 @@ class _DocumentRenewalPageState extends State<DocumentRenewalPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Renovar ${widget.document.documentType}'),
-      ),
+      appBar: AppBar(title: Text('Renovar ${widget.document.documentType}')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Form(
@@ -54,9 +48,8 @@ class _DocumentRenewalPageState extends State<DocumentRenewalPage> {
                     children: [
                       Text(
                         'Documento Actual',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 8),
                       Text(
@@ -67,28 +60,30 @@ class _DocumentRenewalPageState extends State<DocumentRenewalPage> {
                       Text(
                         'Expira: ${DateFormat('dd/MM/yyyy').format(widget.document.expirationDate)}',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: widget.document.isExpired
-                                  ? Colors.red
-                                  : widget.document.isExpiringSoon
-                                      ? Colors.orange
-                                      : AppColors.textSecondary,
-                              fontWeight: widget.document.isExpired || widget.document.isExpiringSoon
-                                  ? FontWeight.bold
-                                  : FontWeight.normal,
-                            ),
+                          color: widget.document.isExpired
+                              ? Colors.red
+                              : widget.document.isExpiringSoon
+                              ? Colors.orange
+                              : AppColors.textSecondary,
+                          fontWeight:
+                              widget.document.isExpired ||
+                                  widget.document.isExpiringSoon
+                              ? FontWeight.bold
+                              : FontWeight.normal,
+                        ),
                       ),
                     ],
                   ),
                 ),
               ),
               const SizedBox(height: 24),
-              
+
               // Nueva fecha de expiración
               Text(
                 'Nueva Fecha de Expiración *',
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
               InkWell(
@@ -101,12 +96,17 @@ class _DocumentRenewalPageState extends State<DocumentRenewalPage> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.calendar_today, color: AppColors.textSecondary),
+                      const Icon(
+                        Icons.calendar_today,
+                        color: AppColors.textSecondary,
+                      ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
                           _newExpirationDate != null
-                              ? DateFormat('dd/MM/yyyy').format(_newExpirationDate!)
+                              ? DateFormat(
+                                  'dd/MM/yyyy',
+                                ).format(_newExpirationDate!)
                               : 'Seleccionar fecha',
                           style: TextStyle(
                             color: _newExpirationDate != null
@@ -124,10 +124,7 @@ class _DocumentRenewalPageState extends State<DocumentRenewalPage> {
                   padding: const EdgeInsets.only(top: 4, left: 4),
                   child: Text(
                     'La fecha de expiración es obligatoria',
-                    style: TextStyle(
-                      color: Colors.red[700],
-                      fontSize: 12,
-                    ),
+                    style: TextStyle(color: Colors.red[700], fontSize: 12),
                   ),
                 ),
               const SizedBox(height: 24),
@@ -135,9 +132,9 @@ class _DocumentRenewalPageState extends State<DocumentRenewalPage> {
               // Nueva imagen del documento
               Text(
                 'Nueva Imagen del Documento *',
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
               if (_selectedImage != null || _selectedXFile != null)
@@ -178,10 +175,7 @@ class _DocumentRenewalPageState extends State<DocumentRenewalPage> {
                   padding: const EdgeInsets.only(top: 4, left: 4),
                   child: Text(
                     'La imagen del documento es obligatoria',
-                    style: TextStyle(
-                      color: Colors.red[700],
-                      fontSize: 12,
-                    ),
+                    style: TextStyle(color: Colors.red[700], fontSize: 12),
                   ),
                 ),
               const SizedBox(height: 32),
@@ -201,7 +195,9 @@ class _DocumentRenewalPageState extends State<DocumentRenewalPage> {
                           width: 24,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
                           ),
                         )
                       : const Text(
@@ -223,7 +219,8 @@ class _DocumentRenewalPageState extends State<DocumentRenewalPage> {
   Future<void> _selectExpirationDate() async {
     final picked = await showDatePicker(
       context: context,
-      initialDate: _newExpirationDate ?? DateTime.now().add(const Duration(days: 365)),
+      initialDate:
+          _newExpirationDate ?? DateTime.now().add(const Duration(days: 365)),
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 3650)), // 10 años
       helpText: 'Seleccionar nueva fecha de expiración',
@@ -238,7 +235,9 @@ class _DocumentRenewalPageState extends State<DocumentRenewalPage> {
 
   Future<void> _pickImage() async {
     if (kIsWeb) {
-      final pickedFile = await _imagePicker.pickImage(source: ImageSource.gallery);
+      final pickedFile = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+      );
       if (pickedFile != null) {
         setState(() {
           _selectedXFile = pickedFile;
@@ -263,7 +262,9 @@ class _DocumentRenewalPageState extends State<DocumentRenewalPage> {
         }
       }
 
-      final pickedFile = await _imagePicker.pickImage(source: ImageSource.gallery);
+      final pickedFile = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+      );
       if (pickedFile != null) {
         setState(() {
           _selectedImage = File(pickedFile.path);
@@ -309,25 +310,28 @@ class _DocumentRenewalPageState extends State<DocumentRenewalPage> {
 
       if (kIsWeb && _selectedXFile != null) {
         imageBytes = await _selectedXFile!.readAsBytes();
-        fileName = 'document_${widget.document.id}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        fileName =
+            'document_${widget.document.id}_${DateTime.now().millisecondsSinceEpoch}.jpg';
       } else if (_selectedImage != null) {
         imageBytes = await _selectedImage!.readAsBytes();
-        fileName = 'document_${widget.document.id}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        fileName =
+            'document_${widget.document.id}_${DateTime.now().millisecondsSinceEpoch}.jpg';
       } else {
         throw Exception('No se seleccionó ninguna imagen');
       }
 
-      final uploadResult = await _documentRepository.uploadDocumentImage(imageBytes, fileName);
+      final uploadResult = await _documentRepository.uploadDocumentImage(
+        imageBytes,
+        fileName,
+      );
       final imageUrl = uploadResult.fold(
         (failure) => throw Exception(failure.message),
         (url) => url,
       );
 
       // 2. Crear el nuevo documento
-      final currentUser = Supabase.instance.client.auth.currentUser;
-      if (currentUser == null) {
-        throw Exception('Usuario no autenticado');
-      }
+      // TODO: Obtener usuario actual desde backend
+      const currentUserId = 'user@example.com';
 
       final newDocument = DocumentEntity(
         vehicleId: widget.document.vehicleId,
@@ -335,7 +339,7 @@ class _DocumentRenewalPageState extends State<DocumentRenewalPage> {
         documentType: widget.document.documentType,
         expirationDate: _newExpirationDate!,
         documentUrl: imageUrl,
-        createdBy: currentUser.id,
+        createdBy: currentUserId,
         isArchived: false,
       );
 
@@ -386,4 +390,3 @@ class _DocumentRenewalPageState extends State<DocumentRenewalPage> {
     }
   }
 }
-

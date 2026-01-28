@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:pai_app/core/theme/app_colors.dart';
 import 'package:pai_app/data/repositories/expense_repository_impl.dart';
 import 'package:pai_app/data/repositories/trip_repository_impl.dart';
@@ -14,7 +13,8 @@ import 'package:pai_app/domain/entities/trip_entity.dart';
 
 class ExpenseFormPage extends StatefulWidget {
   final ExpenseEntity? expense;
-  final String? tripId; // ID del viaje seleccionado (viene de TripSelectionPage)
+  final String?
+  tripId; // ID del viaje seleccionado (viene de TripSelectionPage)
 
   const ExpenseFormPage({
     super.key,
@@ -47,7 +47,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
   List<ExpenseEntity> _driverExpenses = [];
   bool _isLoadingExpenses = false;
 
-  // Tipos de gasto (columna type en Supabase)
+  // Tipos de gasto (columna type en PostgreSQL)
   static const List<String> _expenseTypes = [
     'Combustible',
     'Comida',
@@ -61,7 +61,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
   @override
   void initState() {
     super.initState();
-    
+
     // Si viene tripId, usarlo directamente; si no, cargar viajes
     if (widget.tripId != null) {
       _selectedTripId = widget.tripId;
@@ -71,7 +71,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
       // Solo cargar viajes si no viene tripId y no es edición
       _loadActiveRoutes();
     }
-    
+
     if (widget.expense != null) {
       _selectedTripId = widget.expense!.tripId;
       _amountController.text = widget.expense!.amount.toStringAsFixed(0);
@@ -92,22 +92,20 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
 
   Future<void> _loadDriverExpenses() async {
     final tripId = widget.tripId ?? _selectedTripId;
-    final currentUserId = Supabase.instance.client.auth.currentUser?.id;
-    
-    if (tripId == null || tripId.isEmpty || currentUserId == null) {
-      setState(() {
-        _driverExpenses = [];
-        _isLoadingExpenses = false;
-      });
-      return;
-    }
+    // TODO: Reemplazar por usuario actual de API REST PostgreSQL
+    const currentUserId = 'user@example.com';
+
+    if (tripId == null) return;
 
     setState(() {
       _isLoadingExpenses = true;
     });
 
-    final result = await _expenseRepository.getExpensesByTripIdAndDriver(tripId, currentUserId);
-    
+    final result = await _expenseRepository.getExpensesByTripIdAndDriver(
+      tripId,
+      currentUserId, // Reemplazar por usuario actual de API REST PostgreSQL
+    );
+
     result.fold(
       (failure) {
         if (mounted) {
@@ -163,7 +161,8 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
           final now = DateTime.now();
           final activeTrips = trips.where((trip) {
             if (trip.endDate == null) return true;
-            return trip.endDate!.isAfter(now) || trip.endDate!.isAtSameMomentAs(now);
+            return trip.endDate!.isAfter(now) ||
+                trip.endDate!.isAtSameMomentAs(now);
           }).toList();
 
           setState(() {
@@ -182,7 +181,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
     final typeSelected = _selectedType != null && _selectedType!.isNotEmpty;
     final dateSelected = _selectedDate != null;
     final isValid = formValid && tripSelected && typeSelected && dateSelected;
-    
+
     if (_isFormValid != isValid) {
       setState(() {
         _isFormValid = isValid;
@@ -233,7 +232,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
   Future<void> _pickImage() async {
     try {
       ImageSource source;
-      
+
       // En web, solo usar galería (la cámara no funciona)
       if (kIsWeb) {
         source = ImageSource.gallery;
@@ -264,7 +263,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
             ),
           ),
         );
-        
+
         if (selectedSource == null) return;
         source = selectedSource;
       }
@@ -284,7 +283,8 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
           if (!kIsWeb) {
             _selectedImage = File(image.path);
           }
-          _existingImageUrl = null; // Limpiar URL existente si se selecciona nueva imagen
+          _existingImageUrl =
+              null; // Limpiar URL existente si se selecciona nueva imagen
         });
       }
     } catch (e) {
@@ -368,9 +368,11 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
         // En web, usar los bytes del XFile directamente
         if (kIsWeb && _selectedXFile != null) {
           final fileBytes = await _selectedXFile!.readAsBytes();
-          final fileName = '${DateTime.now().millisecondsSinceEpoch}_${_selectedXFile!.name}';
-          
-          final uploadResult = await _expenseRepository.uploadReceiptImageFromBytes(fileBytes, fileName);
+          final fileName =
+              '${DateTime.now().millisecondsSinceEpoch}_${_selectedXFile!.name}';
+
+          final uploadResult = await _expenseRepository
+              .uploadReceiptImageFromBytes(fileBytes, fileName);
           uploadResult.fold(
             (failure) {
               throw Exception(failure.message);
@@ -381,7 +383,9 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
           );
         } else if (_selectedImage != null) {
           // En móvil, usar el path del File
-          final uploadResult = await _expenseRepository.uploadReceiptImage(_selectedImage!.path);
+          final uploadResult = await _expenseRepository.uploadReceiptImage(
+            _selectedImage!.path,
+          );
           uploadResult.fold(
             (failure) {
               throw Exception(failure.message);
@@ -393,9 +397,9 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
         }
       }
 
-      // Obtener el driver_id del usuario actual (auth.uid())
-      final currentUserId = Supabase.instance.client.auth.currentUser?.id;
-      
+      // TODO: Reemplazar por usuario actual de API REST PostgreSQL
+      final currentUserId = 'user_123456789';
+
       final expense = ExpenseEntity(
         id: widget.expense?.id,
         tripId: _selectedTripId!,
@@ -438,10 +442,10 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
                 behavior: SnackBarBehavior.floating,
               ),
             );
-            
+
             // Recargar gastos después de guardar
             await _loadDriverExpenses();
-            
+
             // Si es edición, cerrar la página; si es nuevo, mantenerla abierta
             if (widget.expense != null) {
               Navigator.of(context).pop(savedExpense);
@@ -475,7 +479,10 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
 
   Widget _buildExpensesHistorySection() {
     final dateFormat = DateFormat('dd/MM/yyyy');
-    final currencyFormat = NumberFormat.currency(symbol: '\$', decimalDigits: 0);
+    final currencyFormat = NumberFormat.currency(
+      symbol: '\$',
+      decimalDigits: 0,
+    );
     final totalAmount = _driverExpenses.fold<double>(
       0.0,
       (sum, expense) => sum + expense.amount,
@@ -483,9 +490,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
 
     return Card(
       elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -498,8 +503,8 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
                 Text(
                   'Mis Gastos Registrados',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ],
             ),
@@ -509,56 +514,52 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
             else if (_driverExpenses.isEmpty)
               Text(
                 'No hay gastos registrados para este viaje',
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontSize: 14,
-                ),
+                style: TextStyle(color: Colors.grey[600], fontSize: 14),
               )
             else ...[
-              ..._driverExpenses.map((expense) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                expense.type,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w500,
-                                ),
+              ..._driverExpenses.map(
+                (expense) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              expense.type,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w500,
                               ),
-                              Text(
-                                dateFormat.format(expense.date),
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey[600],
-                                ),
+                            ),
+                            Text(
+                              dateFormat.format(expense.date),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
-                        Text(
-                          currencyFormat.format(expense.amount),
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.accent,
-                          ),
+                      ),
+                      Text(
+                        currencyFormat.format(expense.amount),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.accent,
                         ),
-                      ],
-                    ),
-                  )),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
               const Divider(),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text(
                     'Total:',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                   Text(
                     currencyFormat.format(totalAmount),
@@ -578,7 +579,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
   }
 
   String _getTripDisplayName(TripEntity trip) {
-    final dateStr = trip.startDate != null 
+    final dateStr = trip.startDate != null
         ? DateFormat('dd/MM/yyyy').format(trip.startDate!)
         : 'Sin fecha';
     return '${trip.origin} → ${trip.destination} ($dateStr)';
@@ -589,35 +590,22 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
       // En web, usar los bytes del XFile
       if (kIsWeb) {
         final bytes = await _selectedXFile!.readAsBytes();
-        return Image.memory(
-          bytes,
-          fit: BoxFit.cover,
-        );
+        return Image.memory(bytes, fit: BoxFit.cover);
       } else if (_selectedImage != null) {
-        return Image.file(
-          _selectedImage!,
-          fit: BoxFit.cover,
-        );
+        return Image.file(_selectedImage!, fit: BoxFit.cover);
       }
     } else if (_selectedImage != null) {
-      return Image.file(
-        _selectedImage!,
-        fit: BoxFit.cover,
-      );
+      return Image.file(_selectedImage!, fit: BoxFit.cover);
     } else if (_existingImageUrl != null) {
       return Image.network(
         _existingImageUrl!,
         fit: BoxFit.cover,
         errorBuilder: (context, error, stackTrace) {
-          return const Center(
-            child: Icon(Icons.error, color: Colors.red),
-          );
+          return const Center(child: Icon(Icons.error, color: Colors.red));
         },
         loadingBuilder: (context, child, loadingProgress) {
           if (loadingProgress == null) return child;
-          return const Center(
-            child: CircularProgressIndicator(),
-          );
+          return const Center(child: CircularProgressIndicator());
         },
       );
     }
@@ -655,21 +643,21 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
                           const DropdownMenuItem<String>(
                             value: null,
                             child: Text('Cargando viajes...'),
-                          )
+                          ),
                         ]
                       : _activeTrips.isEmpty
-                          ? [
-                              const DropdownMenuItem<String>(
-                                value: null,
-                                child: Text('No hay viajes disponibles'),
-                              )
-                            ]
-                          : _activeTrips.map((trip) {
-                              return DropdownMenuItem<String>(
-                                value: trip.id,
-                                child: Text(_getTripDisplayName(trip)),
-                              );
-                            }).toList(),
+                      ? [
+                          const DropdownMenuItem<String>(
+                            value: null,
+                            child: Text('No hay viajes disponibles'),
+                          ),
+                        ]
+                      : _activeTrips.map((trip) {
+                          return DropdownMenuItem<String>(
+                            value: trip.id,
+                            child: Text(_getTripDisplayName(trip)),
+                          );
+                        }).toList(),
                   onChanged: (value) {
                     setState(() {
                       _selectedTripId = value;
@@ -728,7 +716,9 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
                 inputFormatters: [
                   FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
                 ],
@@ -807,7 +797,9 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
                       ),
                     ),
                   ),
-                  if (_selectedXFile != null || _selectedImage != null || _existingImageUrl != null) ...[
+                  if (_selectedXFile != null ||
+                      _selectedImage != null ||
+                      _existingImageUrl != null) ...[
                     const SizedBox(width: 8),
                     IconButton(
                       onPressed: _removeImage,
@@ -820,7 +812,9 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
               const SizedBox(height: 12),
 
               // Miniatura de la foto
-              if (_selectedXFile != null || _selectedImage != null || _existingImageUrl != null)
+              if (_selectedXFile != null ||
+                  _selectedImage != null ||
+                  _existingImageUrl != null)
                 FutureBuilder<Widget>(
                   future: _buildImagePreview(),
                   builder: (context, snapshot) {
@@ -832,9 +826,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(color: AppColors.lightGray),
                         ),
-                        child: const Center(
-                          child: CircularProgressIndicator(),
-                        ),
+                        child: const Center(child: CircularProgressIndicator()),
                       );
                     }
                     return Container(
@@ -879,8 +871,9 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
                           width: 24,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor:
-                                AlwaysStoppedAnimation<Color>(Colors.white),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
                           ),
                         )
                       : const Text(
@@ -900,4 +893,3 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
     );
   }
 }
-

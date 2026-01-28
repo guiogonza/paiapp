@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:pai_app/core/theme/app_colors.dart';
 
 /// Dashboard confidencial de Super Admin para analítica y monitoreo del MVP
@@ -8,11 +7,11 @@ class SuperAdminDashboardPage extends StatefulWidget {
   const SuperAdminDashboardPage({super.key});
 
   @override
-  State<SuperAdminDashboardPage> createState() => _SuperAdminDashboardPageState();
+  State<SuperAdminDashboardPage> createState() =>
+      _SuperAdminDashboardPageState();
 }
 
 class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
-  final SupabaseClient _supabase = Supabase.instance.client;
   bool _isLoading = true;
   Map<String, dynamic> _kpis = {};
 
@@ -28,94 +27,102 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     });
 
     try {
-      // KPI 1: Flota Operativa Real
-      final assignedVehiclesResult = await _supabase
-          .from('profiles')
-          .select('assigned_vehicle_id')
-          .not('assigned_vehicle_id', 'is', null);
-      final assignedCount = (assignedVehiclesResult as List).length;
+      // TODO: Migrar toda la lógica de consultas a API REST PostgreSQL
+      // Ejemplo: final assignedVehiclesResult = await apiClient.getAssignedVehicles(userId);
+      // Repetir para cada consulta que usaba _supabase
 
-      final totalVehiclesResult = await _supabase
-          .from('vehicles')
-          .select('id');
-      final totalVehicles = (totalVehiclesResult as List).length;
+      // KPI 1: Flota Operativa Real
+      // final assignedVehiclesResult = await _supabase
+      //     .from('profiles')
+      //     .select('assigned_vehicle_id')
+      //     .not('assigned_vehicle_id', 'is', null);
+      // final assignedCount = (assignedVehiclesResult as List).length;
+
+      // final totalVehiclesResult = await _supabase.from('vehicles').select('id');
+      // final totalVehicles = (totalVehiclesResult as List).length;
 
       // KPI 2: Tasa de Registro de Gastos
       // Primero obtener todos los trip_id únicos de expenses
-      final expensesResult = await _supabase
-          .from('expenses')
-          .select('trip_id');
-      final tripIdsWithExpenses = (expensesResult as List)
-          .map((e) => e['trip_id'] as String)
-          .toSet()
-          .toList();
-      final routesWithExpenses = tripIdsWithExpenses.length;
+      // final expensesResult = await _supabase.from('expenses').select('trip_id');
+      // final tripIdsWithExpenses = (expensesResult as List)
+      //     .map((e) => e['trip_id'] as String)
+      //     .toSet()
+      //     .toList();
+      // final routesWithExpenses = tripIdsWithExpenses.length;
 
-      final totalRoutesResult = await _supabase
-          .from('routes')
-          .select('id');
-      final totalRoutes = (totalRoutesResult as List).length;
-      final expenseRate = totalRoutes > 0 ? (routesWithExpenses / totalRoutes * 100) : 0.0;
+      // final totalRoutesResult = await _supabase.from('routes').select('id');
+      // final totalRoutes = (totalRoutesResult as List).length;
+      // final expenseRate = totalRoutes > 0
+      //     ? (routesWithExpenses / totalRoutes * 100)
+      //     : 0.0;
 
       // KPI 3: Intensidad de Uso (Excluyendo Login)
-      final sevenDaysAgo = DateTime.now().subtract(const Duration(days: 7)).toIso8601String();
-      final usageLogsResult = await _supabase
-          .from('app_logs')
-          .select('id')
-          .neq('action', 'login')
-          .gte('created_at', sevenDaysAgo);
-      final usageIntensity = (usageLogsResult as List).length;
+      // final sevenDaysAgo = DateTime.now()
+      //     .subtract(const Duration(days: 7))
+      //     .toIso8601String();
+      // final usageLogsResult = await _supabase
+      //     .from('app_logs')
+      //     .select('id')
+      //     .neq('action', 'login')
+      //     .gte('created_at', sevenDaysAgo);
+      // final usageIntensity = (usageLogsResult as List).length;
 
       // KPI 4: Ratio Disciplinario
-      final memosResult = await _supabase
-          .from('remittances')
-          .select('id');
-      final totalMemos = (memosResult as List).length;
-      final disciplinaryRatio = totalRoutes > 0 ? (totalMemos / totalRoutes) : 0.0;
+      // final memosResult = await _supabase.from('remittances').select('id');
+      // final totalMemos = (memosResult as List).length;
+      // final disciplinaryRatio = totalRoutes > 0
+      //     ? (totalMemos / totalRoutes)
+      //     : 0.0;
 
       // KPI 5: Conductores Activos (Health Check)
-      final fortyEightHoursAgo = DateTime.now().subtract(const Duration(hours: 48)).toIso8601String();
-      final activeDriversResult = await _supabase
-          .from('app_logs')
-          .select('user_id')
-          .gte('created_at', fortyEightHoursAgo);
-      final activeDriverIds = (activeDriversResult as List)
-          .map((e) => e['user_id'] as String)
-          .toSet()
-          .toList();
+      // final fortyEightHoursAgo = DateTime.now()
+      //     .subtract(const Duration(hours: 48))
+      //     .toIso8601String();
+      // final activeDriversResult = await _supabase
+      //     .from('app_logs')
+      //     .select('user_id')
+      //     .gte('created_at', fortyEightHoursAgo);
+      // final activeDriverIds = (activeDriversResult as List)
+      //     .map((e) => e['user_id'] as String)
+      //     .toSet()
+      //     .toList();
 
       // Verificar que sean conductores
       // Filtrar los IDs que son conductores
-      final driversResult = await _supabase
-          .from('profiles')
-          .select('id')
-          .eq('role', 'driver');
-      final driverIds = (driversResult as List)
-          .map((e) => e['id'] as String)
-          .toSet();
+      // final driversResult = await _supabase
+      //     .from('profiles')
+      //     .select('id')
+      //     .eq('role', 'driver');
+      // final driverIds = (driversResult as List)
+      //     .map((e) => e['id'] as String)
+      //     .toSet();
       // Contar cuántos de los conductores activos están en la lista de conductores
-      final activeDrivers = activeDriverIds.where((id) => driverIds.contains(id)).length;
+      // final activeDrivers = activeDriverIds
+      //     .where((id) => driverIds.contains(id))
+      //     .length;
 
       // KPI 6: Cobertura de Mantenimiento
-      final vehiclesWithMaintenanceResult = await _supabase
-          .from('maintenance')
-          .select('vehicle_id');
-      final vehiclesWithMaintenance = (vehiclesWithMaintenanceResult as List)
-          .map((e) => e['vehicle_id'] as String)
-          .toSet()
-          .toList()
-          .length;
-      final maintenanceCoverage = totalVehicles > 0 ? (vehiclesWithMaintenance / totalVehicles * 100) : 0.0;
+      // final vehiclesWithMaintenanceResult = await _supabase
+      //     .from('maintenance')
+      //     .select('vehicle_id');
+      // final vehiclesWithMaintenance = (vehiclesWithMaintenanceResult as List)
+      //     .map((e) => e['vehicle_id'] as String)
+      //     .toSet()
+      //     .toList()
+      //     .length;
+      // final maintenanceCoverage = totalVehicles > 0
+      //     ? (vehiclesWithMaintenance / totalVehicles * 100)
+      //     : 0.0;
 
       setState(() {
         _kpis = {
-          'assignedVehicles': assignedCount,
-          'totalVehicles': totalVehicles,
-          'expenseRate': expenseRate,
-          'usageIntensity': usageIntensity,
-          'disciplinaryRatio': disciplinaryRatio,
-          'activeDrivers': activeDrivers,
-          'maintenanceCoverage': maintenanceCoverage,
+          'assignedVehicles': 0,
+          'totalVehicles': 0,
+          'expenseRate': 0.0,
+          'usageIntensity': 0,
+          'disciplinaryRatio': 0.0,
+          'activeDrivers': 0,
+          'maintenanceCoverage': 0.0,
         };
         _isLoading = false;
       });
@@ -202,7 +209,11 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.security, color: Colors.red, size: 20),
+                          const Icon(
+                            Icons.security,
+                            color: Colors.red,
+                            size: 20,
+                          ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
@@ -231,14 +242,16 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                         _buildKPICard(
                           icon: Icons.directions_car,
                           title: 'Flota Operativa',
-                          value: '${_kpis['assignedVehicles'] ?? 0}/${_kpis['totalVehicles'] ?? 0}',
+                          value:
+                              '${_kpis['assignedVehicles'] ?? 0}/${_kpis['totalVehicles'] ?? 0}',
                           color: Colors.blue,
                         ),
                         // KPI 2: Tasa de Registro de Gastos
                         _buildKPICard(
                           icon: Icons.receipt,
                           title: 'Tasa de Gastos',
-                          value: '${(_kpis['expenseRate'] ?? 0.0).toStringAsFixed(1)}%',
+                          value:
+                              '${(_kpis['expenseRate'] ?? 0.0).toStringAsFixed(1)}%',
                           color: Colors.green,
                         ),
                         // KPI 3: Intensidad de Uso
@@ -252,7 +265,8 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                         _buildKPICard(
                           icon: Icons.warning,
                           title: 'Ratio Disciplinario',
-                          value: '${(_kpis['disciplinaryRatio'] ?? 0.0).toStringAsFixed(2)}',
+                          value:
+                              '${(_kpis['disciplinaryRatio'] ?? 0.0).toStringAsFixed(2)}',
                           color: Colors.red,
                         ),
                         // KPI 5: Conductores Activos
@@ -266,7 +280,8 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                         _buildKPICard(
                           icon: Icons.build,
                           title: 'Cobertura Mantenimiento',
-                          value: '${(_kpis['maintenanceCoverage'] ?? 0.0).toStringAsFixed(1)}%',
+                          value:
+                              '${(_kpis['maintenanceCoverage'] ?? 0.0).toStringAsFixed(1)}%',
                           color: Colors.teal,
                         ),
                       ],
@@ -278,4 +293,3 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     );
   }
 }
-

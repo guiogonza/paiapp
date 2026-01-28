@@ -49,14 +49,18 @@ class _TripFormPageState extends State<TripFormPage> {
     super.initState();
     _startDate = widget.trip?.startDate ?? DateTime.now(); // Por defecto hoy
     _loadVehicles();
+    _loadMunicipalities(); // Precargar municipios
     if (widget.trip != null) {
       _selectedVehicleId = widget.trip!.vehicleId;
       _driverNameController.text = widget.trip!.driverName;
       _clientNameController.text = widget.trip!.clientName;
       _originController.text = widget.trip!.origin;
       _destinationController.text = widget.trip!.destination;
-      _revenueAmountController.text = widget.trip!.revenueAmount.toStringAsFixed(0);
-      _budgetAmountController.text = widget.trip!.budgetAmount.toStringAsFixed(0);
+      _revenueAmountController.text = widget.trip!.revenueAmount
+          .toStringAsFixed(0);
+      _budgetAmountController.text = widget.trip!.budgetAmount.toStringAsFixed(
+        0,
+      );
       _endDate = widget.trip!.endDate;
     }
     _loadUserAndDrivers();
@@ -71,6 +75,20 @@ class _TripFormPageState extends State<TripFormPage> {
     _destinationController.addListener(_validateForm);
     _revenueAmountController.addListener(_validateForm);
     _budgetAmountController.addListener(_validateForm);
+  }
+
+  /// Precarga los municipios al iniciar la página
+  Future<void> _loadMunicipalities() async {
+    try {
+      print('🏙️ [TripForm] Precargando municipios...');
+      final municipalities = await _municipalitiesService.loadMunicipalities();
+      print(
+        '🏙️ [TripForm] ${municipalities.length} municipios precargados exitosamente',
+      );
+    } catch (e, stackTrace) {
+      print('❌ [TripForm] Error al precargar municipios: $e');
+      print('   Stack: $stackTrace');
+    }
   }
 
   @override
@@ -113,8 +131,8 @@ class _TripFormPageState extends State<TripFormPage> {
 
       if (!_isCurrentUserDriver) {
         // Owner: cargar lista de conductores con vehículo asignado
-        final driversResult =
-            await _profileRepository.getDriversWithAssignedVehicle();
+        final driversResult = await _profileRepository
+            .getDriversWithAssignedVehicle();
         driversResult.fold(
           (failure) {
             if (mounted) {
@@ -125,7 +143,8 @@ class _TripFormPageState extends State<TripFormPage> {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(
-                      'Error al cargar conductores: ${failure.message}'),
+                    'Error al cargar conductores: ${failure.message}',
+                  ),
                   backgroundColor: Colors.red,
                 ),
               );
@@ -165,28 +184,28 @@ class _TripFormPageState extends State<TripFormPage> {
   /// Carga el vehículo asignado al conductor actual (por id) y
   /// lo agrega a la lista local para poder mostrar la placa.
   Future<void> _loadVehicleForCurrentDriver(String vehicleId) async {
+    // Validar que el ID sea numérico válido
+    final numericId = int.tryParse(vehicleId);
+    if (numericId == null || numericId <= 0) {
+      print('⚠️ ID de vehículo inválido: $vehicleId - Ignorando carga');
+      return;
+    }
+
     final result = await _vehicleRepository.getVehicleById(vehicleId);
 
     result.fold(
       (failure) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'No se pudo cargar el vehículo asignado: ${failure.message}',
-              ),
-              backgroundColor: Colors.red,
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
+        print('⚠️ No se pudo cargar vehículo $vehicleId: ${failure.message}');
+        // No mostrar SnackBar aquí para evitar spam de errores
+        // El usuario puede seleccionar otro vehículo manualmente
       },
       (vehicle) {
         if (!mounted) return;
         setState(() {
           // Actualizar o agregar el vehículo a la lista local
-          final index =
-              _vehicles.indexWhere((v) => v.id != null && v.id == vehicle.id);
+          final index = _vehicles.indexWhere(
+            (v) => v.id != null && v.id == vehicle.id,
+          );
           if (index >= 0) {
             _vehicles[index] = vehicle;
           } else {
@@ -345,15 +364,20 @@ class _TripFormPageState extends State<TripFormPage> {
     });
 
     try {
-      final revenueAmount = double.tryParse(_revenueAmountController.text.trim());
+      final revenueAmount = double.tryParse(
+        _revenueAmountController.text.trim(),
+      );
       if (revenueAmount == null || revenueAmount <= 0) {
-        throw Exception('El monto de ingreso debe ser un número válido mayor a 0');
+        throw Exception(
+          'El monto de ingreso debe ser un número válido mayor a 0',
+        );
       }
 
       final budgetAmount = double.tryParse(_budgetAmountController.text.trim());
       if (budgetAmount == null || budgetAmount <= 0) {
         throw Exception(
-            'El anticipo de viaje debe ser un número válido mayor a 0');
+          'El anticipo de viaje debe ser un número válido mayor a 0',
+        );
       }
 
       final trip = TripEntity(
@@ -496,8 +520,7 @@ class _TripFormPageState extends State<TripFormPage> {
                           final email = driver.email ?? '';
                           final fullName = driver.fullName ?? '';
                           final hasName = fullName.trim().isNotEmpty;
-                          final label =
-                              hasName ? '$fullName ($email)' : email;
+                          final label = hasName ? '$fullName ($email)' : email;
                           return DropdownMenuItem<String>(
                             value: driver.id,
                             child: Text(label),
@@ -512,6 +535,14 @@ class _TripFormPageState extends State<TripFormPage> {
                       );
                       _driverNameController.text = selected.email ?? '';
                       _selectedVehicleId = selected.assignedVehicleId;
+
+                      // Cargar el vehículo asignado al conductor seleccionado
+                      if (selected.assignedVehicleId != null &&
+                          selected.assignedVehicleId!.isNotEmpty) {
+                        _loadVehicleForCurrentDriver(
+                          selected.assignedVehicleId!,
+                        );
+                      }
                     });
                     _validateForm();
                   },
@@ -570,20 +601,28 @@ class _TripFormPageState extends State<TripFormPage> {
               ),
               const SizedBox(height: 20),
 
-              // Origen - Obligatorio con Autocomplete
+              // Origen - Obligatorio con Autocomplete OPTIMIZADO
               Autocomplete<String>(
                 optionsBuilder: (TextEditingValue textEditingValue) async {
                   final query = textEditingValue.text.trim();
+
                   if (query.isEmpty || query.length < 2) {
-                    // No mostrar sugerencias hasta que haya al menos 2 caracteres
                     return const Iterable<String>.empty();
                   }
+
+                  // DEBOUNCE: Esperar 300ms para evitar búsquedas innecesarias
+                  await Future.delayed(const Duration(milliseconds: 300));
+
+                  // Verificar si el query cambió durante el debounce
+                  if (query != textEditingValue.text.trim()) {
+                    return const Iterable<String>.empty();
+                  }
+
                   try {
                     final suggestions = await _municipalitiesService
                         .searchMunicipalities(query);
                     return suggestions;
                   } catch (e) {
-                    print('❌ Error al buscar municipios: $e');
                     return const Iterable<String>.empty();
                   }
                 },
@@ -591,48 +630,52 @@ class _TripFormPageState extends State<TripFormPage> {
                   _originController.text = selection;
                   _validateForm();
                 },
-                fieldViewBuilder: (
-                  BuildContext context,
-                  TextEditingController textEditingController,
-                  FocusNode focusNode,
-                  VoidCallback onFieldSubmitted,
-                ) {
-                  // Sincronizar el controller externo con el interno del Autocomplete
-                  if (textEditingController.text != _originController.text) {
-                    textEditingController.text = _originController.text;
-                  }
-                  _originController.addListener(() {
-                    if (textEditingController.text != _originController.text) {
-                      textEditingController.text = _originController.text;
-                    }
-                  });
-                  
-                  return TextFormField(
-                    controller: textEditingController,
-                    focusNode: focusNode,
-                    decoration: InputDecoration(
-                      labelText: 'Origen *',
-                      hintText: 'Escribe el municipio de origen',
-                      prefixIcon: const Icon(Icons.place),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      helperText: 'Se mostrarán sugerencias mientras escribes',
-                    ),
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'El origen es requerido';
+                fieldViewBuilder:
+                    (
+                      BuildContext context,
+                      TextEditingController textEditingController,
+                      FocusNode focusNode,
+                      VoidCallback onFieldSubmitted,
+                    ) {
+                      // Sincronizar el controller externo con el interno del Autocomplete
+                      if (textEditingController.text !=
+                          _originController.text) {
+                        textEditingController.text = _originController.text;
                       }
-                      // Validar que el municipio existe (opcional, puede ser más flexible)
-                      return null;
+                      _originController.addListener(() {
+                        if (textEditingController.text !=
+                            _originController.text) {
+                          textEditingController.text = _originController.text;
+                        }
+                      });
+
+                      return TextFormField(
+                        controller: textEditingController,
+                        focusNode: focusNode,
+                        decoration: InputDecoration(
+                          labelText: 'Origen *',
+                          hintText: 'Escribe el municipio de origen',
+                          prefixIcon: const Icon(Icons.place),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          helperText:
+                              'Se mostrarán sugerencias mientras escribes',
+                        ),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'El origen es requerido';
+                          }
+                          // Validar que el municipio existe (opcional, puede ser más flexible)
+                          return null;
+                        },
+                        textInputAction: TextInputAction.next,
+                        onChanged: (value) {
+                          _originController.text = value;
+                          _validateForm();
+                        },
+                      );
                     },
-                    textInputAction: TextInputAction.next,
-                    onChanged: (value) {
-                      _originController.text = value;
-                      _validateForm();
-                    },
-                  );
-                },
                 optionsViewBuilder: (context, onSelected, options) {
                   return Align(
                     alignment: Alignment.topLeft,
@@ -659,7 +702,10 @@ class _TripFormPageState extends State<TripFormPage> {
                                 itemBuilder: (context, index) {
                                   final option = options.elementAt(index);
                                   return ListTile(
-                                    leading: const Icon(Icons.location_city, size: 20),
+                                    leading: const Icon(
+                                      Icons.location_city,
+                                      size: 20,
+                                    ),
                                     title: Text(option),
                                     onTap: () {
                                       onSelected(option);
@@ -678,16 +724,30 @@ class _TripFormPageState extends State<TripFormPage> {
               Autocomplete<String>(
                 optionsBuilder: (TextEditingValue textEditingValue) async {
                   final query = textEditingValue.text.trim();
+                  print(
+                    '🔎 [Autocomplete Destino] Query recibido: "$query" (length: ${query.length})',
+                  );
+
                   if (query.isEmpty || query.length < 2) {
+                    print('   ⏭️ Query muy corto, no se busca');
                     // No mostrar sugerencias hasta que haya al menos 2 caracteres
                     return const Iterable<String>.empty();
                   }
+
                   try {
+                    print('   🔍 Llamando a searchMunicipalities...');
                     final suggestions = await _municipalitiesService
                         .searchMunicipalities(query);
+                    print('   ✅ Sugerencias recibidas: ${suggestions.length}');
+                    if (suggestions.isNotEmpty && suggestions.length <= 5) {
+                      print(
+                        '   📍 Primeros resultados: ${suggestions.join(", ")}',
+                      );
+                    }
                     return suggestions;
-                  } catch (e) {
-                    print('❌ Error al buscar municipios: $e');
+                  } catch (e, stackTrace) {
+                    print('❌ Error al buscar municipios en Destino: $e');
+                    print('   Stack: $stackTrace');
                     return const Iterable<String>.empty();
                   }
                 },
@@ -695,48 +755,54 @@ class _TripFormPageState extends State<TripFormPage> {
                   _destinationController.text = selection;
                   _validateForm();
                 },
-                fieldViewBuilder: (
-                  BuildContext context,
-                  TextEditingController textEditingController,
-                  FocusNode focusNode,
-                  VoidCallback onFieldSubmitted,
-                ) {
-                  // Sincronizar el controller externo con el interno del Autocomplete
-                  if (textEditingController.text != _destinationController.text) {
-                    textEditingController.text = _destinationController.text;
-                  }
-                  _destinationController.addListener(() {
-                    if (textEditingController.text != _destinationController.text) {
-                      textEditingController.text = _destinationController.text;
-                    }
-                  });
-                  
-                  return TextFormField(
-                    controller: textEditingController,
-                    focusNode: focusNode,
-                    decoration: InputDecoration(
-                      labelText: 'Destino *',
-                      hintText: 'Escribe el municipio de destino',
-                      prefixIcon: const Icon(Icons.location_on),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      helperText: 'Se mostrarán sugerencias mientras escribes',
-                    ),
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'El destino es requerido';
+                fieldViewBuilder:
+                    (
+                      BuildContext context,
+                      TextEditingController textEditingController,
+                      FocusNode focusNode,
+                      VoidCallback onFieldSubmitted,
+                    ) {
+                      // Sincronizar el controller externo con el interno del Autocomplete
+                      if (textEditingController.text !=
+                          _destinationController.text) {
+                        textEditingController.text =
+                            _destinationController.text;
                       }
-                      // Validar que el municipio existe (opcional, puede ser más flexible)
-                      return null;
+                      _destinationController.addListener(() {
+                        if (textEditingController.text !=
+                            _destinationController.text) {
+                          textEditingController.text =
+                              _destinationController.text;
+                        }
+                      });
+
+                      return TextFormField(
+                        controller: textEditingController,
+                        focusNode: focusNode,
+                        decoration: InputDecoration(
+                          labelText: 'Destino *',
+                          hintText: 'Escribe el municipio de destino',
+                          prefixIcon: const Icon(Icons.location_on),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          helperText:
+                              'Se mostrarán sugerencias mientras escribes',
+                        ),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'El destino es requerido';
+                          }
+                          // Validar que el municipio existe (opcional, puede ser más flexible)
+                          return null;
+                        },
+                        textInputAction: TextInputAction.next,
+                        onChanged: (value) {
+                          _destinationController.text = value;
+                          _validateForm();
+                        },
+                      );
                     },
-                    textInputAction: TextInputAction.next,
-                    onChanged: (value) {
-                      _destinationController.text = value;
-                      _validateForm();
-                    },
-                  );
-                },
                 optionsViewBuilder: (context, onSelected, options) {
                   return Align(
                     alignment: Alignment.topLeft,
@@ -763,7 +829,10 @@ class _TripFormPageState extends State<TripFormPage> {
                                 itemBuilder: (context, index) {
                                   final option = options.elementAt(index);
                                   return ListTile(
-                                    leading: const Icon(Icons.location_city, size: 20),
+                                    leading: const Icon(
+                                      Icons.location_city,
+                                      size: 20,
+                                    ),
                                     title: Text(option),
                                     onTap: () {
                                       onSelected(option);
@@ -789,7 +858,9 @@ class _TripFormPageState extends State<TripFormPage> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
                 inputFormatters: [
                   FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
                 ],
@@ -821,7 +892,9 @@ class _TripFormPageState extends State<TripFormPage> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
                 inputFormatters: [
                   FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
                 ],
@@ -910,8 +983,9 @@ class _TripFormPageState extends State<TripFormPage> {
                           width: 24,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor:
-                                AlwaysStoppedAnimation<Color>(Colors.white),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
                           ),
                         )
                       : const Text(
@@ -931,4 +1005,3 @@ class _TripFormPageState extends State<TripFormPage> {
     );
   }
 }
-

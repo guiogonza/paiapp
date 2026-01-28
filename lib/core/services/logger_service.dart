@@ -1,16 +1,18 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
-
 /// Servicio para registrar acciones de usuarios en app_logs
 /// Usado para analítica y monitoreo del MVP
+/// TODO: Migrar a PostgreSQL - temporalmente deshabilitado
 class LoggerService {
-  static const String _tableName = 'app_logs';
-  static final SupabaseClient _supabase = Supabase.instance.client;
+  // static final SupabaseClient _supabase = Supabase.instance.client;
 
   /// Registra una acción en app_logs
-  /// 
+  ///
   /// [action] - Nombre de la acción (ej: 'login', 'create_trip', 'add_expense')
   /// [details] - Detalles opcionales de la acción (JSON string o texto descriptivo)
   static Future<void> logAction(String action, {String? details}) async {
+    // TODO: Migrar a API REST de PostgreSQL
+    print('⚠️ LoggerService: Temporalmente deshabilitado - acción: $action');
+    return;
+    /* DESHABILITADO TEMPORALMENTE
     try {
       final currentUser = _supabase.auth.currentUser;
       if (currentUser == null) {
@@ -31,6 +33,6 @@ class LoggerService {
       // No fallar la aplicación si el logging falla
       print('❌ LoggerService: Error al registrar acción $action: $e');
     }
+    */
   }
 }
-

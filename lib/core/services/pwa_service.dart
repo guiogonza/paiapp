@@ -45,7 +45,6 @@ class PWAService {
   dynamic _deferredPrompt;
 
   // Estado de instalación
-  bool _canInstall = false;
   bool _hasPrompt = false;
 
   /// Retorna true si se puede mostrar la opción de instalar
@@ -81,7 +80,6 @@ class PWAService {
   /// Registrar el Service Worker
   Future<void> _registerServiceWorker() async {
     try {
-      final navigator = html.window.navigator;
       final serviceWorker = js.context['navigator']['serviceWorker'];
 
       if (serviceWorker != null) {
@@ -105,7 +103,6 @@ class PWAService {
       // Guardar el evento para usarlo después
       _deferredPrompt = event;
       _hasPrompt = true;
-      _canInstall = true;
 
       // Guardar también en window para persistencia
       js.context['deferredPrompt'] = event;
@@ -116,7 +113,6 @@ class PWAService {
     // Escuchar cuando la app se instala
     html.window.addEventListener('appinstalled', (event) {
       print('✅ App was installed');
-      _canInstall = false;
       _hasPrompt = false;
       _deferredPrompt = null;
       js.context['deferredPrompt'] = null;
@@ -127,7 +123,6 @@ class PWAService {
   /// Detectar sistema operativo y navegador
   DeviceInfo _detectDevice() {
     final userAgent = html.window.navigator.userAgent.toLowerCase();
-    final platform = html.window.navigator.platform?.toLowerCase() ?? '';
 
     // Detectar SO
     String os = 'Unknown';
@@ -297,7 +292,6 @@ class PWAService {
         ''',
         ]);
 
-        _canInstall = false;
         _deferredPrompt = null;
         _installStateController.add(false);
         return true;
@@ -385,7 +379,6 @@ class PWAService {
       if (hasDeferredPrompt) {
         print('📲 Found existing deferredPrompt in window');
         _hasPrompt = true;
-        _canInstall = true;
       }
     } catch (e) {
       print('⚠️ Error checking existing prompt: $e');

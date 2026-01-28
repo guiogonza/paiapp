@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:pai_app/core/theme/app_colors.dart';
 import 'package:pai_app/data/repositories/remittance_repository_impl.dart';
 import 'package:pai_app/data/repositories/expense_repository_impl.dart';
@@ -25,11 +24,12 @@ class RemittanceSigningPage extends StatefulWidget {
 }
 
 class _RemittanceSigningPageState extends State<RemittanceSigningPage> {
-  final RemittanceRepositoryImpl _remittanceRepository = RemittanceRepositoryImpl();
+  final RemittanceRepositoryImpl _remittanceRepository =
+      RemittanceRepositoryImpl();
   final ExpenseRepositoryImpl _expenseRepository = ExpenseRepositoryImpl();
   final _formKey = GlobalKey<FormState>();
   final _receivedByController = TextEditingController();
-  
+
   File? _selectedImage;
   XFile? _selectedXFile;
   bool _isLoading = false;
@@ -41,7 +41,8 @@ class _RemittanceSigningPageState extends State<RemittanceSigningPage> {
   void initState() {
     super.initState();
     // Verificar si ya hay una imagen adjunta
-    _hasImage = widget.remittanceWithRoute.remittance.receiptUrl != null &&
+    _hasImage =
+        widget.remittanceWithRoute.remittance.receiptUrl != null &&
         widget.remittanceWithRoute.remittance.receiptUrl!.isNotEmpty;
     // Cargar historial de gastos del conductor para este viaje
     _loadDriverExpenses();
@@ -49,9 +50,9 @@ class _RemittanceSigningPageState extends State<RemittanceSigningPage> {
 
   Future<void> _loadDriverExpenses() async {
     final tripId = widget.remittanceWithRoute.tripId;
-    final currentUserId = Supabase.instance.client.auth.currentUser?.id;
-    
-    if (tripId == null || tripId.isEmpty || currentUserId == null) {
+    final currentUserId = 'user_1';
+
+    if (tripId == null || tripId.isEmpty) {
       return;
     }
 
@@ -59,8 +60,11 @@ class _RemittanceSigningPageState extends State<RemittanceSigningPage> {
       _isLoadingExpenses = true;
     });
 
-    final result = await _expenseRepository.getExpensesByTripIdAndDriver(tripId, currentUserId);
-    
+    final result = await _expenseRepository.getExpensesByTripIdAndDriver(
+      tripId,
+      currentUserId,
+    );
+
     result.fold(
       (failure) {
         // No mostrar error, simplemente no mostrar gastos
@@ -178,36 +182,39 @@ class _RemittanceSigningPageState extends State<RemittanceSigningPage> {
 
       // Generar un nombre de archivo limpio y simple basado en el ID de la remisión
       // IMPORTANTE: El nombre debe ser el mismo para subir y obtener la URL
-      final remittanceId = widget.remittanceWithRoute.remittance.id ?? 
-                          DateTime.now().millisecondsSinceEpoch.toString();
-      
+      final remittanceId =
+          widget.remittanceWithRoute.remittance.id ??
+          DateTime.now().millisecondsSinceEpoch.toString();
+
       // Determinar la extensión del archivo
       String fileExtension = 'jpg'; // Por defecto
       if (kIsWeb && _selectedXFile != null) {
         final originalName = _selectedXFile!.name.toLowerCase();
         if (originalName.endsWith('.png')) {
           fileExtension = 'png';
-        } else if (originalName.endsWith('.jpeg') || originalName.endsWith('.jpg')) {
+        } else if (originalName.endsWith('.jpeg') ||
+            originalName.endsWith('.jpg')) {
           fileExtension = 'jpg';
         }
       } else if (_selectedImage != null) {
         final originalPath = _selectedImage!.path.toLowerCase();
         if (originalPath.endsWith('.png')) {
           fileExtension = 'png';
-        } else if (originalPath.endsWith('.jpeg') || originalPath.endsWith('.jpg')) {
+        } else if (originalPath.endsWith('.jpeg') ||
+            originalPath.endsWith('.jpg')) {
           fileExtension = 'jpg';
         }
       }
-      
+
       // Nombre de archivo limpio: remittance_{id}.{extension}
       final cleanFileName = 'remittance_$remittanceId.$fileExtension';
 
       // Subir la imagen
       if (kIsWeb && _selectedXFile != null) {
         final fileBytes = await _selectedXFile!.readAsBytes();
-        
+
         final uploadResult = await _remittanceRepository.uploadMemorandumImage(
-          fileBytes, 
+          fileBytes,
           cleanFileName, // Usar el nombre limpio
         );
         await uploadResult.fold(
@@ -220,9 +227,9 @@ class _RemittanceSigningPageState extends State<RemittanceSigningPage> {
         );
       } else if (_selectedImage != null) {
         final fileBytes = await _selectedImage!.readAsBytes();
-        
+
         final uploadResult = await _remittanceRepository.uploadMemorandumImage(
-          fileBytes, 
+          fileBytes,
           cleanFileName, // Usar el mismo nombre limpio
         );
         await uploadResult.fold(
@@ -248,7 +255,9 @@ class _RemittanceSigningPageState extends State<RemittanceSigningPage> {
         updatedAt: DateTime.now(),
       );
 
-      final updateResult = await _remittanceRepository.updateRemittance(updatedRemittance);
+      final updateResult = await _remittanceRepository.updateRemittance(
+        updatedRemittance,
+      );
 
       updateResult.fold(
         (failure) {
@@ -298,9 +307,7 @@ class _RemittanceSigningPageState extends State<RemittanceSigningPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Firmar Remisión'),
-      ),
+      appBar: AppBar(title: const Text('Firmar Remisión')),
       body: Form(
         key: _formKey,
         child: SingleChildScrollView(
@@ -322,13 +329,14 @@ class _RemittanceSigningPageState extends State<RemittanceSigningPage> {
                       Text(
                         'Información del Viaje',
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       const SizedBox(height: 12),
                       _buildInfoRow(
                         'Cliente',
-                        widget.remittanceWithRoute.clientName?.isNotEmpty == true
+                        widget.remittanceWithRoute.clientName?.isNotEmpty ==
+                                true
                             ? widget.remittanceWithRoute.clientName!
                             : widget.remittanceWithRoute.receiverName,
                       ),
@@ -341,7 +349,9 @@ class _RemittanceSigningPageState extends State<RemittanceSigningPage> {
                       _buildInfoRow(
                         'Fecha',
                         widget.remittanceWithRoute.createdAt != null
-                            ? DateFormat('dd/MM/yyyy').format(widget.remittanceWithRoute.createdAt!)
+                            ? DateFormat(
+                                'dd/MM/yyyy',
+                              ).format(widget.remittanceWithRoute.createdAt!)
                             : 'N/A',
                       ),
                     ],
@@ -359,9 +369,9 @@ class _RemittanceSigningPageState extends State<RemittanceSigningPage> {
               // Botón gigante para adjuntar foto (OBLIGATORIO)
               Text(
                 'Foto del Memorando *',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
               SizedBox(
@@ -416,16 +426,23 @@ class _RemittanceSigningPageState extends State<RemittanceSigningPage> {
                                         fit: BoxFit.contain,
                                       )
                                     : _selectedImage != null
-                                        ? Image.file(
-                                            _selectedImage!,
-                                            fit: BoxFit.contain,
-                                          )
-                                        : widget.remittanceWithRoute.remittance.receiptUrl != null
-                                            ? Image.network(
-                                                widget.remittanceWithRoute.remittance.receiptUrl!,
-                                                fit: BoxFit.contain,
-                                              )
-                                            : const Icon(Icons.image, size: 80),
+                                    ? Image.file(
+                                        _selectedImage!,
+                                        fit: BoxFit.contain,
+                                      )
+                                    : widget
+                                              .remittanceWithRoute
+                                              .remittance
+                                              .receiptUrl !=
+                                          null
+                                    ? Image.network(
+                                        widget
+                                            .remittanceWithRoute
+                                            .remittance
+                                            .receiptUrl!,
+                                        fit: BoxFit.contain,
+                                      )
+                                    : const Icon(Icons.image, size: 80),
                               ),
                               Positioned(
                                 top: 8,
@@ -504,7 +521,9 @@ class _RemittanceSigningPageState extends State<RemittanceSigningPage> {
                           height: 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
                           ),
                         )
                       : const Icon(Icons.check_circle),
@@ -530,7 +549,10 @@ class _RemittanceSigningPageState extends State<RemittanceSigningPage> {
 
   Widget _buildExpensesHistorySection() {
     final dateFormat = DateFormat('dd/MM/yyyy');
-    final currencyFormat = NumberFormat.currency(symbol: '\$', decimalDigits: 0);
+    final currencyFormat = NumberFormat.currency(
+      symbol: '\$',
+      decimalDigits: 0,
+    );
     final totalAmount = _driverExpenses.fold<double>(
       0.0,
       (sum, expense) => sum + expense.amount,
@@ -538,9 +560,7 @@ class _RemittanceSigningPageState extends State<RemittanceSigningPage> {
 
     return Card(
       elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -553,8 +573,8 @@ class _RemittanceSigningPageState extends State<RemittanceSigningPage> {
                 Text(
                   'Mis Gastos Registrados',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ],
             ),
@@ -564,56 +584,52 @@ class _RemittanceSigningPageState extends State<RemittanceSigningPage> {
             else if (_driverExpenses.isEmpty)
               Text(
                 'No hay gastos registrados para este viaje',
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontSize: 14,
-                ),
+                style: TextStyle(color: Colors.grey[600], fontSize: 14),
               )
             else ...[
-              ..._driverExpenses.map((expense) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                expense.type,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w500,
-                                ),
+              ..._driverExpenses.map(
+                (expense) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              expense.type,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w500,
                               ),
-                              Text(
-                                dateFormat.format(expense.date),
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey[600],
-                                ),
+                            ),
+                            Text(
+                              dateFormat.format(expense.date),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
-                        Text(
-                          currencyFormat.format(expense.amount),
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.accent,
-                          ),
+                      ),
+                      Text(
+                        currencyFormat.format(expense.amount),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.accent,
                         ),
-                      ],
-                    ),
-                  )),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
               const Divider(),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text(
                     'Total:',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                   Text(
                     currencyFormat.format(totalAmount),
@@ -649,13 +665,10 @@ class _RemittanceSigningPageState extends State<RemittanceSigningPage> {
         Expanded(
           child: Text(
             value,
-            style: const TextStyle(
-              color: AppColors.textPrimary,
-            ),
+            style: const TextStyle(color: AppColors.textPrimary),
           ),
         ),
       ],
     );
   }
 }
-

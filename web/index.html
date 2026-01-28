@@ -126,41 +126,30 @@
       window.deferredPrompt = e;
     });
     
-    // Registrar Service Worker
-    // FORZAR desregistro de Service Workers viejos para limpiar caché
+    // Registrar Service Worker para habilitar PWA
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then(function(registrations) {
-        for(let registration of registrations) {
-          registration.unregister();
-          console.log('🗑️ Service Worker desregistrado:', registration.scope);
-        }
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('/sw.js')
+          .then(function(registration) {
+            console.log('✅ Service Worker registered with scope:', registration.scope);
+    
+            // Verificar actualizaciones
+            registration.addEventListener('updatefound', function() {
+              const newWorker = registration.installing;
+              console.log('🔄 New Service Worker installing...');
+    
+              newWorker.addEventListener('statechange', function() {
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  console.log('🆕 New content available, refresh to update');
+                }
+              });
+            });
+          })
+          .catch(function(error) {
+            console.log('⚠️ Service Worker registration failed:', error);
+          });
       });
     }
-    
-    // Desactivamos temporalmente el Service Worker para evitar caché mientras depuramos
-    // if ('serviceWorker' in navigator) {
-    //   window.addEventListener('load', function() {
-    //     navigator.serviceWorker.register('/sw.js')
-    //       .then(function(registration) {
-    //         console.log('✅ Service Worker registered with scope:', registration.scope);
-    // 
-    //         // Verificar actualizaciones
-    //         registration.addEventListener('updatefound', function() {
-    //           const newWorker = registration.installing;
-    //           console.log('🔄 New Service Worker installing...');
-    // 
-    //           newWorker.addEventListener('statechange', function() {
-    //             if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-    //               console.log('🆕 New content available, refresh to update');
-    //             }
-    //           });
-    //         });
-    //       })
-    //       .catch(function(error) {
-    //         console.log('⚠️ Service Worker registration failed:', error);
-    //       });
-    //   });
-    // }
     
     // Detectar si está en modo standalone (instalado)
     function isStandalone() {

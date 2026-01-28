@@ -18,7 +18,8 @@ class DocumentsManagementPage extends StatefulWidget {
   const DocumentsManagementPage({super.key});
 
   @override
-  State<DocumentsManagementPage> createState() => _DocumentsManagementPageState();
+  State<DocumentsManagementPage> createState() =>
+      _DocumentsManagementPageState();
 }
 
 class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
@@ -34,7 +35,7 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
   bool _isLoading = true;
   bool _isLoadingDrivers = false;
   bool _isLoadingVehicles = false;
-  
+
   // Filtros de búsqueda
   String? _selectedVehicleFilter; // null = todos
   String? _selectedDriverFilter; // null = todos
@@ -116,10 +117,7 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -133,28 +131,29 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
 
   void _applyFilters() {
     List<DocumentEntity> filtered = List.from(_allDocuments);
-    
+
     // Filtrar por vehículo
     if (_selectedVehicleFilter != null && _selectedVehicleFilter!.isNotEmpty) {
-      filtered = filtered.where((doc) => 
-        doc.vehicleId == _selectedVehicleFilter
-      ).toList();
+      filtered = filtered
+          .where((doc) => doc.vehicleId == _selectedVehicleFilter)
+          .toList();
     }
-    
+
     // Filtrar por conductor
     if (_selectedDriverFilter != null && _selectedDriverFilter!.isNotEmpty) {
-      filtered = filtered.where((doc) => 
-        doc.driverId == _selectedDriverFilter
-      ).toList();
+      filtered = filtered
+          .where((doc) => doc.driverId == _selectedDriverFilter)
+          .toList();
     }
-    
+
     // Filtrar por tipo de documento
-    if (_selectedDocumentTypeFilter != null && _selectedDocumentTypeFilter != 'Todos') {
-      filtered = filtered.where((doc) => 
-        doc.documentType == _selectedDocumentTypeFilter
-      ).toList();
+    if (_selectedDocumentTypeFilter != null &&
+        _selectedDocumentTypeFilter != 'Todos') {
+      filtered = filtered
+          .where((doc) => doc.documentType == _selectedDocumentTypeFilter)
+          .toList();
     }
-    
+
     setState(() {
       _documents = filtered;
     });
@@ -162,11 +161,11 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
 
   Future<void> _loadDrivers() async {
     if (_isLoadingDrivers) return; // Evitar cargas duplicadas
-    
+
     setState(() {
       _isLoadingDrivers = true;
     });
-    
+
     print('🔄 Recargando lista de conductores...');
     final driversResult = await _profileRepository.getDriversList();
     driversResult.fold(
@@ -181,7 +180,9 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
           if (_selectedAssociationType == 'Conductor') {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('Error al cargar conductores: ${failure.message}'),
+                content: Text(
+                  'Error al cargar conductores: ${failure.message}',
+                ),
                 backgroundColor: Colors.orange,
                 duration: const Duration(seconds: 3),
               ),
@@ -200,7 +201,9 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
           if (_selectedAssociationType == 'Conductor' && driversMap.isEmpty) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('No hay conductores registrados. Por favor, crea usuarios con rol "driver" primero.'),
+                content: Text(
+                  'No hay conductores registrados. Por favor, crea usuarios con rol "driver" primero.',
+                ),
                 backgroundColor: Colors.orange,
                 duration: Duration(seconds: 4),
               ),
@@ -209,71 +212,13 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
         }
       },
     );
-    
+
     if (mounted && _isLoadingDrivers) {
       setState(() {
         _isLoadingDrivers = false;
       });
     }
   }
-
-  Future<void> _loadVehicles() async {
-    if (_isLoadingVehicles) return; // Evitar cargas duplicadas
-    
-    setState(() {
-      _isLoadingVehicles = true;
-    });
-    
-    print('🔄 Cargando lista de vehículos...');
-    final vehiclesResult = await _vehicleRepository.getVehicles();
-    vehiclesResult.fold(
-      (failure) {
-        print('❌ Error al cargar vehículos: ${failure.message}');
-        if (mounted) {
-          setState(() {
-            _vehicles = []; // Asegurar que esté vacío en caso de error
-            _isLoadingVehicles = false;
-          });
-          // Solo mostrar error si el usuario está en el formulario
-          if (_selectedAssociationType == 'Vehículo') {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Error al cargar vehículos: ${failure.message}'),
-                backgroundColor: Colors.orange,
-                duration: const Duration(seconds: 3),
-              ),
-            );
-          }
-        }
-      },
-      (vehicles) {
-        print('✅ Vehículos cargados: ${vehicles.length}');
-        if (mounted) {
-          setState(() {
-            _vehicles = vehicles;
-            _isLoadingVehicles = false;
-          });
-          // Solo mostrar mensaje si el usuario está en el formulario y no hay vehículos
-          if (_selectedAssociationType == 'Vehículo' && vehicles.isEmpty) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('No hay vehículos registrados. Por favor, crea vehículos primero.'),
-                backgroundColor: Colors.orange,
-                duration: Duration(seconds: 4),
-              ),
-            );
-          }
-        }
-      },
-    );
-    
-    if (mounted && _isLoadingVehicles) {
-      setState(() {
-        _isLoadingVehicles = false;
-      });
-    }
-  }
-
 
   Future<void> _pickImage() async {
     try {
@@ -284,7 +229,9 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: const Text('Se necesita permiso de cámara para tomar fotos. Por favor, habilítalo en la configuración de la app.'),
+                content: const Text(
+                  'Se necesita permiso de cámara para tomar fotos. Por favor, habilítalo en la configuración de la app.',
+                ),
                 backgroundColor: Colors.orange,
                 duration: const Duration(seconds: 4),
                 action: SnackBarAction(
@@ -318,13 +265,14 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
       // Manejo específico de errores de plataforma (permisos, etc.)
       String errorMessage = 'Error al acceder a la cámara';
       if (e.code == 'camera_access_denied' || e.code == 'permission_denied') {
-        errorMessage = 'Permiso de cámara denegado. Por favor, habilita el permiso en la configuración de la app.';
+        errorMessage =
+            'Permiso de cámara denegado. Por favor, habilita el permiso en la configuración de la app.';
       } else if (e.code == 'camera_unavailable') {
         errorMessage = 'Cámara no disponible';
       } else if (e.message != null && e.message!.isNotEmpty) {
         errorMessage = e.message!;
       }
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -352,16 +300,18 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
     try {
       // Solicitar permiso de galería si no está en web
       if (!kIsWeb) {
-        Permission? storagePermission = Platform.isAndroid 
-            ? Permission.photos 
+        Permission? storagePermission = Platform.isAndroid
+            ? Permission.photos
             : Permission.photos;
-        
+
         final status = await storagePermission.request();
         if (status.isDenied || status.isPermanentlyDenied) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: const Text('Se necesita permiso de galería para seleccionar imágenes. Por favor, habilítalo en la configuración de la app.'),
+                content: const Text(
+                  'Se necesita permiso de galería para seleccionar imágenes. Por favor, habilítalo en la configuración de la app.',
+                ),
                 backgroundColor: Colors.orange,
                 duration: const Duration(seconds: 4),
                 action: SnackBarAction(
@@ -395,13 +345,14 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
       // Manejo específico de errores de plataforma (permisos, etc.)
       String errorMessage = 'Error al acceder a la galería';
       if (e.code == 'photo_access_denied' || e.code == 'permission_denied') {
-        errorMessage = 'Permiso de galería denegado. Por favor, habilita el permiso en la configuración de la app.';
+        errorMessage =
+            'Permiso de galería denegado. Por favor, habilita el permiso en la configuración de la app.';
       } else if (e.code == 'photo_picker_unavailable') {
         errorMessage = 'Selector de fotos no disponible';
       } else if (e.message != null && e.message!.isNotEmpty) {
         errorMessage = e.message!;
       }
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -433,7 +384,9 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
     if (_selectedAssociationType == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Debes seleccionar si el documento es de un Vehículo o Conductor'),
+          content: Text(
+            'Debes seleccionar si el documento es de un Vehículo o Conductor',
+          ),
           backgroundColor: Colors.red,
         ),
       );
@@ -483,17 +436,23 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
           final fileBytes = kIsWeb && _selectedXFile != null
               ? await _selectedXFile!.readAsBytes()
               : await _selectedImage!.readAsBytes();
-          
-          final fileName = 'document_${DateTime.now().millisecondsSinceEpoch}.${kIsWeb && _selectedXFile != null ? _selectedXFile!.name.split('.').last : 'jpg'}';
-          
-          final uploadResult = await _documentRepository.uploadDocumentImage(fileBytes, fileName);
+
+          final fileName =
+              'document_${DateTime.now().millisecondsSinceEpoch}.${kIsWeb && _selectedXFile != null ? _selectedXFile!.name.split('.').last : 'jpg'}';
+
+          final uploadResult = await _documentRepository.uploadDocumentImage(
+            fileBytes,
+            fileName,
+          );
           uploadResult.fold(
             (failure) {
               // Si falla la subida de imagen, continuar sin imagen (es opcional)
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('Advertencia: No se pudo subir la imagen. El documento se guardará sin imagen. ${failure.message}'),
+                    content: Text(
+                      'Advertencia: No se pudo subir la imagen. El documento se guardará sin imagen. ${failure.message}',
+                    ),
                     backgroundColor: Colors.orange,
                     duration: const Duration(seconds: 4),
                   ),
@@ -510,7 +469,9 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('Advertencia: Error al procesar la imagen. El documento se guardará sin imagen.'),
+                content: Text(
+                  'Advertencia: Error al procesar la imagen. El documento se guardará sin imagen.',
+                ),
                 backgroundColor: Colors.orange,
                 duration: const Duration(seconds: 3),
               ),
@@ -521,15 +482,19 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
       }
 
       final document = DocumentEntity(
-        vehicleId: _selectedAssociationType == 'Vehículo' ? _selectedVehicleId : null,
-        driverId: _selectedAssociationType == 'Conductor' ? _selectedDriverId : null,
+        vehicleId: _selectedAssociationType == 'Vehículo'
+            ? _selectedVehicleId
+            : null,
+        driverId: _selectedAssociationType == 'Conductor'
+            ? _selectedDriverId
+            : null,
         documentType: _documentTypeController.text.trim(),
         expirationDate: _selectedExpirationDate!,
         documentUrl: documentUrl,
       );
 
       final result = await _documentRepository.createDocument(document);
-      
+
       bool success = false;
       result.fold(
         (failure) {
@@ -560,10 +525,7 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
       }
       return false;
@@ -588,7 +550,6 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
     _documentTypeController.clear();
   }
 
-
   String _getAssociatedName(DocumentEntity document) {
     if (document.isVehicleDocument) {
       final vehicle = _vehicles.firstWhere(
@@ -603,7 +564,8 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
       );
       return 'Vehículo: ${vehicle.placa}';
     } else if (document.isDriverDocument) {
-      final driverName = _driverNames[document.driverId] ?? document.driverId ?? 'Desconocido';
+      final driverName =
+          _driverNames[document.driverId] ?? document.driverId ?? 'Desconocido';
       return 'Conductor: $driverName';
     }
     return 'No asociado';
@@ -613,9 +575,7 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
   Widget build(BuildContext context) {
     if (_isLoading) {
       return Scaffold(
-        appBar: AppBar(
-          title: const Text('Documentos / Gestión'),
-        ),
+        appBar: AppBar(title: const Text('Documentos / Gestión')),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
@@ -749,15 +709,17 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
                         .where((type) => !_commonDocumentTypes.contains(type))
                         .toSet()
                         .map((type) {
-                      return DropdownMenuItem<String>(
-                        value: type,
-                        child: Text(type),
-                      );
-                    }),
+                          return DropdownMenuItem<String>(
+                            value: type,
+                            child: Text(type),
+                          );
+                        }),
                   ],
                   onChanged: (value) {
                     setState(() {
-                      _selectedDocumentTypeFilter = value == 'Todos' ? null : value;
+                      _selectedDocumentTypeFilter = value == 'Todos'
+                          ? null
+                          : value;
                     });
                     _applyFilters();
                   },
@@ -773,54 +735,59 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   // Sección de Alertas
-            Card(
-              elevation: 2,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.warning, color: Colors.orange),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Alertas de Documentos',
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                        ),
-                      ],
+                  Card(
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    const SizedBox(height: 16),
-                    if (_documents.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.all(24.0),
-                        child: Center(
-                          child: Column(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
                             children: [
-                              Icon(Icons.description, size: 48, color: Colors.grey[400]),
-                              const SizedBox(height: 16),
+                              Icon(Icons.warning, color: Colors.orange),
+                              const SizedBox(width: 8),
                               Text(
-                                'No hay documentos registrados',
-                                style: TextStyle(
-                                  color: Colors.grey[600],
-                                  fontSize: 16,
-                                ),
+                                'Alertas de Documentos',
+                                style: Theme.of(context).textTheme.titleLarge
+                                    ?.copyWith(fontWeight: FontWeight.bold),
                               ),
                             ],
                           ),
-                        ),
-                      )
-                    else
-                      ..._documents.map((document) => _buildDocumentAlertItem(document)),
-                  ],
-                ),
-              ),
-            ),
+                          const SizedBox(height: 16),
+                          if (_documents.isEmpty)
+                            Padding(
+                              padding: const EdgeInsets.all(24.0),
+                              child: Center(
+                                child: Column(
+                                  children: [
+                                    Icon(
+                                      Icons.description,
+                                      size: 48,
+                                      color: Colors.grey[400],
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      'No hay documentos registrados',
+                                      style: TextStyle(
+                                        color: Colors.grey[600],
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            )
+                          else
+                            ..._documents.map(
+                              (document) => _buildDocumentAlertItem(document),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -855,14 +822,14 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
               setModalState(fn);
               setState(fn);
             }
-            
+
             // Función helper para cargar conductores con actualización del modal
             Future<void> loadDriversForModal() async {
               if (_isLoadingDrivers) return;
               updateBothStates(() {
                 _isLoadingDrivers = true;
               });
-              
+
               // Cargar conductores directamente
               print('🔄 Cargando lista de conductores desde modal...');
               final driversResult = await _profileRepository.getDriversList();
@@ -877,7 +844,9 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
                     if (_selectedAssociationType == 'Conductor') {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text('Error al cargar conductores: ${failure.message}'),
+                          content: Text(
+                            'Error al cargar conductores: ${failure.message}',
+                          ),
                           backgroundColor: Colors.orange,
                           duration: const Duration(seconds: 3),
                         ),
@@ -892,10 +861,13 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
                       _driverNames = driversMap;
                       _isLoadingDrivers = false;
                     });
-                    if (_selectedAssociationType == 'Conductor' && driversMap.isEmpty) {
+                    if (_selectedAssociationType == 'Conductor' &&
+                        driversMap.isEmpty) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('No hay conductores registrados. Por favor, crea usuarios con rol "driver" primero.'),
+                          content: Text(
+                            'No hay conductores registrados. Por favor, crea usuarios con rol "driver" primero.',
+                          ),
                           backgroundColor: Colors.orange,
                           duration: Duration(seconds: 4),
                         ),
@@ -905,14 +877,14 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
                 },
               );
             }
-            
+
             // Función helper para cargar vehículos con actualización del modal
             Future<void> loadVehiclesForModal() async {
               if (_isLoadingVehicles) return;
               updateBothStates(() {
                 _isLoadingVehicles = true;
               });
-              
+
               // Cargar vehículos directamente
               print('🔄 Cargando lista de vehículos desde modal...');
               final vehiclesResult = await _vehicleRepository.getVehicles();
@@ -927,7 +899,9 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
                     if (_selectedAssociationType == 'Vehículo') {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text('Error al cargar vehículos: ${failure.message}'),
+                          content: Text(
+                            'Error al cargar vehículos: ${failure.message}',
+                          ),
                           backgroundColor: Colors.orange,
                           duration: const Duration(seconds: 3),
                         ),
@@ -942,10 +916,13 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
                       _vehicles = vehicles;
                       _isLoadingVehicles = false;
                     });
-                    if (_selectedAssociationType == 'Vehículo' && vehicles.isEmpty) {
+                    if (_selectedAssociationType == 'Vehículo' &&
+                        vehicles.isEmpty) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('No hay vehículos registrados. Por favor, crea vehículos primero.'),
+                          content: Text(
+                            'No hay vehículos registrados. Por favor, crea vehículos primero.',
+                          ),
                           backgroundColor: Colors.orange,
                           duration: Duration(seconds: 4),
                         ),
@@ -955,6 +932,7 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
                 },
               );
             }
+
             return SingleChildScrollView(
               controller: scrollController,
               padding: const EdgeInsets.all(16.0),
@@ -963,95 +941,96 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                Row(
-                  children: [
-                    Icon(Icons.add_circle, color: AppColors.primary),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Registrar Nuevo Documento',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                    Row(
+                      children: [
+                        Icon(Icons.add_circle, color: AppColors.primary),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Registrar Nuevo Documento',
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                        const Spacer(),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.of(context).pop(),
+                        ),
+                      ],
                     ),
-                    const Spacer(),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                // Tipo de Asociación
-                DropdownButtonFormField<String>(
-                  initialValue: _selectedAssociationType,
-                  decoration: InputDecoration(
-                    labelText: 'Asociar a *',
-                    prefixIcon: const Icon(Icons.link),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  items: _associationTypes.map((type) {
-                    return DropdownMenuItem(
-                      value: type,
-                      child: Text(type),
-                    );
-                  }).toList(),
-                  onChanged: (value) async {
-                    // Actualizar estado del modal y del widget principal
-                    updateBothStates(() {
-                      _selectedAssociationType = value;
-                      _selectedVehicleId = null;
-                      _selectedDriverId = null;
-                    });
-                    
-                    // Cargar datos según la selección
-                    if (value == 'Conductor') {
-                      // Cargar conductores si no están cargados
-                      if (_driverNames.isEmpty) {
-                        await loadDriversForModal();
-                      }
-                    } else if (value == 'Vehículo') {
-                      // Cargar vehículos si no están cargados
-                      if (_vehicles.isEmpty) {
-                        await loadVehiclesForModal();
-                      }
-                    }
-                  },
-                ),
-                const SizedBox(height: 16),
+                    const SizedBox(height: 24),
+                    // Tipo de Asociación
+                    DropdownButtonFormField<String>(
+                      initialValue: _selectedAssociationType,
+                      decoration: InputDecoration(
+                        labelText: 'Asociar a *',
+                        prefixIcon: const Icon(Icons.link),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      items: _associationTypes.map((type) {
+                        return DropdownMenuItem(value: type, child: Text(type));
+                      }).toList(),
+                      onChanged: (value) async {
+                        // Actualizar estado del modal y del widget principal
+                        updateBothStates(() {
+                          _selectedAssociationType = value;
+                          _selectedVehicleId = null;
+                          _selectedDriverId = null;
+                        });
 
-                // Selector de Vehículo
-                if (_selectedAssociationType == 'Vehículo')
-                  _isLoadingVehicles
-                      ? Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey[300]!),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            children: [
-                              const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                        // Cargar datos según la selección
+                        if (value == 'Conductor') {
+                          // Cargar conductores si no están cargados
+                          if (_driverNames.isEmpty) {
+                            await loadDriversForModal();
+                          }
+                        } else if (value == 'Vehículo') {
+                          // Cargar vehículos si no están cargados
+                          if (_vehicles.isEmpty) {
+                            await loadVehiclesForModal();
+                          }
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Selector de Vehículo
+                    if (_selectedAssociationType == 'Vehículo')
+                      _isLoadingVehicles
+                          ? Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                border: Border.all(color: Colors.grey[300]!),
+                                borderRadius: BorderRadius.circular(12),
                               ),
-                              const SizedBox(width: 12),
-                              Text(
-                                'Cargando vehículos...',
-                                style: TextStyle(color: Colors.grey[600]),
+                              child: Row(
+                                children: [
+                                  const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Text(
+                                    'Cargando vehículos...',
+                                    style: TextStyle(color: Colors.grey[600]),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
-                        )
-                      : _vehicles.isEmpty
+                            )
+                          : _vehicles.isEmpty
                           ? Container(
                               padding: const EdgeInsets.all(16),
                               decoration: BoxDecoration(
                                 color: Colors.orange.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Colors.orange, width: 1),
+                                border: Border.all(
+                                  color: Colors.orange,
+                                  width: 1,
+                                ),
                               ),
                               child: Row(
                                 children: [
@@ -1077,12 +1056,15 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
-                                helperText: '${_vehicles.length} vehículo(s) disponible(s)',
+                                helperText:
+                                    '${_vehicles.length} vehículo(s) disponible(s)',
                               ),
                               items: _vehicles.map((vehicle) {
                                 return DropdownMenuItem(
                                   value: vehicle.id,
-                                  child: Text('${vehicle.placa} - ${vehicle.marca} ${vehicle.modelo}'),
+                                  child: Text(
+                                    '${vehicle.placa} - ${vehicle.marca} ${vehicle.modelo}',
+                                  ),
                                 );
                               }).toList(),
                               onChanged: (value) {
@@ -1091,44 +1073,50 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
                                 });
                               },
                               validator: (value) {
-                                if (_selectedAssociationType == 'Vehículo' && (value == null || value.isEmpty)) {
+                                if (_selectedAssociationType == 'Vehículo' &&
+                                    (value == null || value.isEmpty)) {
                                   return 'Debes seleccionar un vehículo';
                                 }
                                 return null;
                               },
                             ),
 
-                // Selector de Conductor
-                if (_selectedAssociationType == 'Conductor')
-                  _isLoadingDrivers
-                      ? Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey[300]!),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            children: [
-                              const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                    // Selector de Conductor
+                    if (_selectedAssociationType == 'Conductor')
+                      _isLoadingDrivers
+                          ? Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                border: Border.all(color: Colors.grey[300]!),
+                                borderRadius: BorderRadius.circular(12),
                               ),
-                              const SizedBox(width: 12),
-                              Text(
-                                'Cargando conductores...',
-                                style: TextStyle(color: Colors.grey[600]),
+                              child: Row(
+                                children: [
+                                  const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Text(
+                                    'Cargando conductores...',
+                                    style: TextStyle(color: Colors.grey[600]),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
-                        )
-                      : _driverNames.isEmpty
+                            )
+                          : _driverNames.isEmpty
                           ? Container(
                               padding: const EdgeInsets.all(16),
                               decoration: BoxDecoration(
                                 color: Colors.orange.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Colors.orange, width: 1),
+                                border: Border.all(
+                                  color: Colors.orange,
+                                  width: 1,
+                                ),
                               ),
                               child: Row(
                                 children: [
@@ -1154,7 +1142,8 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
-                                helperText: '${_driverNames.length} conductor(es) disponible(s)',
+                                helperText:
+                                    '${_driverNames.length} conductor(es) disponible(s)',
                               ),
                               items: _driverNames.entries.map((entry) {
                                 return DropdownMenuItem(
@@ -1168,178 +1157,194 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
                                 });
                               },
                               validator: (value) {
-                                if (_selectedAssociationType == 'Conductor' && (value == null || value.isEmpty)) {
+                                if (_selectedAssociationType == 'Conductor' &&
+                                    (value == null || value.isEmpty)) {
                                   return 'Debes seleccionar un conductor';
                                 }
                                 return null;
                               },
                             ),
 
-                if (_selectedAssociationType != null) const SizedBox(height: 16),
+                    if (_selectedAssociationType != null)
+                      const SizedBox(height: 16),
 
-                // Tipo de Documento
-                TextFormField(
-                        controller: _documentTypeController,
+                    // Tipo de Documento
+                    TextFormField(
+                      controller: _documentTypeController,
+                      decoration: InputDecoration(
+                        labelText: 'Tipo de Documento *',
+                        hintText: 'Ej: SOAT, Licencia, Seguro...',
+                        prefixIcon: const Icon(Icons.description),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        suffixIcon: PopupMenuButton<String>(
+                          icon: const Icon(Icons.arrow_drop_down),
+                          onSelected: (value) {
+                            _documentTypeController.text = value;
+                          },
+                          itemBuilder: (context) {
+                            return _commonDocumentTypes.map((type) {
+                              return PopupMenuItem(
+                                value: type,
+                                child: Text(type),
+                              );
+                            }).toList();
+                          },
+                        ),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'El tipo de documento es requerido';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Fecha de Expiración
+                    InkWell(
+                      onTap: () async {
+                        final DateTime? picked = await showDatePicker(
+                          context: context,
+                          initialDate:
+                              _selectedExpirationDate ??
+                              DateTime.now().add(const Duration(days: 30)),
+                          firstDate: DateTime.now(),
+                          lastDate: DateTime.now().add(
+                            const Duration(days: 365 * 10),
+                          ), // 10 años
+                        );
+
+                        if (picked != null) {
+                          updateBothStates(() {
+                            _selectedExpirationDate = picked;
+                          });
+                        }
+                      },
+                      child: InputDecorator(
                         decoration: InputDecoration(
-                          labelText: 'Tipo de Documento *',
-                          hintText: 'Ej: SOAT, Licencia, Seguro...',
-                          prefixIcon: const Icon(Icons.description),
+                          labelText: 'Fecha de Expiración *',
+                          prefixIcon: const Icon(Icons.calendar_today),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          suffixIcon: PopupMenuButton<String>(
-                            icon: const Icon(Icons.arrow_drop_down),
-                            onSelected: (value) {
-                              _documentTypeController.text = value;
-                            },
-                            itemBuilder: (context) {
-                              return _commonDocumentTypes.map((type) {
-                                return PopupMenuItem(
-                                  value: type,
-                                  child: Text(type),
-                                );
-                              }).toList();
-                            },
+                        ),
+                        child: Text(
+                          _selectedExpirationDate != null
+                              ? DateFormat(
+                                  'dd/MM/yyyy',
+                                ).format(_selectedExpirationDate!)
+                              : 'Selecciona la fecha',
+                          style: TextStyle(
+                            color: _selectedExpirationDate != null
+                                ? AppColors.textPrimary
+                                : Colors.grey[600],
                           ),
                         ),
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'El tipo de documento es requerido';
-                          }
-                          return null;
-                        },
-                ),
-                const SizedBox(height: 16),
-
-                // Fecha de Expiración
-                InkWell(
-                  onTap: () async {
-                    final DateTime? picked = await showDatePicker(
-                      context: context,
-                      initialDate: _selectedExpirationDate ?? DateTime.now().add(const Duration(days: 30)),
-                      firstDate: DateTime.now(),
-                      lastDate: DateTime.now().add(const Duration(days: 365 * 10)), // 10 años
-                    );
-
-                    if (picked != null) {
-                      updateBothStates(() {
-                        _selectedExpirationDate = picked;
-                      });
-                    }
-                  },
-                  child: InputDecorator(
-                    decoration: InputDecoration(
-                      labelText: 'Fecha de Expiración *',
-                      prefixIcon: const Icon(Icons.calendar_today),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    child: Text(
-                      _selectedExpirationDate != null
-                          ? DateFormat('dd/MM/yyyy').format(_selectedExpirationDate!)
-                          : 'Selecciona la fecha',
-                      style: TextStyle(
-                        color: _selectedExpirationDate != null
-                            ? AppColors.textPrimary
-                            : Colors.grey[600],
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
+                    const SizedBox(height: 16),
 
-                // Imagen del Documento (Opcional)
-                Text(
-                  'Imagen del Documento (Opcional)',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    // Imagen del Documento (Opcional)
+                    Text(
+                      'Imagen del Documento (Opcional)',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: _pickImageFromGallery,
-                        icon: const Icon(Icons.photo_library),
-                        label: const Text('Seleccionar de Galería'),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: _pickImageFromGallery,
+                            icon: const Icon(Icons.photo_library),
+                            label: const Text('Seleccionar de Galería'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: _pickImage,
+                            icon: const Icon(Icons.camera_alt),
+                            label: const Text('Tomar Foto'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.accent,
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (_selectedXFile != null ||
+                        _selectedImage != null ||
+                        _existingImageUrl != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.check_circle,
+                              color: Colors.green,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Imagen seleccionada',
+                              style: TextStyle(color: Colors.green),
+                            ),
+                            const Spacer(),
+                            TextButton(
+                              onPressed: () {
+                                setState(() {
+                                  _selectedImage = null;
+                                  _selectedXFile = null;
+                                  _existingImageUrl = null;
+                                });
+                              },
+                              child: const Text('Eliminar'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    const SizedBox(height: 24),
+
+                    // Botón Guardar
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton(
+                        onPressed: _isSaving
+                            ? null
+                            : () async {
+                                final success = await _handleSave();
+                                if (mounted && success) {
+                                  Navigator.of(context).pop(); // Cerrar modal
+                                  _resetForm(); // Resetear formulario
+                                }
+                              },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
                           foregroundColor: Colors.white,
                         ),
+                        child: _isSaving
+                            ? const CircularProgressIndicator(
+                                color: Colors.white,
+                              )
+                            : const Text(
+                                'GUARDAR DOCUMENTO',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: _pickImage,
-                        icon: const Icon(Icons.camera_alt),
-                        label: const Text('Tomar Foto'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.accent,
-                          foregroundColor: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                if (_selectedXFile != null || _selectedImage != null || _existingImageUrl != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Row(
-                      children: [
-                        Icon(Icons.check_circle, color: Colors.green, size: 20),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Imagen seleccionada',
-                          style: TextStyle(color: Colors.green),
-                        ),
-                        const Spacer(),
-                        TextButton(
-                          onPressed: () {
-                            setState(() {
-                              _selectedImage = null;
-                              _selectedXFile = null;
-                              _existingImageUrl = null;
-                            });
-                          },
-                          child: const Text('Eliminar'),
-                        ),
-                      ],
-                    ),
-                  ),
-                const SizedBox(height: 24),
-
-                // Botón Guardar
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton(
-                    onPressed: _isSaving
-                        ? null
-                        : () async {
-                            final success = await _handleSave();
-                            if (mounted && success) {
-                              Navigator.of(context).pop(); // Cerrar modal
-                              _resetForm(); // Resetear formulario
-                            }
-                          },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                    ),
-                    child: _isSaving
-                        ? const CircularProgressIndicator(color: Colors.white)
-                        : const Text(
-                            'GUARDAR DOCUMENTO',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                  ),
-                ),
                   ],
                 ),
               ),
@@ -1363,21 +1368,14 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
       color: trafficLightColor.withValues(alpha: 0.1),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
-        side: BorderSide(
-          color: trafficLightColor,
-          width: 2,
-        ),
+        side: BorderSide(color: trafficLightColor, width: 2),
       ),
       child: Padding(
         padding: const EdgeInsets.all(12.0),
         child: Row(
           children: [
             // Semáforo (ícono de color)
-            Icon(
-              trafficLightIcon,
-              color: trafficLightColor,
-              size: 32,
-            ),
+            Icon(trafficLightIcon, color: trafficLightColor, size: 32),
             const SizedBox(width: 12),
             // Información del documento
             Expanded(
@@ -1389,16 +1387,15 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
-                      color: trafficLightStatus == 'vencido' ? Colors.red[700] : AppColors.textPrimary,
+                      color: trafficLightStatus == 'vencido'
+                          ? Colors.red[700]
+                          : AppColors.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     _getAssociatedName(document),
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -1406,7 +1403,9 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
                     style: TextStyle(
                       fontSize: 12,
                       color: trafficLightColor,
-                      fontWeight: trafficLightStatus != 'bien' ? FontWeight.bold : FontWeight.normal,
+                      fontWeight: trafficLightStatus != 'bien'
+                          ? FontWeight.bold
+                          : FontWeight.normal,
                     ),
                   ),
                   if (trafficLightStatus == 'vencido')
@@ -1446,7 +1445,8 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
               onPressed: () {
                 Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (_) => DocumentHistoryPage(currentDocument: document),
+                    builder: (_) =>
+                        DocumentHistoryPage(currentDocument: document),
                   ),
                 );
               },
@@ -1470,7 +1470,8 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
               tooltip: 'Renovar documento',
             ),
             // Botón para ver documento si existe
-            if (document.documentUrl != null && document.documentUrl!.isNotEmpty)
+            if (document.documentUrl != null &&
+                document.documentUrl!.isNotEmpty)
               IconButton(
                 icon: const Icon(Icons.visibility),
                 onPressed: () {
@@ -1500,12 +1501,13 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
                                     child: Text('Error al cargar la imagen'),
                                   );
                                 },
-                                loadingBuilder: (context, child, loadingProgress) {
-                                  if (loadingProgress == null) return child;
-                                  return const Center(
-                                    child: CircularProgressIndicator(),
-                                  );
-                                },
+                                loadingBuilder:
+                                    (context, child, loadingProgress) {
+                                      if (loadingProgress == null) return child;
+                                      return const Center(
+                                        child: CircularProgressIndicator(),
+                                      );
+                                    },
                               ),
                             ),
                           ),
@@ -1522,4 +1524,3 @@ class _DocumentsManagementPageState extends State<DocumentsManagementPage> {
     );
   }
 }
-

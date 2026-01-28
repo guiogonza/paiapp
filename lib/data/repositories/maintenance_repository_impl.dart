@@ -13,8 +13,6 @@ import 'package:pai_app/domain/repositories/maintenance_repository.dart';
 class MaintenanceRepositoryImpl implements MaintenanceRepository {
   final LocalApiClient _localApi = LocalApiClient();
   final GPSAuthService _gpsAuthService = GPSAuthService();
-  static const String _tableName = 'maintenance';
-  static const String _vehiclesTableName = 'vehicles';
   static const String _devicesUrl =
       'https://plataforma.sistemagps.online/api/get_devices';
 

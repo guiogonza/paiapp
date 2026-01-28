@@ -51,50 +51,479 @@ app.post('/auth/login', async (req, res) => {
     const { email, password } = req.body;
     console.log(`🔐 Intento de login: ${email}`);
 
-    // Normalizar email (si es solo número, agregar dominio)
-    let normalizedEmail = email.trim();
-    if (!normalizedEmail.includes('@')) {
-      normalizedEmail = `${normalizedEmail}@conductor.app`;
+    // PASO 1: Autenticar contra plataforma.sistemagps.online
+    const gpsLoginUrl = 'https://plataforma.sistemagps.online/api/login';
+    const formBody = `email=${encodeURIComponent(email)}&password=${encodeURIComponent(password)}`;
+    
+    console.log(`📡 Autenticando contra GPS API: ${email}`);
+    
+    const gpsResponse = await fetch(gpsLoginUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'application/json',
+        'User-Agent': 'PAI-App/1.0'
+      },
+      body: formBody
+    });
+
+    const gpsData = await gpsResponse.json();
+    console.log(`📡 Respuesta GPS API:`, gpsData);
+
+    // Verificar si la autenticación GPS fue exitosa
+    if (!gpsResponse.ok || gpsData.status === 0) {
+      console.log(`❌ Autenticación GPS fallida: ${gpsData.message || 'Credenciales inválidas'}`);
+      return res.status(401).json({ error: 'Credenciales inválidas' });
     }
 
-    const result = await pool.query(
-      'SELECT * FROM profiles WHERE email = $1 AND is_active = true',
-      [normalizedEmail]
+    const gpsApiKey = gpsData.user_api_hash || gpsData.api_key;
+    if (!gpsApiKey) {
+      console.log(`❌ No se recibió API key del GPS`);
+      return res.status(401).json({ error: 'Error de autenticación GPS' });
+    }
+
+    console.log(`✅ Autenticación GPS exitosa - API Key: ${gpsApiKey.substring(0, 20)}...`);
+
+    // PASO 2: Buscar o crear usuario en base de datos local
+    let result = await pool.query(
+      'SELECT * FROM profiles WHERE email = $1',
+      [email]
     );
 
+    let user;
     if (result.rows.length === 0) {
-      console.log(`❌ Usuario no encontrado: ${normalizedEmail}`);
-      return res.status(401).json({ error: 'Credenciales inválidas' });
+      console.log(`👤 Usuario nuevo - creando perfil: ${email}`);
+      
+      // Crear nuevo usuario con rol 'owner' por defecto
+      // Password hash no se usa porque autenticamos contra GPS
+      const dummyHash = await bcrypt.hash('gps-authenticated', 10);
+      
+      const insertResult = await pool.query(
+        `INSERT INTO profiles (email, password_hash, full_name, role, is_active, created_at) 
+         VALUES ($1, $2, $3, $4, true, NOW()) 
+         RETURNING *`,
+        [email, dummyHash, email.split('@')[0], 'owner']
+      );
+      user = insertResult.rows[0];
+      console.log(`✅ Usuario creado: ${user.id}`);
+    } else {
+      user = result.rows[0];
+      
+      // Actualizar última autenticación
+      await pool.query(
+        'UPDATE profiles SET updated_at = NOW() WHERE id = $1',
+        [user.id]
+      );
+      console.log(`✅ Usuario existente: ${user.id}`);
     }
 
-    const user = result.rows[0];
-    const validPassword = await bcrypt.compare(password, user.password_hash);
+    // Guardar credenciales GPS en la sesión del usuario (opcional)
+    await pool.query(
+      `INSERT INTO user_settings (user_id, setting_key, setting_value, updated_at)
+       VALUES ($1, 'gps_api_key', $2, NOW())
+       ON CONFLICT (user_id, setting_key) 
+       DO UPDATE SET setting_value = $2, updated_at = NOW()`,
+      [user.id, gpsApiKey]
+    );
 
-    if (!validPassword) {
-      console.log(`❌ Contraseña incorrecta para: ${normalizedEmail}`);
-      return res.status(401).json({ error: 'Credenciales inválidas' });
-    }
-
+    // PASO 3: Generar token JWT
     const token = jwt.sign(
       { id: user.id, email: user.email, role: user.role },
       JWT_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: '15m' }
     );
 
-    console.log(`✅ Login exitoso: ${normalizedEmail} (${user.role})`);
+    console.log(`✅ Login exitoso: ${user.email} (${user.role})`);
 
     res.json({
-      access_token: token,
+      token: token,
       user: {
-        id: user.id,
+        userId: user.id,
         email: user.email,
-        full_name: user.full_name,
+        fullName: user.full_name,
         role: user.role,
-        assigned_vehicle_id: user.assigned_vehicle_id,
+        assignedVehicleId: user.assigned_vehicle_id,
       },
+      gpsApiKey: gpsApiKey
     });
   } catch (error) {
     console.error('❌ Error en login:', error);
+    res.status(500).json({ error: 'Error del servidor' });
+  }
+});
+
+// ============================================================================
+// PROFILES ENDPOINTS
+// ============================================================================
+
+// Obtener perfil del usuario autenticado
+app.get('/profiles/me', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT id, email, full_name, role, phone, assigned_vehicle_id, avatar_url, is_active, created_at, updated_at FROM profiles WHERE id = $1',
+      [req.user.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Perfil no encontrado' });
+    }
+
+    const profile = result.rows[0];
+    res.json({
+      id: profile.id,
+      email: profile.email,
+      fullName: profile.full_name,
+      role: profile.role,
+      phone: profile.phone,
+      assignedVehicleId: profile.assigned_vehicle_id,
+      avatarUrl: profile.avatar_url,
+      isActive: profile.is_active,
+      createdAt: profile.created_at,
+      updatedAt: profile.updated_at
+    });
+  } catch (error) {
+    console.error('❌ Error obteniendo perfil:', error);
+    res.status(500).json({ error: 'Error del servidor' });
+  }
+});
+
+// Listar todos los conductores
+app.get('/profiles/drivers', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, email, full_name, phone, assigned_vehicle_id, is_active, created_at, updated_at 
+       FROM profiles 
+       WHERE role = 'driver' AND is_active = true
+       ORDER BY full_name ASC`
+    );
+
+    const drivers = result.rows.map(driver => ({
+      id: driver.id,
+      email: driver.email,
+      fullName: driver.full_name,
+      phone: driver.phone,
+      assignedVehicleId: driver.assigned_vehicle_id,
+      isActive: driver.is_active,
+      createdAt: driver.created_at,
+      updatedAt: driver.updated_at
+    }));
+
+    res.json(drivers);
+  } catch (error) {
+    console.error('❌ Error listando conductores:', error);
+    res.status(500).json({ error: 'Error del servidor' });
+  }
+});
+
+// Crear conductor
+app.post('/profiles/drivers', authenticateToken, async (req, res) => {
+  try {
+    const { fullName, email, phone } = req.body;
+
+    // Generar password temporal
+    const tempPassword = Math.random().toString(36).slice(-8);
+    const passwordHash = await bcrypt.hash(tempPassword, 10);
+
+    const result = await pool.query(
+      `INSERT INTO profiles (email, password_hash, full_name, role, phone, is_active, created_at)
+       VALUES ($1, $2, $3, 'driver', $4, true, NOW())
+       RETURNING id, email, full_name, phone, is_active, created_at`,
+      [email, passwordHash, fullName, phone]
+    );
+
+    const driver = result.rows[0];
+    res.status(201).json({
+      id: driver.id,
+      email: driver.email,
+      fullName: driver.full_name,
+      phone: driver.phone,
+      isActive: driver.is_active,
+      createdAt: driver.created_at,
+      temporaryPassword: tempPassword
+    });
+  } catch (error) {
+    console.error('❌ Error creando conductor:', error);
+    res.status(500).json({ error: 'Error del servidor' });
+  }
+});
+
+// ============================================================================
+// VEHICLES ENDPOINTS
+// ============================================================================
+
+// Listar vehículos del usuario
+app.get('/vehicles', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, placa, marca, modelo, ano, color, tipo, capacidad_carga, 
+              gps_device_id, owner_id, is_active, created_at, updated_at
+       FROM vehicles 
+       WHERE owner_id = $1
+       ORDER BY placa ASC`,
+      [req.user.id]
+    );
+
+    const vehicles = result.rows.map(v => ({
+      id: v.id,
+      plate: v.placa,
+      brand: v.marca,
+      model: v.modelo,
+      year: v.ano,
+      color: v.color,
+      type: v.tipo,
+      loadCapacity: v.capacidad_carga,
+      gpsDeviceId: v.gps_device_id,
+      ownerId: v.owner_id,
+      isActive: v.is_active,
+      createdAt: v.created_at,
+      updatedAt: v.updated_at
+    }));
+
+    res.json(vehicles);
+  } catch (error) {
+    console.error('❌ Error listando vehículos:', error);
+    res.status(500).json({ error: 'Error del servidor' });
+  }
+});
+
+// Crear vehículo
+app.post('/vehicles', authenticateToken, async (req, res) => {
+  try {
+    const { plate, brand, model, year, color, type, loadCapacity, gpsDeviceId } = req.body;
+
+    const result = await pool.query(
+      `INSERT INTO vehicles (placa, marca, modelo, ano, color, tipo, capacidad_carga,
+                             gps_device_id, owner_id, is_active, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true, NOW())
+       RETURNING *`,
+      [plate, brand, model, year, color, type, loadCapacity, gpsDeviceId, req.user.id]
+    );
+
+    const vehicle = result.rows[0];
+    res.status(201).json({
+      id: vehicle.id,
+      plate: vehicle.placa,
+      brand: vehicle.marca,
+      model: vehicle.modelo,
+      year: vehicle.ano,
+      color: vehicle.color,
+      type: vehicle.tipo,
+      loadCapacity: vehicle.capacidad_carga,
+      gpsDeviceId: vehicle.gps_device_id,
+      ownerId: vehicle.owner_id,
+      isActive: vehicle.is_active,
+      createdAt: vehicle.created_at
+    });
+  } catch (error) {
+    console.error('❌ Error creando vehículo:', error);
+    res.status(500).json({ error: 'Error del servidor' });
+  }
+});
+
+// ============================================================================
+// EXPENSES ENDPOINTS
+// ============================================================================
+
+// Listar gastos
+app.get('/expenses', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, driver_id, vehicle_id, trip_id, amount, expense_type, description, 
+              expense_date, receipt_url, currency, created_at, updated_at
+       FROM expenses 
+       WHERE driver_id = $1
+       ORDER BY expense_date DESC`,
+      [req.user.id]
+    );
+
+    const expenses = result.rows.map(e => ({
+      id: e.id,
+      driverId: e.driver_id,
+      vehicleId: e.vehicle_id,
+      tripId: e.trip_id,
+      amount: parseFloat(e.amount),
+      category: e.expense_type,
+      description: e.description,
+      expenseDate: e.expense_date,
+      receiptUrl: e.receipt_url,
+      currency: e.currency,
+      createdAt: e.created_at,
+      updatedAt: e.updated_at
+    }));
+
+    res.json(expenses);
+  } catch (error) {
+    console.error('❌ Error listando gastos:', error);
+    res.status(500).json({ error: 'Error del servidor' });
+  }
+});
+
+// Crear gasto
+app.post('/expenses', authenticateToken, async (req, res) => {
+  try {
+    const { vehicleId, tripId, amount, category, description, expenseDate, receiptUrl } = req.body;
+
+    const result = await pool.query(
+      `INSERT INTO expenses (driver_id, vehicle_id, trip_id, amount, expense_type, 
+                            description, expense_date, receipt_url, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+       RETURNING *`,
+      [req.user.id, vehicleId, tripId, amount, category || 'otros', description, expenseDate, receiptUrl]
+    );
+
+    const expense = result.rows[0];
+    res.status(201).json({
+      id: expense.id,
+      driverId: expense.driver_id,
+      vehicleId: expense.vehicle_id,
+      tripId: expense.trip_id,
+      amount: parseFloat(expense.amount),
+      category: expense.expense_type,
+      description: expense.description,
+      expenseDate: expense.expense_date,
+      receiptUrl: expense.receipt_url,
+      createdAt: expense.created_at
+    });
+  } catch (error) {
+    console.error('❌ Error creando gasto:', error);
+    res.status(500).json({ error: 'Error del servidor' });
+  }
+});
+
+// ============================================================================
+// INCOMES ENDPOINTS
+// ============================================================================
+
+// Listar ingresos
+app.get('/incomes', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, user_id, vehicle_id, trip_id, amount, source, description, 
+              income_date, created_at, updated_at
+       FROM incomes 
+       WHERE user_id = $1
+       ORDER BY income_date DESC`,
+      [req.user.id]
+    );
+
+    const incomes = result.rows.map(i => ({
+      id: i.id,
+      userId: i.user_id,
+      vehicleId: i.vehicle_id,
+      tripId: i.trip_id,
+      amount: parseFloat(i.amount),
+      source: i.source,
+      description: i.description,
+      incomeDate: i.income_date,
+      createdAt: i.created_at,
+      updatedAt: i.updated_at
+    }));
+
+    res.json(incomes);
+  } catch (error) {
+    console.error('❌ Error listando ingresos:', error);
+    res.status(500).json({ error: 'Error del servidor' });
+  }
+});
+
+// Crear ingreso
+app.post('/incomes', authenticateToken, async (req, res) => {
+  try {
+    const { vehicleId, tripId, amount, source, description, incomeDate } = req.body;
+
+    const result = await pool.query(
+      `INSERT INTO incomes (user_id, vehicle_id, trip_id, amount, source, 
+                           description, income_date, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+       RETURNING *`,
+      [req.user.id, vehicleId, tripId, amount, source, description, incomeDate]
+    );
+
+    const income = result.rows[0];
+    res.status(201).json({
+      id: income.id,
+      userId: income.user_id,
+      vehicleId: income.vehicle_id,
+      tripId: income.trip_id,
+      amount: parseFloat(income.amount),
+      source: income.source,
+      description: income.description,
+      incomeDate: income.income_date,
+      createdAt: income.created_at
+    });
+  } catch (error) {
+    console.error('❌ Error creando ingreso:', error);
+    res.status(500).json({ error: 'Error del servidor' });
+  }
+});
+
+// ============================================================================
+// TRIPS ENDPOINTS
+// ============================================================================
+
+// Listar viajes
+app.get('/trips', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, vehicle_id, driver_id, start_time, end_time, 
+              start_address, end_address, distance_km, duration_minutes, 
+              fuel_consumed, status, notes, created_at, updated_at
+       FROM trips 
+       WHERE driver_id = $1
+       ORDER BY start_time DESC`,
+      [req.user.id]
+    );
+
+    const trips = result.rows.map(t => ({
+      id: t.id,
+      vehicleId: t.vehicle_id,
+      driverId: t.driver_id,
+      startTime: t.start_time,
+      endTime: t.end_time,
+      startAddress: t.start_address,
+      endAddress: t.end_address,
+      distanceKm: t.distance_km,
+      durationMinutes: t.duration_minutes,
+      fuelConsumed: t.fuel_consumed,
+      status: t.status,
+      notes: t.notes,
+      createdAt: t.created_at,
+      updatedAt: t.updated_at
+    }));
+
+    res.json(trips);
+  } catch (error) {
+    console.error('❌ Error listando viajes:', error);
+    res.status(500).json({ error: 'Error del servidor' });
+  }
+});
+
+// Crear viaje
+app.post('/trips', authenticateToken, async (req, res) => {
+  try {
+    const { vehicleId, driverId, startAddress, endAddress, status } = req.body;
+
+    const result = await pool.query(
+      `INSERT INTO trips (vehicle_id, driver_id, start_address, end_address, 
+                         start_time, status, created_at)
+       VALUES ($1, $2, $3, $4, NOW(), $5, NOW())
+       RETURNING *`,
+      [vehicleId, driverId || req.user.id, startAddress, endAddress, status || 'in_progress']
+    );
+
+    const trip = result.rows[0];
+    res.status(201).json({
+      id: trip.id,
+      vehicleId: trip.vehicle_id,
+      driverId: trip.driver_id,
+      startAddress: trip.start_address,
+      endAddress: trip.end_address,
+      startTime: trip.start_time,
+      status: trip.status,
+      createdAt: trip.created_at
+    });
+  } catch (error) {
+    console.error('❌ Error creando viaje:', error);
     res.status(500).json({ error: 'Error del servidor' });
   }
 });
@@ -104,13 +533,18 @@ app.post('/auth/signup', async (req, res) => {
   try {
     const { email, password, full_name, role = 'driver', assigned_vehicle_id } = req.body;
     
+    console.log(`📝 Registrando usuario: ${email}`);
+    console.log(`   - Full Name: ${full_name}`);
+    console.log(`   - Role: ${role}`);
+    console.log(`   - Assigned Vehicle ID: ${assigned_vehicle_id}`);
+    
     // Normalizar email
     let normalizedEmail = email.trim();
     if (!normalizedEmail.includes('@')) {
       normalizedEmail = `${normalizedEmail}@conductor.app`;
     }
 
-    console.log(`📝 Registrando usuario: ${normalizedEmail}`);
+    console.log(`📝 Email normalizado: ${normalizedEmail}`);
 
     // Verificar si ya existe
     const existing = await pool.query(
@@ -138,7 +572,7 @@ app.post('/auth/signup', async (req, res) => {
     const token = jwt.sign(
       { id: newUser.id, email: newUser.email, role: newUser.role },
       JWT_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: '15m' }
     );
 
     console.log(`✅ Usuario creado: ${normalizedEmail}`);
@@ -260,6 +694,29 @@ app.patch('/rest/v1/profiles/:id', authenticateToken, async (req, res) => {
     res.json(result.rows[0]);
   } catch (error) {
     console.error('❌ Error actualizando perfil:', error);
+    res.status(500).json({ error: 'Error del servidor' });
+  }
+});
+
+// Eliminar perfil/conductor
+app.delete('/rest/v1/profiles/:id', authenticateToken, async (req, res) => {
+  try {
+    console.log(`🗑️ Eliminando perfil con ID: ${req.params.id}`);
+    
+    const result = await pool.query(
+      'DELETE FROM profiles WHERE id = $1 RETURNING *',
+      [req.params.id]
+    );
+
+    if (result.rows.length === 0) {
+      console.log(`❌ Perfil no encontrado: ${req.params.id}`);
+      return res.status(404).json({ error: 'Perfil no encontrado' });
+    }
+
+    console.log(`✅ Perfil eliminado: ${result.rows[0].email}`);
+    res.json({ message: 'Perfil eliminado exitosamente', profile: result.rows[0] });
+  } catch (error) {
+    console.error('❌ Error eliminando perfil:', error);
     res.status(500).json({ error: 'Error del servidor' });
   }
 });

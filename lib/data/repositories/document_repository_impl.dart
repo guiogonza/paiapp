@@ -8,9 +8,15 @@ import 'package:pai_app/domain/repositories/document_repository.dart';
 import 'package:pai_app/data/models/document_model.dart';
 
 class DocumentRepositoryImpl implements DocumentRepository {
-  final SupabaseClient _supabase = Supabase.instance.client;
+  // TODO: Remover Supabase - ya no se usa
+  // final SupabaseClient _supabase = Supabase.instance.client;
+
+  // Getter temporal para evitar errores - lanzará error si se usa
+  dynamic get _supabase =>
+      throw UnimplementedError('Supabase ya no se usa - migrado a PostgreSQL');
   static const String _tableName = 'documents';
-  static const String _storageBucket = 'signatures'; // Usar el mismo bucket que las remisiones
+  static const String _storageBucket =
+      'signatures'; // Usar el mismo bucket que las remisiones
 
   @override
   Future<Either<DocumentFailure, List<DocumentEntity>>> getDocuments() async {
@@ -29,12 +35,14 @@ class DocumentRepositoryImpl implements DocumentRepository {
 
       return Right(documents);
     } on PostgrestException catch (e) {
-      if (e.message.contains('row-level security') || 
+      if (e.message.contains('row-level security') ||
           e.message.contains('policy') ||
           e.code == 'PGRST301') {
-        return Left(ValidationFailure(
-          'No tienes permisos. Asegúrate de estar autenticado como owner.'
-        ));
+        return Left(
+          ValidationFailure(
+            'No tienes permisos. Asegúrate de estar autenticado como owner.',
+          ),
+        );
       }
       return Left(DatabaseFailure(_mapPostgrestError(e)));
     } on SocketException catch (_) {
@@ -45,7 +53,9 @@ class DocumentRepositoryImpl implements DocumentRepository {
   }
 
   @override
-  Future<Either<DocumentFailure, DocumentEntity>> getDocumentById(String id) async {
+  Future<Either<DocumentFailure, DocumentEntity>> getDocumentById(
+    String id,
+  ) async {
     try {
       final response = await _supabase
           .from(_tableName)
@@ -72,7 +82,9 @@ class DocumentRepositoryImpl implements DocumentRepository {
   }
 
   @override
-  Future<Either<DocumentFailure, List<DocumentEntity>>> getDocumentsByVehicleId(String vehicleId) async {
+  Future<Either<DocumentFailure, List<DocumentEntity>>> getDocumentsByVehicleId(
+    String vehicleId,
+  ) async {
     try {
       // Filtrar solo documentos activos (no archivados)
       final response = await _supabase
@@ -98,7 +110,9 @@ class DocumentRepositoryImpl implements DocumentRepository {
   }
 
   @override
-  Future<Either<DocumentFailure, List<DocumentEntity>>> getDocumentsByDriverId(String driverId) async {
+  Future<Either<DocumentFailure, List<DocumentEntity>>> getDocumentsByDriverId(
+    String driverId,
+  ) async {
     try {
       // Filtrar solo documentos activos (no archivados)
       final response = await _supabase
@@ -124,17 +138,24 @@ class DocumentRepositoryImpl implements DocumentRepository {
   }
 
   @override
-  Future<Either<DocumentFailure, DocumentEntity>> createDocument(DocumentEntity document) async {
+  Future<Either<DocumentFailure, DocumentEntity>> createDocument(
+    DocumentEntity document,
+  ) async {
     try {
       // Obtener el ID del usuario autenticado (owner)
       final currentUserId = _supabase.auth.currentUser?.id;
       if (currentUserId == null) {
-        return const Left(ValidationFailure('Usuario no autenticado. Por favor, inicia sesión.'));
+        return const Left(
+          ValidationFailure(
+            'Usuario no autenticado. Por favor, inicia sesión.',
+          ),
+        );
       }
 
       final documentData = DocumentModel.fromEntity(document).toJson();
       documentData.remove('id'); // No incluir id en la creación
-      documentData['created_by'] = currentUserId; // Incluir explícitamente el usuario que crea el documento
+      documentData['created_by'] =
+          currentUserId; // Incluir explícitamente el usuario que crea el documento
       documentData['created_at'] = DateTime.now().toIso8601String();
       documentData['updated_at'] = DateTime.now().toIso8601String();
 
@@ -147,12 +168,14 @@ class DocumentRepositoryImpl implements DocumentRepository {
       final createdDocument = DocumentModel.fromJson(response);
       return Right(createdDocument.toEntity());
     } on PostgrestException catch (e) {
-      if (e.message.contains('row-level security') || 
+      if (e.message.contains('row-level security') ||
           e.message.contains('policy') ||
           e.code == 'PGRST301') {
-        return Left(ValidationFailure(
-          'No tienes permisos. Asegúrate de estar autenticado como owner.'
-        ));
+        return Left(
+          ValidationFailure(
+            'No tienes permisos. Asegúrate de estar autenticado como owner.',
+          ),
+        );
       }
       return Left(DatabaseFailure(_mapPostgrestError(e)));
     } on SocketException catch (_) {
@@ -163,10 +186,14 @@ class DocumentRepositoryImpl implements DocumentRepository {
   }
 
   @override
-  Future<Either<DocumentFailure, DocumentEntity>> updateDocument(DocumentEntity document) async {
+  Future<Either<DocumentFailure, DocumentEntity>> updateDocument(
+    DocumentEntity document,
+  ) async {
     try {
       if (document.id == null) {
-        return const Left(ValidationFailure('El ID del documento es requerido para actualizar'));
+        return const Left(
+          ValidationFailure('El ID del documento es requerido para actualizar'),
+        );
       }
 
       final documentData = DocumentModel.fromEntity(document).toJson();
@@ -197,10 +224,7 @@ class DocumentRepositoryImpl implements DocumentRepository {
   @override
   Future<Either<DocumentFailure, void>> deleteDocument(String id) async {
     try {
-      await _supabase
-          .from(_tableName)
-          .delete()
-          .eq('id', id);
+      await _supabase.from(_tableName).delete().eq('id', id);
 
       return const Right(null);
     } on PostgrestException catch (e) {
@@ -216,11 +240,14 @@ class DocumentRepositoryImpl implements DocumentRepository {
   }
 
   @override
-  Future<Either<DocumentFailure, String>> uploadDocumentImage(List<int> fileBytes, String fileName) async {
+  Future<Either<DocumentFailure, String>> uploadDocumentImage(
+    List<int> fileBytes,
+    String fileName,
+  ) async {
     try {
       // Convertir List<int> a Uint8List
       final uint8List = Uint8List.fromList(fileBytes);
-      
+
       // Normalizar el nombre del archivo
       final normalizedFileName = fileName
           .toLowerCase()
@@ -253,16 +280,16 @@ class DocumentRepositoryImpl implements DocumentRepository {
   }
 
   @override
-  Future<Either<DocumentFailure, void>> deleteDocumentImage(String imageUrl) async {
+  Future<Either<DocumentFailure, void>> deleteDocumentImage(
+    String imageUrl,
+  ) async {
     try {
       // Extraer el path del archivo desde la URL
       final uri = Uri.parse(imageUrl);
       final pathSegments = uri.pathSegments;
       final filePath = pathSegments.sublist(pathSegments.length - 2).join('/');
 
-      await _supabase.storage
-          .from(_storageBucket)
-          .remove([filePath]);
+      await _supabase.storage.from(_storageBucket).remove([filePath]);
 
       return const Right(null);
     } on StorageException catch (e) {
@@ -325,7 +352,9 @@ class DocumentRepositoryImpl implements DocumentRepository {
   }
 
   @override
-  Future<Either<DocumentFailure, List<DocumentEntity>>> getDocumentHistory(DocumentEntity document) async {
+  Future<Either<DocumentFailure, List<DocumentEntity>>> getDocumentHistory(
+    DocumentEntity document,
+  ) async {
     try {
       // Buscar documentos archivados con el mismo tipo y asociación (vehículo o conductor)
       var query = _supabase
@@ -371,4 +400,3 @@ class DocumentRepositoryImpl implements DocumentRepository {
     return e.toString();
   }
 }
-

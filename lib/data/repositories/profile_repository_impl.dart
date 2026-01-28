@@ -9,7 +9,13 @@ import 'package:pai_app/data/models/profile_model.dart';
 import 'package:pai_app/data/services/local_api_client.dart';
 
 class ProfileRepositoryImpl implements ProfileRepository {
-  final SupabaseClient _supabase = Supabase.instance.client;
+  // TODO: Remover Supabase - ya no se usa
+  // final SupabaseClient _supabase = Supabase.instance.client;
+
+  // Getter temporal para evitar errores - lanzará error si se usa
+  dynamic get _supabase =>
+      throw UnimplementedError('Supabase ya no se usa - migrado a PostgreSQL');
+
   final LocalApiClient _localApi = LocalApiClient();
   static const String _tableName = 'profiles';
 
@@ -37,17 +43,23 @@ class ProfileRepositoryImpl implements ProfileRepository {
     String? vehicleId,
   }) async {
     try {
-      final updateData = <String, dynamic>{'assigned_vehicle_id': vehicleId};
+      print('🔄 Actualizando vehículo asignado...');
+      print('   Driver ID: $driverId');
+      print('   Vehicle ID: $vehicleId');
 
-      await _supabase.from(_tableName).update(updateData).eq('id', driverId);
+      // Usar la API local de PostgreSQL
+      await _localApi.patch('/rest/v1/profiles', driverId, {
+        'assigned_vehicle_id': vehicleId,
+      });
 
+      print('✅ Vehículo asignado actualizado correctamente');
       return const Right(unit);
-    } on PostgrestException catch (e) {
-      return Left(DatabaseFailure(_mapPostgrestError(e)));
     } on SocketException catch (_) {
+      print('❌ Error de red al actualizar vehículo asignado');
       return const Left(NetworkFailure());
     } catch (e) {
-      return Left(UnknownFailure(_mapGenericError(e)));
+      print('❌ Error al actualizar vehículo asignado: $e');
+      return Left(DatabaseFailure('Error al actualizar vehículo: $e'));
     }
   }
 
@@ -55,24 +67,35 @@ class ProfileRepositoryImpl implements ProfileRepository {
   Future<Either<ProfileFailure, List<ProfileEntity>>>
   getDriversWithAssignedVehicle() async {
     try {
-      final response = await _supabase
-          .from(_tableName)
-          .select('*')
-          .eq('role', 'driver')
-          .order('email', ascending: true);
+      print('🔍 Obteniendo conductores con vehículos asignados...');
 
-      final profilesList = (response as List)
-          .map((json) => ProfileModel.fromJson(json as Map<String, dynamic>))
-          .map((model) => model.toEntity())
-          .toList();
+      // Usar la API local de PostgreSQL
+      final response = await _localApi.getDrivers();
 
+      final profilesList = <ProfileEntity>[];
+      for (var profileData in response) {
+        final profile = ProfileEntity(
+          id: profileData['id'] ?? '',
+          userId: profileData['id'] ?? '',
+          email: profileData['email'] ?? '',
+          fullName: profileData['full_name'] ?? '',
+          role: profileData['role'] ?? 'driver',
+          assignedVehicleId: profileData['assigned_vehicle_id'],
+          createdAt: profileData['created_at'] != null
+              ? DateTime.tryParse(profileData['created_at'])
+              : DateTime.now(),
+        );
+        profilesList.add(profile);
+      }
+
+      print('✅ ${profilesList.length} conductores con vehículos encontrados');
       return Right(profilesList);
-    } on PostgrestException catch (e) {
-      return Left(DatabaseFailure(_mapPostgrestError(e)));
     } on SocketException catch (_) {
+      print('❌ Error de red al obtener conductores');
       return const Left(NetworkFailure());
     } catch (e) {
-      return Left(UnknownFailure(_mapGenericError(e)));
+      print('❌ Error al obtener conductores: $e');
+      return Left(DatabaseFailure('Error al obtener conductores: $e'));
     }
   }
 
@@ -141,9 +164,6 @@ class ProfileRepositoryImpl implements ProfileRepository {
       final profilesList = response as List;
       print('📋 Procesando ${profilesList.length} perfiles...');
 
-      // Buscar específicamente pepe@pai.com para diagnóstico
-      bool foundPepe = false;
-
       for (var index = 0; index < profilesList.length; index++) {
         final profileRaw = profilesList[index];
 
@@ -167,7 +187,6 @@ class ProfileRepositoryImpl implements ProfileRepository {
 
         // Diagnóstico especial para pepe@pai.com
         if (email != null && email.toLowerCase().contains('pepe')) {
-          foundPepe = true;
           print(
             '🔍 ENCONTRADO PEPE: id="$profileId", email="$email", role="$role"',
           );
@@ -223,19 +242,6 @@ class ProfileRepositoryImpl implements ProfileRepository {
     }
   }
 
-  /// Convierte cualquier texto de usuario a un formato válido para Supabase Auth
-  /// Si ya tiene formato de email, lo devuelve tal cual
-  /// Si no, lo convierte a usuario@conductor.app (dominio válido)
-  String _normalizeUsernameForSupabase(String username) {
-    final trimmed = username.trim();
-    // Si ya tiene formato de email (contiene @), usarlo tal cual
-    if (trimmed.contains('@')) {
-      return trimmed;
-    }
-    // Si no tiene formato de email, convertirlo a usuario@conductor.app
-    return '$trimmed@conductor.app';
-  }
-
   @override
   Future<Either<ProfileFailure, ProfileEntity>> createDriver(
     String username,
@@ -287,6 +293,29 @@ class ProfileRepositoryImpl implements ProfileRepository {
       }
 
       return Left(DatabaseFailure('Error al crear conductor: $errorMsg'));
+    }
+  }
+
+  @override
+  Future<Either<ProfileFailure, Unit>> deleteDriver(String driverId) async {
+    try {
+      print('🗑️ Eliminando conductor con ID: $driverId');
+
+      // Eliminar del backend PostgreSQL usando el método delete
+      final success = await _localApi.delete('/rest/v1/profiles', driverId);
+
+      if (success) {
+        print('✅ Conductor eliminado exitosamente');
+        return const Right(unit);
+      } else {
+        print('❌ Error al eliminar conductor');
+        return const Left(DatabaseFailure('Error al eliminar conductor'));
+      }
+    } catch (e) {
+      print('❌ Error al eliminar conductor: $e');
+      return Left(
+        DatabaseFailure('Error al eliminar conductor: ${e.toString()}'),
+      );
     }
   }
 

@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:pai_app/core/theme/app_colors.dart';
 import 'package:pai_app/data/repositories/auth_repository_impl.dart';
 import 'package:pai_app/data/services/vehicle_location_service.dart';
+import 'package:pai_app/data/services/local_api_client.dart';
 import 'package:pai_app/domain/entities/vehicle_location_entity.dart';
 import 'package:pai_app/presentation/pages/login/login_page.dart';
 import 'package:pai_app/presentation/pages/vehicle_history/vehicle_history_page.dart';
@@ -18,7 +19,6 @@ import 'package:pai_app/presentation/pages/drivers/drivers_management_page.dart'
 import 'package:pai_app/presentation/pages/maintenance/maintenance_page.dart';
 import 'package:pai_app/data/repositories/maintenance_repository_impl.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:pai_app/data/repositories/trip_repository_impl.dart';
 import 'package:pai_app/data/repositories/expense_repository_impl.dart';
 import 'package:pai_app/data/repositories/remittance_repository_impl.dart';
@@ -110,6 +110,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
 
   /// Carga el role del usuario actual
   Future<void> _loadUserRole() async {
+    // TODO: Reemplazar por usuario actual de API REST PostgreSQL
     final result = await _profileRepository.getCurrentUserProfile();
     result.fold(
       (failure) => debugPrint('Error al cargar perfil: ${failure.message}'),
@@ -623,8 +624,19 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
 
   @override
   Widget build(BuildContext context) {
-    final user = Supabase.instance.client.auth.currentUser;
-    final userName = (user?.email ?? 'PAI').split('@').first;
+    // Obtener usuario actual desde LocalApiClient
+    final localApi = LocalApiClient();
+    final currentUser = localApi.currentUser;
+    final userEmail = currentUser?['email'] as String? ?? 'Usuario';
+    final userFullName =
+        currentUser?['fullName'] as String? ??
+        currentUser?['full_name'] as String?;
+    final userName = userFullName ?? userEmail.split('@').first;
+
+    // Debug: Mostrar usuario actual
+    debugPrint('👤 Usuario actual en dashboard: $userEmail');
+    debugPrint('👤 Nombre completo: $userFullName');
+    debugPrint('👤 currentUser completo: $currentUser');
 
     final baseTheme = Theme.of(context);
     final textTheme = GoogleFonts.poppinsTextTheme(baseTheme.textTheme);
@@ -675,11 +687,54 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage> {
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
-                                Text(
-                                  'Torre de control',
-                                  style: textTheme.bodySmall?.copyWith(
-                                    color: AppColors.white.withOpacity(0.9),
-                                    fontSize: 11,
+                                InkWell(
+                                  onTap: () {
+                                    // Mostrar email completo en un SnackBar
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Row(
+                                          children: [
+                                            const Icon(
+                                              Icons.person,
+                                              color: Colors.white,
+                                              size: 20,
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Text(
+                                                    userFullName ?? userName,
+                                                    style: const TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                  Text(
+                                                    userEmail,
+                                                    style: const TextStyle(
+                                                      fontSize: 12,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        backgroundColor: AppColors.primary,
+                                        duration: const Duration(seconds: 3),
+                                      ),
+                                    );
+                                  },
+                                  child: Text(
+                                    userEmail,
+                                    style: textTheme.bodySmall?.copyWith(
+                                      color: AppColors.white.withOpacity(0.9),
+                                      fontSize: 11,
+                                    ),
                                   ),
                                 ),
                               ],
