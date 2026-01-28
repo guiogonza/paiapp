@@ -101,6 +101,22 @@ class GPSVehicleProvider {
     debugPrint('[GPSVehicleProvider] Cache limpiado');
   }
 
+  /// Obtiene un vehículo específico por ID
+  Future<VehicleEntity?> getVehicleById(String vehicleId) async {
+    try {
+      final vehicles = await getVehicles();
+      return vehicles.firstWhere(
+        (v) => v.id == vehicleId,
+        orElse: () => throw Exception('Vehículo no encontrado'),
+      );
+    } catch (e) {
+      debugPrint(
+        '[GPSVehicleProvider] Error obteniendo vehículo $vehicleId: $e',
+      );
+      return null;
+    }
+  }
+
   /// Obtiene los dispositivos GPS como modelos tipados (para uso avanzado)
   Future<List<GPSDeviceModel>> getDeviceModels({
     bool forceRefresh = false,

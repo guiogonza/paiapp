@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:pai_app/core/theme/app_colors.dart';
-import 'package:pai_app/data/repositories/vehicle_repository_impl.dart';
+import 'package:pai_app/data/providers/gps_vehicle_provider.dart';
 import 'package:pai_app/data/services/profitability_service.dart';
 import 'package:pai_app/domain/entities/profitability_record_entity.dart';
 import 'package:pai_app/domain/entities/vehicle_entity.dart';
@@ -11,13 +11,15 @@ class ProfitabilityByVehiclePage extends StatefulWidget {
   const ProfitabilityByVehiclePage({super.key});
 
   @override
-  State<ProfitabilityByVehiclePage> createState() => _ProfitabilityByVehiclePageState();
+  State<ProfitabilityByVehiclePage> createState() =>
+      _ProfitabilityByVehiclePageState();
 }
 
-class _ProfitabilityByVehiclePageState extends State<ProfitabilityByVehiclePage> {
-  final _vehicleRepository = VehicleRepositoryImpl();
+class _ProfitabilityByVehiclePageState
+    extends State<ProfitabilityByVehiclePage> {
+  final _gpsVehicleProvider = GPSVehicleProvider();
   final _profitabilityService = ProfitabilityService();
-  
+
   List<VehicleEntity> _vehicles = [];
   VehicleEntity? _selectedVehicle;
   DateTime? _fromDate;
@@ -37,23 +39,20 @@ class _ProfitabilityByVehiclePageState extends State<ProfitabilityByVehiclePage>
   }
 
   Future<void> _loadVehicles() async {
-    final result = await _vehicleRepository.getVehicles();
-    result.fold(
-      (failure) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error al cargar vehículos: ${failure.message}')),
-          );
-        }
-      },
-      (vehicles) {
-        if (mounted) {
-          setState(() {
-            _vehicles = vehicles;
-          });
-        }
-      },
-    );
+    try {
+      final vehicles = await _gpsVehicleProvider.getVehicles();
+      if (mounted) {
+        setState(() {
+          _vehicles = vehicles;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al cargar vehículos: $e')),
+        );
+      }
+    }
   }
 
   Future<void> _searchRecords() async {
@@ -103,7 +102,8 @@ class _ProfitabilityByVehiclePageState extends State<ProfitabilityByVehiclePage>
     }
 
     try {
-      final fileName = 'rentabilidad_vehiculo_${_selectedVehicle?.placa}_${DateFormat('yyyy-MM-dd').format(_fromDate!)}_${DateFormat('yyyy-MM-dd').format(_toDate!)}.xlsx';
+      final fileName =
+          'rentabilidad_vehiculo_${_selectedVehicle?.placa}_${DateFormat('yyyy-MM-dd').format(_fromDate!)}_${DateFormat('yyyy-MM-dd').format(_toDate!)}.xlsx';
       await ExcelExportUtils.exportProfitabilityRecords(
         records: _records,
         fileName: fileName,
@@ -120,9 +120,9 @@ class _ProfitabilityByVehiclePageState extends State<ProfitabilityByVehiclePage>
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al exportar: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error al exportar: $e')));
       }
     }
   }
@@ -130,7 +130,9 @@ class _ProfitabilityByVehiclePageState extends State<ProfitabilityByVehiclePage>
   Future<void> _selectDate(BuildContext context, bool isFromDate) async {
     final picked = await showDatePicker(
       context: context,
-      initialDate: isFromDate ? (_fromDate ?? DateTime.now()) : (_toDate ?? DateTime.now()),
+      initialDate: isFromDate
+          ? (_fromDate ?? DateTime.now())
+          : (_toDate ?? DateTime.now()),
       firstDate: DateTime(2020),
       lastDate: DateTime.now().add(const Duration(days: 365)),
       builder: (context, child) {
@@ -203,7 +205,9 @@ class _ProfitabilityByVehiclePageState extends State<ProfitabilityByVehiclePage>
                   items: _vehicles.map((vehicle) {
                     return DropdownMenuItem(
                       value: vehicle,
-                      child: Text('${vehicle.placa} - ${vehicle.marca} ${vehicle.modelo}'),
+                      child: Text(
+                        '${vehicle.placa} - ${vehicle.marca} ${vehicle.modelo}',
+                      ),
                     );
                   }).toList(),
                   onChanged: (value) {
@@ -289,28 +293,27 @@ class _ProfitabilityByVehiclePageState extends State<ProfitabilityByVehiclePage>
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : _hasSearched && _records.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.inbox,
-                              size: 64,
-                              color: AppColors.textSecondary,
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'No se encontraron registros',
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    color: AppColors.textSecondary,
-                                  ),
-                            ),
-                          ],
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.inbox,
+                          size: 64,
+                          color: AppColors.textSecondary,
                         ),
-                      )
-                    : _records.isEmpty
-                        ? const SizedBox()
-                        : _buildRecordsTable(),
+                        const SizedBox(height: 16),
+                        Text(
+                          'No se encontraron registros',
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(color: AppColors.textSecondary),
+                        ),
+                      ],
+                    ),
+                  )
+                : _records.isEmpty
+                ? const SizedBox()
+                : _buildRecordsTable(),
           ),
         ],
       ),
@@ -324,7 +327,9 @@ class _ProfitabilityByVehiclePageState extends State<ProfitabilityByVehiclePage>
       scrollDirection: Axis.horizontal,
       child: SingleChildScrollView(
         child: DataTable(
-          headingRowColor: WidgetStateProperty.all(AppColors.primary.withOpacity(0.1)),
+          headingRowColor: WidgetStateProperty.all(
+            AppColors.primary.withOpacity(0.1),
+          ),
           columns: const [
             DataColumn(label: Text('Fecha')),
             DataColumn(label: Text('Tipo')),
@@ -345,45 +350,68 @@ class _ProfitabilityByVehiclePageState extends State<ProfitabilityByVehiclePage>
                       record.isIncome
                           ? 'Ingreso'
                           : record.isTripExpense
-                              ? 'G. Viaje'
-                              : 'G. Mant.',
+                          ? 'G. Viaje'
+                          : 'G. Mant.',
                       style: const TextStyle(fontSize: 11),
                     ),
                     backgroundColor: record.isIncome
                         ? Colors.green.withOpacity(0.2)
                         : record.isTripExpense
-                            ? Colors.orange.withOpacity(0.2)
-                            : Colors.red.withOpacity(0.2),
+                        ? Colors.orange.withOpacity(0.2)
+                        : Colors.red.withOpacity(0.2),
                   ),
                 ),
-                DataCell(Text(
-                  record.isIncome ? '\$${numberFormat.format(record.amount)}' : '-',
-                  style: TextStyle(
-                    color: record.isIncome ? Colors.green : Colors.grey,
-                    fontWeight: record.isIncome ? FontWeight.bold : FontWeight.normal,
+                DataCell(
+                  Text(
+                    record.isIncome
+                        ? '\$${numberFormat.format(record.amount)}'
+                        : '-',
+                    style: TextStyle(
+                      color: record.isIncome ? Colors.green : Colors.grey,
+                      fontWeight: record.isIncome
+                          ? FontWeight.bold
+                          : FontWeight.normal,
+                    ),
                   ),
-                )),
-                DataCell(Text(
-                  record.isTripExpense ? '\$${numberFormat.format(record.amount)}' : '-',
-                  style: TextStyle(
-                    color: record.isTripExpense ? Colors.orange : Colors.grey,
-                    fontWeight: record.isTripExpense ? FontWeight.bold : FontWeight.normal,
+                ),
+                DataCell(
+                  Text(
+                    record.isTripExpense
+                        ? '\$${numberFormat.format(record.amount)}'
+                        : '-',
+                    style: TextStyle(
+                      color: record.isTripExpense ? Colors.orange : Colors.grey,
+                      fontWeight: record.isTripExpense
+                          ? FontWeight.bold
+                          : FontWeight.normal,
+                    ),
                   ),
-                )),
-                DataCell(Text(
-                  record.isMaintenanceExpense ? '\$${numberFormat.format(record.amount)}' : '-',
-                  style: TextStyle(
-                    color: record.isMaintenanceExpense ? Colors.red : Colors.grey,
-                    fontWeight: record.isMaintenanceExpense ? FontWeight.bold : FontWeight.normal,
+                ),
+                DataCell(
+                  Text(
+                    record.isMaintenanceExpense
+                        ? '\$${numberFormat.format(record.amount)}'
+                        : '-',
+                    style: TextStyle(
+                      color: record.isMaintenanceExpense
+                          ? Colors.red
+                          : Colors.grey,
+                      fontWeight: record.isMaintenanceExpense
+                          ? FontWeight.bold
+                          : FontWeight.normal,
+                    ),
                   ),
-                )),
+                ),
                 DataCell(Text(record.clientName ?? '-')),
                 DataCell(Text(record.expenseType ?? '-')),
-                DataCell(Text(
-                  record.routeOrigin != null && record.routeDestination != null
-                      ? '${record.routeOrigin} → ${record.routeDestination}'
-                      : '-',
-                )),
+                DataCell(
+                  Text(
+                    record.routeOrigin != null &&
+                            record.routeDestination != null
+                        ? '${record.routeOrigin} → ${record.routeDestination}'
+                        : '-',
+                  ),
+                ),
               ],
             );
           }).toList(),
@@ -392,4 +420,3 @@ class _ProfitabilityByVehiclePageState extends State<ProfitabilityByVehiclePage>
     );
   }
 }
-

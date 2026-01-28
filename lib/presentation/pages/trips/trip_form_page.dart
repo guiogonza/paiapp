@@ -5,7 +5,7 @@ import 'package:pai_app/core/theme/app_colors.dart';
 import 'package:pai_app/core/utils/validators.dart';
 import 'package:pai_app/core/services/municipalities_service.dart';
 import 'package:pai_app/data/repositories/trip_repository_impl.dart';
-import 'package:pai_app/data/repositories/vehicle_repository_impl.dart';
+import 'package:pai_app/data/providers/gps_vehicle_provider.dart';
 import 'package:pai_app/data/repositories/profile_repository_impl.dart';
 import 'package:pai_app/domain/entities/trip_entity.dart';
 import 'package:pai_app/domain/entities/vehicle_entity.dart';
@@ -29,7 +29,7 @@ class _TripFormPageState extends State<TripFormPage> {
   final _revenueAmountController = TextEditingController();
   final _budgetAmountController = TextEditingController();
   final _tripRepository = TripRepositoryImpl();
-  final _vehicleRepository = VehicleRepositoryImpl();
+  final _gpsVehicleProvider = GPSVehicleProvider();
   final _profileRepository = ProfileRepositoryImpl();
 
   String? _selectedVehicleId;
@@ -191,60 +191,56 @@ class _TripFormPageState extends State<TripFormPage> {
       return;
     }
 
-    final result = await _vehicleRepository.getVehicleById(vehicleId);
+    try {
+      final vehicle = await _gpsVehicleProvider.getVehicleById(vehicleId);
 
-    result.fold(
-      (failure) {
-        print('⚠️ No se pudo cargar vehículo $vehicleId: ${failure.message}');
-        // No mostrar SnackBar aquí para evitar spam de errores
-        // El usuario puede seleccionar otro vehículo manualmente
-      },
-      (vehicle) {
-        if (!mounted) return;
-        setState(() {
-          // Actualizar o agregar el vehículo a la lista local
-          final index = _vehicles.indexWhere(
-            (v) => v.id != null && v.id == vehicle.id,
-          );
-          if (index >= 0) {
-            _vehicles[index] = vehicle;
-          } else {
-            _vehicles.add(vehicle);
-          }
-          // Asegurar que el id seleccionado coincida
-          if (vehicle.id != null) {
-            _selectedVehicleId = vehicle.id;
-          }
-        });
-        _validateForm();
-      },
-    );
+      if (vehicle == null) {
+        print('⚠️ Vehículo $vehicleId no encontrado en GPS');
+        return;
+      }
+
+      if (!mounted) return;
+      setState(() {
+        // Actualizar o agregar el vehículo a la lista local
+        final index = _vehicles.indexWhere(
+          (v) => v.id != null && v.id == vehicle.id,
+        );
+        if (index >= 0) {
+          _vehicles[index] = vehicle;
+        } else {
+          _vehicles.add(vehicle);
+        }
+        // Asegurar que el id seleccionado coincida
+        if (vehicle.id != null) {
+          _selectedVehicleId = vehicle.id;
+        }
+      });
+      _validateForm();
+    } catch (e) {
+      print('⚠️ Error al cargar vehículo $vehicleId: $e');
+    }
   }
 
   Future<void> _loadVehicles() async {
-    final result = await _vehicleRepository.getVehicles();
-
-    result.fold(
-      (failure) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error al cargar vehículos: ${failure.message}'),
-              backgroundColor: Colors.red,
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
-      },
-      (vehicles) {
-        if (mounted) {
-          setState(() {
-            _vehicles = vehicles;
-          });
-          _validateForm();
-        }
-      },
-    );
+    try {
+      final vehicles = await _gpsVehicleProvider.getVehicles();
+      if (mounted) {
+        setState(() {
+          _vehicles = vehicles;
+        });
+        _validateForm();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al cargar vehículos: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
   void _validateForm() {

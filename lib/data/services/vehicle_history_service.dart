@@ -5,12 +5,14 @@ import 'package:pai_app/domain/entities/vehicle_history_entity.dart';
 import 'package:flutter/foundation.dart';
 
 /// Servicio que obtiene el historial de ubicaciones de vehículos desde la API de GPS
+/// Reutiliza el API hash que ya existe del login del mapa
 class VehicleHistoryService {
-  static const String _historyUrl = 'https://plataforma.sistemagps.online/api/get_history';
+  static const String _historyUrl =
+      'https://plataforma.sistemagps.online/api/get_history';
   final GPSAuthService _authService = GPSAuthService();
 
   /// Obtiene el historial de un vehículo específico
-  /// 
+  ///
   /// [vehicleId] - ID del vehículo
   /// [from] - Fecha de inicio (opcional, por defecto últimas 24 horas)
   /// [to] - Fecha de fin (opcional, por defecto ahora)
@@ -21,18 +23,23 @@ class VehicleHistoryService {
     DateTime? to,
   }) async {
     try {
-      // Obtener el API key
+      // Usar el API key que ya existe (del login del mapa/dispositivos)
+      // NO hacer login nuevamente
       final apiKey = await _authService.getApiKey();
-      
+
       if (apiKey == null || apiKey.isEmpty) {
-        throw Exception('No se pudo obtener el API key');
+        throw Exception(
+          'No hay API key GPS disponible. El mapa debe cargarse primero.',
+        );
       }
+
+      debugPrint('🔑 Usando API key existente para historial');
 
       // Construir los parámetros de la URL en el orden correcto
       // Orden correcto según el API: lang, user_api_hash, report_id, device_id, from_date, to_date, from_time, to_time
       final fromDate = from ?? DateTime.now().subtract(const Duration(days: 1));
       final toDate = to ?? DateTime.now();
-      
+
       // Construir parámetros en el orden exacto requerido por el API
       final params = <String, String>{
         'lang': 'es',
@@ -44,7 +51,7 @@ class VehicleHistoryService {
         'from_time': _formatTimeOnly(fromDate),
         'to_time': _formatTimeOnly(toDate),
       };
-      
+
       if (kDebugMode) {
         print('📅 Enviando fechas obligatorias:');
         print('   from_date: ${params['from_date']}');
@@ -55,7 +62,7 @@ class VehicleHistoryService {
 
       // Construir la URL - Uri.parse maneja automáticamente la codificación de espacios
       final uri = Uri.parse(_historyUrl).replace(queryParameters: params);
-      
+
       if (kDebugMode) {
         print('📡 Consultando historial para vehículo $vehicleId ($plate)');
         print('   URL completa: ${uri.toString()}');
@@ -66,18 +73,20 @@ class VehicleHistoryService {
       }
 
       // Hacer la petición
-      final response = await http.get(
-        uri,
-        headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'Flutter-App/1.0',
-        },
-      ).timeout(
-        const Duration(seconds: 30),
-        onTimeout: () {
-          throw Exception('Timeout al consultar historial');
-        },
-      );
+      final response = await http
+          .get(
+            uri,
+            headers: {
+              'Accept': 'application/json',
+              'User-Agent': 'Flutter-App/1.0',
+            },
+          )
+          .timeout(
+            const Duration(seconds: 30),
+            onTimeout: () {
+              throw Exception('Timeout al consultar historial');
+            },
+          );
 
       if (kDebugMode) {
         print('📡 Status Code: ${response.statusCode}');
@@ -112,22 +121,28 @@ class VehicleHistoryService {
           print('   Respuesta del servidor: ${response.body}');
           print('   Headers de respuesta: ${response.headers}');
         }
-        
+
         // Error 422 generalmente significa parámetros incorrectos
         if (response.statusCode == 422) {
-          throw Exception('Error 422: Parámetros incorrectos. Verifica el formato de las fechas y el device_id. Respuesta: ${response.body}');
+          throw Exception(
+            'Error 422: Parámetros incorrectos. Verifica el formato de las fechas y el device_id. Respuesta: ${response.body}',
+          );
         }
-        
+
         // Error 500 es un error del servidor, pero puede ser por parámetros incorrectos
         if (response.statusCode == 500) {
           final errorBody = response.body;
           if (kDebugMode) {
             print('❌ Error 500 del servidor. Respuesta completa: $errorBody');
           }
-          throw Exception('Error 500: Error interno del servidor. El API puede estar teniendo problemas o los parámetros no son correctos. Respuesta: $errorBody');
+          throw Exception(
+            'Error 500: Error interno del servidor. El API puede estar teniendo problemas o los parámetros no son correctos. Respuesta: $errorBody',
+          );
         }
-        
-        throw Exception('Error al obtener historial: ${response.statusCode} - ${response.body}');
+
+        throw Exception(
+          'Error al obtener historial: ${response.statusCode} - ${response.body}',
+        );
       }
     } on http.ClientException catch (e) {
       if (kDebugMode) {
@@ -172,16 +187,18 @@ class VehicleHistoryService {
       print('📦 Parseando respuesta del historial...');
       print('   Body length: ${response.body.length} caracteres');
     }
-    
+
     final data = json.decode(response.body);
-    
+
     if (kDebugMode) {
       print('📦 Respuesta de historial recibida');
       print('   Tipo de dato: ${data.runtimeType}');
       if (data is Map) {
         print('   Estructura del Map:');
         data.forEach((key, value) {
-          print('     $key: ${value.runtimeType}${value is List ? ' (${value.length} items)' : ''}');
+          print(
+            '     $key: ${value.runtimeType}${value is List ? ' (${value.length} items)' : ''}',
+          );
         });
       } else if (data is List) {
         print('   Es una Lista con ${data.length} items');
@@ -199,7 +216,7 @@ class VehicleHistoryService {
 
     // La respuesta tiene estructura anidada: {"items": [{"items": [...]}]}
     List<dynamic> items = [];
-    
+
     if (data is Map) {
       // Buscar items en el nivel superior
       final topLevelItems = data['items'] as List?;
@@ -213,10 +230,7 @@ class VehicleHistoryService {
         }
       } else {
         // Fallback: buscar en otras keys comunes
-        items = data['data'] ?? 
-                data['history'] ?? 
-                data['positions'] ?? 
-                [];
+        items = data['data'] ?? data['history'] ?? data['positions'] ?? [];
       }
     } else if (data is List) {
       items = data;
@@ -236,15 +250,16 @@ class VehicleHistoryService {
     }
 
     final history = <VehicleHistoryEntity>[];
-    
+
     for (var item in items) {
       try {
         if (item is! Map) continue;
-        
+
         // Extraer coordenadas (priorizar latitude/longitude, luego lat/lng)
         final lat = (item['latitude'] ?? item['lat'] ?? 0.0).toDouble();
-        final lng = (item['longitude'] ?? item['lng'] ?? item['lon'] ?? 0.0).toDouble();
-        
+        final lng = (item['longitude'] ?? item['lng'] ?? item['lon'] ?? 0.0)
+            .toDouble();
+
         // Extraer timestamp - usar 'time' con formato DD-MM-YYYY HH:MM:SS
         DateTime? timestamp;
         if (item['time'] != null) {
@@ -275,7 +290,7 @@ class VehicleHistoryService {
             }
           }
         }
-        
+
         // Si no se pudo parsear 'time', intentar con 'raw_time' (formato YYYY-MM-DD)
         if (timestamp == null && item['raw_time'] != null) {
           try {
@@ -291,12 +306,18 @@ class VehicleHistoryService {
         timestamp ??= DateTime.now();
 
         // Extraer otros campos
-        final speed = item['speed'] != null ? (item['speed'] as num).toDouble() : null;
-        final heading = item['course'] != null 
-            ? (item['course'] as num).toDouble() 
-            : (item['heading'] != null ? (item['heading'] as num).toDouble() : null);
-        final altitude = item['altitude'] != null ? (item['altitude'] as num).toDouble() : null;
-        
+        final speed = item['speed'] != null
+            ? (item['speed'] as num).toDouble()
+            : null;
+        final heading = item['course'] != null
+            ? (item['course'] as num).toDouble()
+            : (item['heading'] != null
+                  ? (item['heading'] as num).toDouble()
+                  : null);
+        final altitude = item['altitude'] != null
+            ? (item['altitude'] as num).toDouble()
+            : null;
+
         // Extraer 'valid' - puede venir como 1/0 o true/false
         bool? valid;
         if (item['valid'] != null) {
@@ -306,7 +327,7 @@ class VehicleHistoryService {
             valid = (item['valid'] as int) == 1;
           }
         }
-        
+
         // Extraer 'ignition' de other_arr
         bool? ignition;
         if (item['other_arr'] != null && item['other_arr'] is List) {
@@ -349,4 +370,3 @@ class VehicleHistoryService {
     return history;
   }
 }
-
