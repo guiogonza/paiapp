@@ -121,6 +121,31 @@ class ProfileRepositoryImpl implements ProfileRepository {
   }
 
   @override
+  Future<Either<ProfileFailure, ProfileEntity>> getProfileByEmail(
+    String email,
+  ) async {
+    try {
+      // Usar LocalApiClient en lugar de Supabase
+      final response = await _localApi.get('/rest/v1/profiles?email=eq.$email');
+
+      if (response is List && response.isEmpty) {
+        return const Left(NotFoundFailure('Perfil no encontrado'));
+      }
+
+      final profileData = response is List ? response.first : response;
+      final profile = ProfileModel.fromJson(profileData);
+      return Right(profile.toEntity());
+    } on SocketException catch (_) {
+      return const Left(NetworkFailure());
+    } catch (e) {
+      if (e.toString().contains('not found') || e.toString().contains('404')) {
+        return const Left(NotFoundFailure('Perfil no encontrado'));
+      }
+      return Left(UnknownFailure(_mapGenericError(e)));
+    }
+  }
+
+  @override
   Future<Either<ProfileFailure, Map<String, String>>> getDriversList() async {
     try {
       // Usar la API local de PostgreSQL

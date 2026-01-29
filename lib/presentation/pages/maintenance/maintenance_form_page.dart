@@ -6,6 +6,7 @@ import 'package:pai_app/core/utils/currency_input_formatter.dart';
 import 'package:pai_app/data/repositories/maintenance_repository_impl.dart';
 import 'package:pai_app/data/repositories/vehicle_repository_impl.dart';
 import 'package:pai_app/data/providers/gps_vehicle_provider.dart';
+import 'package:pai_app/data/services/local_api_client.dart';
 import 'package:pai_app/domain/entities/maintenance_entity.dart';
 import 'package:pai_app/domain/entities/vehicle_entity.dart';
 import 'package:pai_app/presentation/widgets/tire_selector.dart';
@@ -402,8 +403,26 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
       }
     }
 
-    // TODO: Reemplazar por usuario actual de API REST PostgreSQL
-    final currentUser = 'user_123456789';
+    // Obtener ID del usuario actual del LocalApiClient
+    final currentUser = LocalApiClient().currentUser?['id'];
+
+    if (currentUser == null) {
+      debugPrint('❌ No se pudo obtener el ID del usuario actual');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Error: Usuario no autenticado'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        setState(() {
+          _isLoading = false;
+        });
+      }
+      return;
+    }
+
+    debugPrint('✅ Usuario actual ID: $currentUser');
 
     final cost =
         CurrencyInputFormatter.getNumericValue(_costController.text) ?? 0.0;

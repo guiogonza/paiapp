@@ -124,6 +124,9 @@ class MaintenanceRepositoryImpl implements MaintenanceRepository {
       final maintenanceModel = MaintenanceModel.fromEntity(maintenance);
       final maintenanceData = maintenanceModel.toJson();
 
+      // Sobrescribir created_by con el ID del usuario actual autenticado
+      maintenanceData['created_by'] = currentUser['id'];
+
       print('📝 Registrando mantenimiento: $maintenanceData');
       print('📝 Kilometraje al servicio: ${maintenance.kmAtService} km');
 

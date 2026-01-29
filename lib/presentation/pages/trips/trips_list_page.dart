@@ -26,16 +26,19 @@ class _TripsListPageState extends State<TripsListPage> {
   final _profileRepository = ProfileRepositoryImpl();
   List<TripEntity> _allTrips = []; // Todos los viajes cargados
   List<TripEntity> _trips = []; // Viajes filtrados
-  final Map<String, List<ExpenseEntity>> _expensesByTrip = {}; // tripId -> expenses
+  final Map<String, List<ExpenseEntity>> _expensesByTrip =
+      {}; // tripId -> expenses
   bool _isLoading = true;
   TripFailure? _error;
   Map<String, VehicleEntity> _vehiclesById = {};
+  Map<String, String> _driverNames = {}; // email -> fullName
   bool _isCurrentUserDriver = false;
   String? _currentUserEmail;
-  
+
   // Controladores de búsqueda
   final TextEditingController _searchController = TextEditingController();
-  String _searchType = 'Todos'; // 'Todos', 'Origen', 'Destino', 'Cliente', 'Conductor'
+  String _searchType =
+      'Todos'; // 'Todos', 'Origen', 'Destino', 'Cliente', 'Conductor'
   String? _selectedDriverFilter; // Para filtro por conductor (dropdown)
   List<String> _availableDrivers = []; // Lista de conductores con historial
 
@@ -71,45 +74,49 @@ class _TripsListPageState extends State<TripsListPage> {
       case 'Origen':
         final query = _searchController.text.toLowerCase().trim();
         if (query.isNotEmpty) {
-          filtered = filtered.where((trip) => 
-            trip.origin.toLowerCase().contains(query)
-          ).toList();
+          filtered = filtered
+              .where((trip) => trip.origin.toLowerCase().contains(query))
+              .toList();
         }
         break;
       case 'Destino':
         final query = _searchController.text.toLowerCase().trim();
         if (query.isNotEmpty) {
-          filtered = filtered.where((trip) => 
-            trip.destination.toLowerCase().contains(query)
-          ).toList();
+          filtered = filtered
+              .where((trip) => trip.destination.toLowerCase().contains(query))
+              .toList();
         }
         break;
       case 'Cliente':
         final query = _searchController.text.toLowerCase().trim();
         if (query.isNotEmpty) {
-          filtered = filtered.where((trip) => 
-            trip.clientName.toLowerCase().contains(query)
-          ).toList();
+          filtered = filtered
+              .where((trip) => trip.clientName.toLowerCase().contains(query))
+              .toList();
         }
         break;
       case 'Conductor':
         // Usar el dropdown seleccionado
-        if (_selectedDriverFilter != null && _selectedDriverFilter!.isNotEmpty) {
-          filtered = filtered.where((trip) => 
-            trip.driverName == _selectedDriverFilter
-          ).toList();
+        if (_selectedDriverFilter != null &&
+            _selectedDriverFilter!.isNotEmpty) {
+          filtered = filtered
+              .where((trip) => trip.driverName == _selectedDriverFilter)
+              .toList();
         }
         break;
       case 'Todos':
       default:
         final query = _searchController.text.toLowerCase().trim();
         if (query.isNotEmpty) {
-          filtered = filtered.where((trip) => 
-            trip.origin.toLowerCase().contains(query) ||
-            trip.destination.toLowerCase().contains(query) ||
-            trip.clientName.toLowerCase().contains(query) ||
-            trip.driverName.toLowerCase().contains(query)
-          ).toList();
+          filtered = filtered
+              .where(
+                (trip) =>
+                    trip.origin.toLowerCase().contains(query) ||
+                    trip.destination.toLowerCase().contains(query) ||
+                    trip.clientName.toLowerCase().contains(query) ||
+                    trip.driverName.toLowerCase().contains(query),
+              )
+              .toList();
         }
         break;
     }
@@ -147,6 +154,9 @@ class _TripsListPageState extends State<TripsListPage> {
 
         // Cargar vehículos una sola vez
         await _loadVehicles();
+
+        // Cargar nombres de conductores
+        await _loadDriverNames(filteredTrips);
 
         if (mounted) {
           setState(() {
@@ -203,6 +213,37 @@ class _TripsListPageState extends State<TripsListPage> {
     );
   }
 
+  Future<void> _loadDriverNames(List<TripEntity> trips) async {
+    // Obtener emails únicos de conductores
+    final driverEmails = trips
+        .where((trip) => trip.driverName.isNotEmpty)
+        .map((trip) => trip.driverName)
+        .toSet();
+
+    // Cargar perfiles de conductores
+    for (final email in driverEmails) {
+      try {
+        final result = await _profileRepository.getProfileByEmail(email);
+        result.fold(
+          (failure) {
+            // Si falla, usar el email como nombre
+            _driverNames[email] = email;
+          },
+          (profile) {
+            // Usar fullName si existe, sino el email
+            _driverNames[email] = profile.fullName ?? email;
+          },
+        );
+      } catch (e) {
+        _driverNames[email] = email;
+      }
+    }
+
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
   Future<void> _handleDelete(String id) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -253,10 +294,12 @@ class _TripsListPageState extends State<TripsListPage> {
   Future<void> _loadExpensesForTrips(List<TripEntity> trips) async {
     for (final trip in trips) {
       if (trip.id == null) continue;
-      
+
       try {
-        final expensesResult = await _expenseRepository.getExpensesByTripId(trip.id!);
-        
+        final expensesResult = await _expenseRepository.getExpensesByTripId(
+          trip.id!,
+        );
+
         expensesResult.fold(
           (failure) {
             // Ignorar errores, simplemente no mostrar gastos
@@ -330,9 +373,7 @@ class _TripsListPageState extends State<TripsListPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Viajes'),
-      ),
+      appBar: AppBar(title: const Text('Viajes')),
       body: Column(
         children: [
           // Barra de búsqueda
@@ -350,14 +391,23 @@ class _TripsListPageState extends State<TripsListPage> {
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
                   ),
                   items: const [
-                    DropdownMenuItem(value: 'Todos', child: Text('Todos los campos')),
+                    DropdownMenuItem(
+                      value: 'Todos',
+                      child: Text('Todos los campos'),
+                    ),
                     DropdownMenuItem(value: 'Origen', child: Text('Origen')),
                     DropdownMenuItem(value: 'Destino', child: Text('Destino')),
                     DropdownMenuItem(value: 'Cliente', child: Text('Cliente')),
-                    DropdownMenuItem(value: 'Conductor', child: Text('Conductor')),
+                    DropdownMenuItem(
+                      value: 'Conductor',
+                      child: Text('Conductor'),
+                    ),
                   ],
                   onChanged: (value) {
                     if (value != null) {
@@ -382,7 +432,10 @@ class _TripsListPageState extends State<TripsListPage> {
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
                         ),
                         items: [
                           const DropdownMenuItem(
@@ -420,7 +473,10 @@ class _TripsListPageState extends State<TripsListPage> {
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
                         ),
                         onChanged: (_) => _applySearch(),
                       ),
@@ -429,19 +485,14 @@ class _TripsListPageState extends State<TripsListPage> {
           ),
           // Lista de viajes
           Expanded(
-            child: RefreshIndicator(
-              onRefresh: _loadTrips,
-              child: _buildBody(),
-            ),
+            child: RefreshIndicator(onRefresh: _loadTrips, child: _buildBody()),
           ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
           final result = await Navigator.of(context).push<TripEntity>(
-            MaterialPageRoute(
-              builder: (_) => const TripFormPage(),
-            ),
+            MaterialPageRoute(builder: (_) => const TripFormPage()),
           );
 
           if (result != null) {
@@ -456,9 +507,7 @@ class _TripsListPageState extends State<TripsListPage> {
 
   Widget _buildBody() {
     if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
+      return const Center(child: CircularProgressIndicator());
     }
 
     if (_error != null) {
@@ -468,11 +517,7 @@ class _TripsListPageState extends State<TripsListPage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                Icons.error_outline,
-                size: 64,
-                color: Colors.red[300],
-              ),
+              Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
               const SizedBox(height: 16),
               Text(
                 _error!.message,
@@ -507,16 +552,16 @@ class _TripsListPageState extends State<TripsListPage> {
               Text(
                 'No tienes viajes aún',
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
+                  color: AppColors.textSecondary,
+                ),
               ),
               const SizedBox(height: 8),
               Text(
                 'Toca el botón + para agregar tu primer viaje',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
+                  color: AppColors.textSecondary,
+                ),
               ),
             ],
           ),
@@ -542,19 +587,13 @@ class _TripsListPageState extends State<TripsListPage> {
                 );
               }
             },
-              leading: CircleAvatar(
-                backgroundColor: AppColors.accent.withOpacity(0.2),
-                child: Icon(
-                  Icons.route,
-                  color: AppColors.accent,
-                ),
-              ),
+            leading: CircleAvatar(
+              backgroundColor: AppColors.accent.withOpacity(0.2),
+              child: Icon(Icons.route, color: AppColors.accent),
+            ),
             title: Text(
-              trip.driverName,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 18,
-              ),
+              _driverNames[trip.driverName] ?? trip.driverName,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
             ),
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -718,12 +757,12 @@ class _TripsListPageState extends State<TripsListPage> {
                   onTap: () async {
                     await Future.delayed(const Duration(milliseconds: 100));
                     if (context.mounted) {
-                      final result =
-                          await Navigator.of(context).push<TripEntity>(
-                        MaterialPageRoute(
-                          builder: (_) => TripFormPage(trip: trip),
-                        ),
-                      );
+                      final result = await Navigator.of(context)
+                          .push<TripEntity>(
+                            MaterialPageRoute(
+                              builder: (_) => TripFormPage(trip: trip),
+                            ),
+                          );
 
                       if (result != null && mounted) {
                         _loadTrips();
@@ -752,4 +791,3 @@ class _TripsListPageState extends State<TripsListPage> {
     );
   }
 }
-

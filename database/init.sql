@@ -86,7 +86,7 @@ CREATE INDEX IF NOT EXISTS idx_vh_vehicle_date ON vehicle_history(vehicle_id, re
 -- =====================================================
 CREATE TABLE IF NOT EXISTS documents (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    vehicle_id UUID NOT NULL REFERENCES vehicles(id) ON DELETE CASCADE,
+    vehicle_id UUID REFERENCES vehicles(id) ON DELETE CASCADE,
     document_type VARCHAR(100) NOT NULL,
     document_number VARCHAR(100),
     issue_date DATE,
@@ -96,7 +96,8 @@ CREATE TABLE IF NOT EXISTS documents (
     notes TEXT,
     is_archived BOOLEAN DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    driver_id UUID REFERENCES profiles(id) ON DELETE CASCADE
 );
 
 -- Índices para documents
@@ -179,11 +180,19 @@ CREATE TABLE IF NOT EXISTS maintenance (
     scheduled_date DATE,
     completed_date DATE,
     next_maintenance_date DATE,
-    next_maintenance_km INTEGER,
+    next_maintenance_km DECIMAL(10,2),
     workshop_name VARCHAR(255),
     invoice_number VARCHAR(100),
     notes TEXT,
     status VARCHAR(50) DEFAULT 'scheduled',
+    -- Nuevas columnas para compatibilidad con la API
+    service_date DATE,
+    km_at_service DECIMAL(10,2),
+    alert_date DATE,
+    custom_service_name VARCHAR(255),
+    tire_position VARCHAR(100),
+    created_by UUID REFERENCES profiles(id),
+    provider_name VARCHAR(255),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     
@@ -193,6 +202,9 @@ CREATE TABLE IF NOT EXISTS maintenance (
 -- Índices para maintenance
 CREATE INDEX IF NOT EXISTS idx_maintenance_vehicle ON maintenance(vehicle_id);
 CREATE INDEX IF NOT EXISTS idx_maintenance_dates ON maintenance(scheduled_date, completed_date);
+CREATE INDEX IF NOT EXISTS idx_maintenance_service_date ON maintenance(service_date);
+CREATE INDEX IF NOT EXISTS idx_maintenance_alert_date ON maintenance(alert_date);
+CREATE INDEX IF NOT EXISTS idx_maintenance_created_by ON maintenance(created_by);
 
 -- =====================================================
 -- TABLA: remisiones (documentos de envío)
@@ -240,6 +252,20 @@ CREATE TABLE IF NOT EXISTS gps_credentials (
     last_sync_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- =====================================================
+-- TABLA: user_settings (configuraciones de usuario)
+-- =====================================================
+CREATE TABLE IF NOT EXISTS user_settings (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+    setting_key VARCHAR(100) NOT NULL,
+    setting_value TEXT,
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    
+    CONSTRAINT user_settings_user_id_setting_key_key UNIQUE (user_id, setting_key)
 );
 
 -- =====================================================

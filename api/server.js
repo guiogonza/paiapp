@@ -139,7 +139,8 @@ app.post('/auth/login', async (req, res) => {
     res.json({
       token: token,
       user: {
-        userId: user.id,
+        id: user.id,
+        userId: user.id, // Mantener por compatibilidad
         email: user.email,
         fullName: user.full_name,
         role: user.role,
@@ -633,7 +634,7 @@ app.get('/auth/me', authenticateToken, async (req, res) => {
 // Obtener todos los conductores
 app.get('/rest/v1/profiles', authenticateToken, async (req, res) => {
   try {
-    const { role, select } = req.query;
+    const { role, select, id, email } = req.query;
     
     let query = 'SELECT * FROM profiles WHERE is_active = true';
     const params = [];
@@ -641,6 +642,16 @@ app.get('/rest/v1/profiles', authenticateToken, async (req, res) => {
     if (role) {
       params.push(role.replace('eq.', ''));
       query += ` AND role = $${params.length}`;
+    }
+
+    if (id) {
+      params.push(id.replace('eq.', ''));
+      query += ` AND id = $${params.length}`;
+    }
+
+    if (email) {
+      params.push(email.replace('eq.', ''));
+      query += ` AND email = $${params.length}`;
     }
 
     query += ' ORDER BY created_at DESC';
@@ -1146,14 +1157,17 @@ app.post('/rest/v1/maintenance', authenticateToken, async (req, res) => {
     } = req.body;
 
     console.log('📝 Creando mantenimiento:', { vehicle_id, service_type, km_at_service, cost });
+    console.log('📝 created_by recibido del frontend:', created_by);
+    console.log('📝 req.user.id del token JWT:', req.user.id);
+    console.log('📝 Valor final para created_by:', created_by || req.user.id);
     
     const result = await pool.query(
       `INSERT INTO maintenance (
-        vehicle_id, service_type, maintenance_type, service_date, 
-        km_at_service, cost, next_change_km, alert_date,
-        custom_service_name, tire_position, created_by, status
+        vehicle_id, maintenance_type, service_date, 
+        km_at_service, cost, next_maintenance_km, alert_date,
+        custom_service_name, tire_position, created_by, provider_name, status
       )
-       VALUES ($1, $2, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'completed')
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'completed')
        RETURNING *`,
       [
         vehicle_id, 
@@ -1165,7 +1179,8 @@ app.post('/rest/v1/maintenance', authenticateToken, async (req, res) => {
         alert_date || null,
         custom_service_name || null,
         tire_position || null,
-        created_by || req.user.id
+        created_by || req.user.id,
+        provider_name || null
       ]
     );
 
@@ -1182,24 +1197,25 @@ app.patch('/rest/v1/maintenance/:id', authenticateToken, async (req, res) => {
   try {
     const { 
       service_type, service_date, km_at_service, cost, 
-      next_change_km, alert_date, notes, tire_position, provider 
+      next_change_km, alert_date, notes, tire_position, provider_name 
     } = req.body;
 
     const result = await pool.query(
       `UPDATE maintenance SET 
-        service_type = COALESCE($1, service_type),
+        maintenance_type = COALESCE($1, maintenance_type),
         service_date = COALESCE($2, service_date),
         km_at_service = COALESCE($3, km_at_service),
         cost = COALESCE($4, cost),
-        next_change_km = COALESCE($5, next_change_km),
+        next_maintenance_km = COALESCE($5, next_maintenance_km),
         alert_date = COALESCE($6, alert_date),
         notes = COALESCE($7, notes),
         tire_position = COALESCE($8, tire_position),
-        provider = COALESCE($9, provider)
+        provider_name = COALESCE($9, provider_name),
+        updated_at = CURRENT_TIMESTAMP
        WHERE id = $10
        RETURNING *`,
       [service_type, service_date, km_at_service, cost, next_change_km, 
-       alert_date, notes, tire_position, provider, req.params.id]
+       alert_date, notes, tire_position, provider_name, req.params.id]
     );
 
     if (result.rows.length === 0) {
@@ -1230,8 +1246,8 @@ app.post('/rest/v1/maintenance/clear-alerts', authenticateToken, async (req, res
   try {
     const { vehicle_id, service_type, exclude_id, tire_position } = req.body;
 
-    let query = `UPDATE maintenance SET next_change_km = NULL, alert_date = NULL 
-                 WHERE vehicle_id = $1 AND service_type = $2`;
+    let query = `UPDATE maintenance SET next_maintenance_km = NULL, alert_date = NULL 
+                 WHERE vehicle_id = $1 AND maintenance_type = $2`;
     const params = [vehicle_id, service_type];
 
     if (exclude_id) {
