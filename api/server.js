@@ -68,7 +68,8 @@ app.post('/auth/login', async (req, res) => {
     });
 
     const gpsData = await gpsResponse.json();
-    console.log(`📡 Respuesta GPS API:`, gpsData);
+    // Log sin exponer datos sensibles
+    console.log(`📡 Respuesta GPS API recibida`);
 
     // Verificar si la autenticación GPS fue exitosa
     if (!gpsResponse.ok || gpsData.status === 0) {
@@ -82,7 +83,7 @@ app.post('/auth/login', async (req, res) => {
       return res.status(401).json({ error: 'Error de autenticación GPS' });
     }
 
-    console.log(`✅ Autenticación GPS exitosa - API Key: ${gpsApiKey.substring(0, 20)}...`);
+    console.log(`✅ Autenticación GPS exitosa`);
 
     // PASO 2: Buscar o crear usuario en base de datos local
     let result = await pool.query(

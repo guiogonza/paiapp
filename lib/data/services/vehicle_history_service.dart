@@ -33,7 +33,7 @@ class VehicleHistoryService {
         );
       }
 
-      debugPrint('🔑 Usando API key existente para historial');
+      debugPrint('🔑 Usando credenciales GPS para historial');
 
       // Construir los parámetros de la URL en el orden correcto
       // Orden correcto según el API: lang, user_api_hash, report_id, device_id, from_date, to_date, from_time, to_time

@@ -1,24 +1,17 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:dartz/dartz.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:pai_app/domain/entities/remittance_entity.dart';
 import 'package:pai_app/domain/entities/remittance_with_route_entity.dart';
 import 'package:pai_app/domain/entities/route_entity.dart';
 import 'package:pai_app/domain/failures/remittance_failure.dart';
 import 'package:pai_app/domain/repositories/remittance_repository.dart';
 import 'package:pai_app/data/models/remittance_model.dart';
+import 'package:pai_app/data/services/local_api_client.dart';
 
 class RemittanceRepositoryImpl implements RemittanceRepository {
-  // TODO: Remover Supabase - ya no se usa
-  // final SupabaseClient _supabase = Supabase.instance.client;
-
-  // Getter temporal para evitar errores - lanzará error si se usa
-  dynamic get _supabase =>
-      throw UnimplementedError('Supabase ya no se usa - migrado a PostgreSQL');
-  static const String _tableName = 'remittances';
-  // IMPORTANTE: El bucket de storage en Supabase se llama 'signatures' (en plural)
-  static const String _storageBucket = 'signatures';
+  final LocalApiClient _localApi = LocalApiClient();
+  static const String _tableName =
+      'remisiones'; // Nombre correcto en PostgreSQL
 
   // Helper para parsear números que pueden venir como String
   double _parseDouble(dynamic value, [double defaultValue = 0.0]) {
@@ -32,18 +25,15 @@ class RemittanceRepositoryImpl implements RemittanceRepository {
   Future<Either<RemittanceFailure, List<RemittanceEntity>>>
   getRemittances() async {
     try {
-      final response = await _supabase
-          .from(_tableName)
-          .select()
-          .order('created_at', ascending: false);
+      final response = await _localApi.get(
+        '/rest/v1/$_tableName?order=created_at.desc',
+      );
 
       final remittances = (response as List)
           .map((json) => RemittanceModel.fromJson(json).toEntity())
           .toList();
 
       return Right(remittances);
-    } on PostgrestException catch (e) {
-      return Left(DatabaseFailure(_mapPostgrestError(e)));
     } on SocketException catch (_) {
       return const Left(NetworkFailure());
     } catch (e) {
@@ -55,19 +45,15 @@ class RemittanceRepositoryImpl implements RemittanceRepository {
   Future<Either<RemittanceFailure, List<RemittanceEntity>>>
   getPendingRemittances() async {
     try {
-      final response = await _supabase
-          .from(_tableName)
-          .select()
-          .eq('status', 'pendiente')
-          .order('created_at', ascending: false);
+      final response = await _localApi.get(
+        '/rest/v1/$_tableName?status=eq.pendiente&order=created_at.desc',
+      );
 
       final remittances = (response as List)
           .map((json) => RemittanceModel.fromJson(json).toEntity())
           .toList();
 
       return Right(remittances);
-    } on PostgrestException catch (e) {
-      return Left(DatabaseFailure(_mapPostgrestError(e)));
     } on SocketException catch (_) {
       return const Left(NetworkFailure());
     } catch (e) {
@@ -79,103 +65,27 @@ class RemittanceRepositoryImpl implements RemittanceRepository {
   Future<Either<RemittanceFailure, List<RemittanceWithRouteEntity>>>
   getRemittancesWithRoutes() async {
     try {
-      // Hacer JOIN con routes usando Supabase
-      // NOTA: La FK en remittances se llama trip_id (no route_id)
-      final response = await _supabase
-          .from(_tableName)
-          .select('''
-            *,
-            routes:trip_id (
-              id,
-              vehicle_id,
-              start_location,
-              end_location,
-              driver_name,
-              client_name,
-              revenue_amount,
-              created_at
-            )
-          ''')
-          .order('created_at', ascending: false);
+      // Obtener remisiones
+      final remittancesResponse = await _localApi.get(
+        '/rest/v1/$_tableName?order=created_at.desc',
+      );
 
       final remittancesWithRoutes = <RemittanceWithRouteEntity>[];
 
-      for (var item in response as List) {
+      for (var item in remittancesResponse as List) {
         final remittance = RemittanceModel.fromJson(item).toEntity();
-
-        // Extraer datos de route del JOIN
-        final routeData = item['routes'] as Map<String, dynamic>?;
-        if (routeData != null) {
-          final route = RouteEntity(
-            id: routeData['id'] as String?,
-            vehicleId: routeData['vehicle_id'] as String,
-            startLocation: routeData['start_location'] as String? ?? '',
-            endLocation: routeData['end_location'] as String? ?? '',
-            driverName: routeData['driver_name'] as String?,
-            clientName: routeData['client_name'] as String?,
-            revenueAmount: routeData['revenue_amount'] != null
-                ? _parseDouble(routeData['revenue_amount'])
-                : null,
-            createdAt: routeData['created_at'] != null
-                ? DateTime.parse(routeData['created_at'] as String)
-                : null,
-          );
-
-          remittancesWithRoutes.add(
-            RemittanceWithRouteEntity(remittance: remittance, route: route),
-          );
-        }
-      }
-
-      return Right(remittancesWithRoutes);
-    } on PostgrestException catch (e) {
-      return Left(DatabaseFailure(_mapPostgrestError(e)));
-    } on SocketException catch (_) {
-      return const Left(NetworkFailure());
-    } catch (e) {
-      return Left(UnknownFailure(_mapGenericError(e)));
-    }
-  }
-
-  @override
-  Future<Either<RemittanceFailure, List<RemittanceWithRouteEntity>>>
-  getPendingRemittancesWithRoutes() async {
-    try {
-      // Obtener TODOS los estados: pendiente_completar, pendiente_cobrar, y cobrado
-      // IMPORTANTE: La FK se llama trip_id (NO route_id)
-      // La columna updated_at ya existe en la tabla
-      final remittancesResponse = await _supabase
-          .from(_tableName)
-          .select(
-            'id, trip_id, receiver_name, status, receipt_url, created_at, updated_at',
-          )
-          .or(
-            'status.eq.pendiente_completar,status.eq.pendiente_cobrar,status.eq.cobrado',
-          )
-          .order('created_at', ascending: false);
-
-      final remittancesWithRoutes = <RemittanceWithRouteEntity>[];
-
-      for (var remittanceData in remittancesResponse as List) {
-        final remittance = RemittanceModel.fromJson(remittanceData).toEntity();
-
-        // Obtener el route correspondiente usando trip_id
         final tripId = remittance.tripId;
-        if (tripId.isEmpty) {
-          continue;
-        }
+
+        if (tripId.isEmpty) continue;
 
         try {
-          final routeResponse = await _supabase
-              .from('routes')
-              .select(
-                'id, vehicle_id, start_location, end_location, driver_name, client_name, revenue_amount, created_at',
-              )
-              .eq('id', tripId)
-              .maybeSingle();
+          // Obtener el route correspondiente
+          final routeResponse = await _localApi.get(
+            '/rest/v1/routes?id=eq.$tripId',
+          );
 
-          if (routeResponse != null) {
-            final routeData = routeResponse;
+          if (routeResponse is List && routeResponse.isNotEmpty) {
+            final routeData = routeResponse.first;
             final route = RouteEntity(
               id: routeData['id'] as String?,
               vehicleId: routeData['vehicle_id'] as String,
@@ -196,15 +106,69 @@ class RemittanceRepositoryImpl implements RemittanceRepository {
             );
           }
         } catch (e) {
-          // Si no se encuentra el route, continuar con la siguiente remisión
           print('Error al obtener route $tripId: $e');
           continue;
         }
       }
 
       return Right(remittancesWithRoutes);
-    } on PostgrestException catch (e) {
-      return Left(DatabaseFailure(_mapPostgrestError(e)));
+    } on SocketException catch (_) {
+      return const Left(NetworkFailure());
+    } catch (e) {
+      return Left(UnknownFailure(_mapGenericError(e)));
+    }
+  }
+
+  @override
+  Future<Either<RemittanceFailure, List<RemittanceWithRouteEntity>>>
+  getPendingRemittancesWithRoutes() async {
+    try {
+      // Obtener remisiones con estados: pendiente_completar, pendiente_cobrar, cobrado
+      final remittancesResponse = await _localApi.get(
+        '/rest/v1/$_tableName?or=(status.eq.pendiente_completar,status.eq.pendiente_cobrar,status.eq.cobrado)&order=created_at.desc',
+      );
+
+      final remittancesWithRoutes = <RemittanceWithRouteEntity>[];
+
+      for (var remittanceData in remittancesResponse as List) {
+        final remittance = RemittanceModel.fromJson(remittanceData).toEntity();
+        final tripId = remittance.tripId;
+
+        if (tripId.isEmpty) continue;
+
+        try {
+          final routeResponse = await _localApi.get(
+            '/rest/v1/routes?id=eq.$tripId',
+          );
+
+          if (routeResponse is List && routeResponse.isNotEmpty) {
+            final routeData = routeResponse.first;
+            final route = RouteEntity(
+              id: routeData['id'] as String?,
+              vehicleId: routeData['vehicle_id'] as String,
+              startLocation: routeData['start_location'] as String? ?? '',
+              endLocation: routeData['end_location'] as String? ?? '',
+              driverName: routeData['driver_name'] as String?,
+              clientName: routeData['client_name'] as String?,
+              revenueAmount: routeData['revenue_amount'] != null
+                  ? _parseDouble(routeData['revenue_amount'])
+                  : null,
+              createdAt: routeData['created_at'] != null
+                  ? DateTime.parse(routeData['created_at'] as String)
+                  : null,
+            );
+
+            remittancesWithRoutes.add(
+              RemittanceWithRouteEntity(remittance: remittance, route: route),
+            );
+          }
+        } catch (e) {
+          print('Error al obtener route $tripId: $e');
+          continue;
+        }
+      }
+
+      return Right(remittancesWithRoutes);
     } on SocketException catch (_) {
       return const Left(NetworkFailure());
     } catch (e) {
@@ -217,22 +181,21 @@ class RemittanceRepositoryImpl implements RemittanceRepository {
     String id,
   ) async {
     try {
-      final response = await _supabase
-          .from(_tableName)
-          .select()
-          .eq('id', id)
-          .single();
+      final response = await _localApi.get('/rest/v1/$_tableName?id=eq.$id');
 
-      final remittance = RemittanceModel.fromJson(response).toEntity();
-      return Right(remittance);
-    } on PostgrestException catch (e) {
-      if (e.code == 'PGRST116') {
+      if (response is List && response.isEmpty) {
         return const Left(NotFoundFailure('Remisión no encontrada'));
       }
-      return Left(DatabaseFailure(_mapPostgrestError(e)));
+
+      final data = response is List ? response.first : response;
+      final remittance = RemittanceModel.fromJson(data).toEntity();
+      return Right(remittance);
     } on SocketException catch (_) {
       return const Left(NetworkFailure());
     } catch (e) {
+      if (e.toString().contains('not found') || e.toString().contains('404')) {
+        return const Left(NotFoundFailure('Remisión no encontrada'));
+      }
       return Left(UnknownFailure(_mapGenericError(e)));
     }
   }
@@ -240,18 +203,12 @@ class RemittanceRepositoryImpl implements RemittanceRepository {
   @override
   Future<Either<RemittanceFailure, void>> markAsCollected(String id) async {
     try {
-      // Actualizar status y updated_at (la columna updated_at ya existe en la tabla)
-      await _supabase
-          .from(_tableName)
-          .update({
-            'status': 'cobrado',
-            'updated_at': DateTime.now().toIso8601String(),
-          })
-          .eq('id', id);
+      await _localApi.patch('/rest/v1/$_tableName', id, {
+        'status': 'cobrado',
+        'updated_at': DateTime.now().toIso8601String(),
+      });
 
       return const Right(null);
-    } on PostgrestException catch (e) {
-      return Left(DatabaseFailure(_mapPostgrestError(e)));
     } on SocketException catch (_) {
       return const Left(NetworkFailure());
     } catch (e) {
@@ -265,18 +222,15 @@ class RemittanceRepositoryImpl implements RemittanceRepository {
   ) async {
     try {
       final remittanceData = RemittanceModel.fromEntity(remittance).toJson();
-      remittanceData.remove('id'); // No incluir id en la creación
+      remittanceData.remove('id');
 
-      final response = await _supabase
-          .from(_tableName)
-          .insert(remittanceData)
-          .select()
-          .single();
+      final response = await _localApi.post(
+        '/rest/v1/$_tableName',
+        remittanceData,
+      );
 
       final createdRemittance = RemittanceModel.fromJson(response).toEntity();
       return Right(createdRemittance);
-    } on PostgrestException catch (e) {
-      return Left(DatabaseFailure(_mapPostgrestError(e)));
     } on SocketException catch (_) {
       return const Left(NetworkFailure());
     } catch (e) {
@@ -289,20 +243,17 @@ class RemittanceRepositoryImpl implements RemittanceRepository {
     String tripId,
   ) async {
     try {
-      final response = await _supabase
-          .from(_tableName)
-          .select()
-          .eq('trip_id', tripId)
-          .maybeSingle();
+      final response = await _localApi.get(
+        '/rest/v1/$_tableName?trip_id=eq.$tripId',
+      );
 
-      if (response == null) {
+      if (response is List && response.isEmpty) {
         return const Right(null);
       }
 
-      final remittance = RemittanceModel.fromJson(response).toEntity();
+      final data = response is List ? response.first : response;
+      final remittance = RemittanceModel.fromJson(data).toEntity();
       return Right(remittance);
-    } on PostgrestException catch (e) {
-      return Left(DatabaseFailure(_mapPostgrestError(e)));
     } on SocketException catch (_) {
       return const Left(NetworkFailure());
     } catch (e) {
@@ -324,50 +275,45 @@ class RemittanceRepositoryImpl implements RemittanceRepository {
       }
 
       final remittanceData = RemittanceModel.fromEntity(remittance).toJson();
-      remittanceData.remove('id'); // No actualizar el id
-
-      // Actualizar updated_at (la columna updated_at ya existe en la tabla)
+      remittanceData.remove('id');
       remittanceData['updated_at'] = DateTime.now().toIso8601String();
 
-      final response = await _supabase
-          .from(_tableName)
-          .update(remittanceData)
-          .eq('id', remittance.id!)
-          .select()
-          .single();
+      await _localApi.patch(
+        '/rest/v1/$_tableName',
+        remittance.id!,
+        remittanceData,
+      );
 
-      final updatedRemittance = RemittanceModel.fromJson(response).toEntity();
+      // Obtener el registro actualizado
+      final updatedResponse = await _localApi.get(
+        '/rest/v1/$_tableName?id=eq.${remittance.id}',
+      );
+      final updatedData = updatedResponse is List
+          ? updatedResponse.first
+          : updatedResponse;
+      final updatedRemittance = RemittanceModel.fromJson(
+        updatedData,
+      ).toEntity();
+
       return Right(updatedRemittance);
-    } on PostgrestException catch (e) {
-      if (e.code == 'PGRST116') {
-        return const Left(NotFoundFailure('Remisión no encontrada'));
-      }
-      return Left(DatabaseFailure(_mapPostgrestError(e)));
     } on SocketException catch (_) {
       return const Left(NetworkFailure());
     } catch (e) {
+      if (e.toString().contains('not found') || e.toString().contains('404')) {
+        return const Left(NotFoundFailure('Remisión no encontrada'));
+      }
       return Left(UnknownFailure(_mapGenericError(e)));
     }
-  }
-
-  String _mapPostgrestError(PostgrestException e) {
-    return e.message.isNotEmpty ? e.message : 'Error en la base de datos';
   }
 
   @override
   Future<Either<RemittanceFailure, List<RemittanceWithRouteEntity>>>
   getDriverPendingRemittances(String driverName) async {
     try {
-      // Obtener remisiones pendientes sin receipt_url (sin foto adjunta)
-      // IMPORTANTE: La columna FK se llama trip_id (NO route_id)
-      // La columna updated_at ya existe en la tabla
-      final remittancesResponse = await _supabase
-          .from(_tableName)
-          .select(
-            'id, trip_id, receiver_name, status, receipt_url, created_at, updated_at',
-          )
-          .eq('status', 'pendiente')
-          .order('created_at', ascending: false);
+      // Obtener remisiones pendientes
+      final remittancesResponse = await _localApi.get(
+        '/rest/v1/$_tableName?status=eq.pendiente&order=created_at.desc',
+      );
 
       final remittancesWithRoutes = <RemittanceWithRouteEntity>[];
 
@@ -380,25 +326,19 @@ class RemittanceRepositoryImpl implements RemittanceRepository {
           continue;
         }
 
-        // Obtener el route correspondiente usando trip_id
         final tripId = remittance.tripId;
-        if (tripId.isEmpty) {
-          continue;
-        }
+        if (tripId.isEmpty) continue;
 
         try {
-          final routeResponse = await _supabase
-              .from('routes')
-              .select()
-              .eq('id', tripId)
-              .maybeSingle();
+          final routeResponse = await _localApi.get(
+            '/rest/v1/routes?id=eq.$tripId',
+          );
 
-          if (routeResponse != null) {
-            final routeData = routeResponse;
+          if (routeResponse is List && routeResponse.isNotEmpty) {
+            final routeData = routeResponse.first;
             final routeDriverName = routeData['driver_name'] as String?;
 
-            // Filtrar por driver_name del route (comparación case-insensitive)
-            // Permite buscar tanto por email como por nombre completo
+            // Filtrar por driver_name del route
             if (routeDriverName != null &&
                 routeDriverName.toLowerCase().trim() ==
                     driverName.toLowerCase().trim()) {
@@ -423,15 +363,12 @@ class RemittanceRepositoryImpl implements RemittanceRepository {
             }
           }
         } catch (e) {
-          // Si no se encuentra el route, continuar con la siguiente remisión
           print('Error al obtener route $tripId: $e');
           continue;
         }
       }
 
       return Right(remittancesWithRoutes);
-    } on PostgrestException catch (e) {
-      return Left(DatabaseFailure(_mapPostgrestError(e)));
     } on SocketException catch (_) {
       return const Left(NetworkFailure());
     } catch (e) {
@@ -445,54 +382,13 @@ class RemittanceRepositoryImpl implements RemittanceRepository {
     String fileName,
   ) async {
     try {
-      // Normalizar el nombre del archivo: eliminar espacios y caracteres especiales
-      // Asegurar que el path sea limpio y simple
-      final normalizedFileName = fileName
-          .replaceAll(
-            RegExp(r'[^\w\.-]'),
-            '_',
-          ) // Reemplazar caracteres especiales con _
-          .replaceAll(RegExp(r'_+'), '_') // Reemplazar múltiples _ con uno solo
-          .toLowerCase(); // Convertir a minúsculas para consistencia
-
-      // Determinar el contentType basado en la extensión
-      String contentType = 'image/jpeg'; // Por defecto
-      if (normalizedFileName.endsWith('.png')) {
-        contentType = 'image/png';
-      } else if (normalizedFileName.endsWith('.jpg') ||
-          normalizedFileName.endsWith('.jpeg')) {
-        contentType = 'image/jpeg';
-      }
-
-      // Convertir List<int> a Uint8List
-      final uint8List = Uint8List.fromList(fileBytes);
-
-      // Subir usando uploadBinary con el nombre normalizado
-      // IMPORTANTE: Usar el mismo nombre normalizado para subir y obtener la URL
-      await _supabase.storage
-          .from(_storageBucket)
-          .uploadBinary(
-            normalizedFileName, // Usar el nombre normalizado
-            uint8List,
-            fileOptions: FileOptions(
-              upsert: true, // Permitir sobrescribir si existe
-              contentType: contentType,
-            ),
-          );
-
-      // Obtener la URL pública usando EXACTAMENTE el mismo nombre normalizado
-      final imageUrl = _supabase.storage
-          .from(_storageBucket)
-          .getPublicUrl(normalizedFileName); // Mismo nombre normalizado
-
-      return Right(imageUrl);
-    } on StorageException catch (e) {
-      print('❌ Error de Storage al subir imagen: ${e.message}');
-      return Left(StorageFailure(_mapStorageError(e)));
+      // TODO: Implementar upload de imágenes con la API local
+      return const Left(
+        StorageFailure('Upload de imágenes no disponible en modo local'),
+      );
     } on SocketException catch (_) {
       return const Left(NetworkFailure());
     } catch (e) {
-      print('❌ Error desconocido al subir imagen: $e');
       return Left(StorageFailure(_mapGenericError(e)));
     }
   }
@@ -502,33 +398,13 @@ class RemittanceRepositoryImpl implements RemittanceRepository {
     String imageUrl,
   ) async {
     try {
-      // Extraer el nombre del archivo de la URL
-      final fileName = imageUrl.split('/').last.split('?').first;
-
-      await _supabase.storage.from(_storageBucket).remove([fileName]);
-
+      // TODO: Implementar delete de imágenes con la API local
       return const Right(null);
-    } on StorageException catch (e) {
-      // Si el archivo no existe, no es un error crítico
-      if (e.statusCode == '404' || e.message.contains('not found')) {
-        return const Right(null);
-      }
-      return Left(StorageFailure(_mapStorageError(e)));
     } on SocketException catch (_) {
       return const Left(NetworkFailure());
     } catch (e) {
       return Left(StorageFailure(_mapGenericError(e)));
     }
-  }
-
-  String _mapStorageError(StorageException e) {
-    if (e.statusCode == '413') {
-      return 'La imagen es demasiado grande';
-    }
-    if (e.statusCode == '415') {
-      return 'Formato de imagen no soportado';
-    }
-    return e.message.isNotEmpty ? e.message : 'Error al subir la imagen';
   }
 
   String _mapGenericError(dynamic e) {

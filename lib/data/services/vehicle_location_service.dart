@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:pai_app/data/services/gps_auth_service.dart';
 import 'package:pai_app/domain/entities/vehicle_location_entity.dart';
@@ -65,10 +66,8 @@ class VehicleLocationService {
         queryParameters: {'user_api_hash': currentApiKey, 'lang': 'es'},
       );
 
-      print('📡 Consultando devices en: ${uri.toString()}');
-      print(
-        '📡 API Key (primeros 30 chars): ${currentApiKey.substring(0, currentApiKey.length > 30 ? 30 : currentApiKey.length)}...',
-      );
+      // Log sin exponer la URL completa con API key
+      debugPrint('📡 Consultando devices en GPS API...');
 
       // Hacer la petición con headers
       // Nota: En web puede haber problemas de CORS, pero intentamos de todas formas
@@ -91,7 +90,6 @@ class VehicleLocationService {
           );
 
       print('📡 Status Code: ${response.statusCode}');
-      print('📡 Response Headers: ${response.headers}');
 
       if (response.statusCode == 200) {
         return _parseDevicesResponse(response);

@@ -26,8 +26,8 @@ class LocalApiClient {
       return 'http://localhost:3000';
     }
 
-    // Producción (VPS) - usar proxy nginx
-    return '$origin/api';
+    // Producción (VPS) - usar el mismo origen (nginx proxea /auth/ y /rest/)
+    return origin;
   }
 
   String? _accessToken;
