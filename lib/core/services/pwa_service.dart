@@ -259,12 +259,15 @@ class PWAService {
     }
 
     // Verificar si hay un prompt disponible en JavaScript
-    final hasDeferredPrompt =
-        js.context.callMethod('eval', [
-              'window.deferredPrompt !== null && window.deferredPrompt !== undefined',
-            ])
-            as bool? ??
-        false;
+    bool hasDeferredPrompt = false;
+    try {
+      final result = js.context.callMethod('eval', [
+        'typeof window.deferredPrompt !== "undefined" && window.deferredPrompt !== null',
+      ]);
+      hasDeferredPrompt = result == true;
+    } catch (e) {
+      print('⚠️ Error checking deferredPrompt: $e');
+    }
 
     // Para navegadores con soporte nativo
     if (hasDeferredPrompt || _deferredPrompt != null) {
@@ -273,20 +276,28 @@ class PWAService {
         js.context.callMethod('eval', [
           '''
           (function() {
-            if (window.deferredPrompt) {
-              console.log('🚀 Calling prompt() on deferredPrompt');
-              window.deferredPrompt.prompt();
-              window.deferredPrompt.userChoice.then(function(choiceResult) {
-                console.log('📱 User choice:', choiceResult.outcome);
-                if (choiceResult.outcome === 'accepted') {
-                  console.log('✅ User accepted the install prompt');
-                } else {
-                  console.log('❌ User dismissed the install prompt');
-                }
-                window.deferredPrompt = null;
-              });
-            } else {
-              console.warn('⚠️ No deferredPrompt available');
+            try {
+              if (window.deferredPrompt && typeof window.deferredPrompt.prompt === 'function') {
+                console.log('🚀 Calling prompt() on deferredPrompt');
+                window.deferredPrompt.prompt();
+                window.deferredPrompt.userChoice.then(function(choiceResult) {
+                  console.log('📱 User choice:', choiceResult.outcome);
+                  if (choiceResult.outcome === 'accepted') {
+                    console.log('✅ User accepted the install prompt');
+                  } else {
+                    console.log('❌ User dismissed the install prompt');
+                  }
+                  window.deferredPrompt = null;
+                }).catch(function(e) {
+                  console.warn('⚠️ Error in userChoice:', e);
+                  window.deferredPrompt = null;
+                });
+              } else {
+                console.warn('⚠️ No valid deferredPrompt available');
+              }
+            } catch(e) {
+              console.warn('⚠️ Error in prompt:', e);
+              window.deferredPrompt = null;
             }
           })();
         ''',

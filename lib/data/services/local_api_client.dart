@@ -167,7 +167,17 @@ class LocalApiClient {
         Uri.parse('$_baseUrl/auth/me'),
         headers: _headers,
       );
-      return response.statusCode == 200;
+
+      if (response.statusCode == 200) {
+        return true;
+      }
+
+      // Token inválido o expirado - limpiar sesión
+      if (response.statusCode == 401 || response.statusCode == 403) {
+        print('⚠️ Token inválido, limpiando sesión...');
+        await logout();
+      }
+      return false;
     } catch (e) {
       print('⚠️ Error verificando sesión: $e');
       return false;
