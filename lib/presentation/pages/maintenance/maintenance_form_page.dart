@@ -1,8 +1,8 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:pai_app/core/theme/app_colors.dart';
 import 'package:pai_app/core/constants/maintenance_rules.dart';
+import 'package:pai_app/core/utils/currency_input_formatter.dart';
 import 'package:pai_app/data/repositories/maintenance_repository_impl.dart';
 import 'package:pai_app/data/repositories/vehicle_repository_impl.dart';
 import 'package:pai_app/data/providers/gps_vehicle_provider.dart';
@@ -78,35 +78,11 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
   }
 
   Future<void> _loadVehicles() async {
-    debugPrint('🚗 [MaintenanceForm] Cargando vehículos...');
+    debugPrint('🚗 [MaintenanceForm] Cargando vehículos desde GPS...');
 
-    // 1) Intentar obtener vehículos del repositorio local
-    final result = await _vehicleRepository.getVehicles();
-    List<VehicleEntity> localVehicles = [];
-
-    result.fold(
-      (failure) {
-        debugPrint(
-          '⚠️ [MaintenanceForm] Error en repo local: ${failure.message}',
-        );
-      },
-      (vehicles) {
-        localVehicles = vehicles;
-        debugPrint(
-          '📦 [MaintenanceForm] Vehículos locales: ${vehicles.length}',
-        );
-      },
-    );
-
-    // 2) Si no hay vehículos locales, cargar desde GPS
-    List<VehicleEntity> vehiclesToUse = localVehicles;
-    if (vehiclesToUse.isEmpty) {
-      debugPrint(
-        '🛰️ [MaintenanceForm] Sin vehículos locales, cargando desde GPS...',
-      );
-      vehiclesToUse = await _gpsVehicleProvider.getVehicles();
-      debugPrint('✅ [MaintenanceForm] Vehículos GPS: ${vehiclesToUse.length}');
-    }
+    // Siempre cargar desde GPS (fuente de verdad para vehículos disponibles)
+    List<VehicleEntity> vehiclesToUse = await _gpsVehicleProvider.getVehicles();
+    debugPrint('✅ [MaintenanceForm] Vehículos GPS: ${vehiclesToUse.length}');
 
     if (mounted) {
       setState(() {
@@ -336,10 +312,101 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
       _isLoading = true;
     });
 
+    // Si el vehículo tiene un ID numérico (del GPS), crearlo primero en la BD
+    String vehicleId = _selectedVehicle!.id ?? '';
+    final isGpsId = vehicleId.isNotEmpty && int.tryParse(vehicleId) != null;
+
+    if (vehicleId.isEmpty || isGpsId) {
+      debugPrint(
+        '🔄 Vehículo con ID GPS ($vehicleId), buscando o creando en BD: ${_selectedVehicle!.placa}',
+      );
+
+      // Primero intentar obtener el vehículo por placa (puede que ya exista)
+      final vehiclesResult = await _vehicleRepository.getVehicles();
+      VehicleEntity? existingVehicle;
+
+      vehiclesResult.fold((failure) => null, (vehicles) {
+        try {
+          existingVehicle = vehicles.firstWhere(
+            (v) =>
+                v.placa.toUpperCase() == _selectedVehicle!.placa.toUpperCase(),
+          );
+        } catch (e) {
+          existingVehicle = null;
+        }
+      });
+
+      if (existingVehicle != null) {
+        // El vehículo ya existe en la BD, usar su UUID
+        vehicleId = existingVehicle!.id!;
+        debugPrint(
+          '✅ Vehículo ya existe con UUID: $vehicleId (placa: ${existingVehicle!.placa})',
+        );
+      } else {
+        // Crear el vehículo
+        final createResult = await _vehicleRepository.createVehicle(
+          _selectedVehicle!,
+        );
+
+        await createResult.fold(
+          (failure) {
+            // Si falla por duplicado, mostrar error claro
+            if (failure.toString().contains('already exists') ||
+                failure.toString().contains('unique_placa')) {
+              debugPrint('⚠️ Vehículo duplicado detectado');
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'El vehículo ${_selectedVehicle!.placa} ya existe. Por favor, recarga la página e intenta nuevamente.',
+                    ),
+                    backgroundColor: Colors.orange,
+                  ),
+                );
+                setState(() {
+                  _isLoading = false;
+                });
+              }
+              throw Exception('Vehículo duplicado');
+            } else if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Error al crear vehículo: ${failure.toString()}',
+                  ),
+                  backgroundColor: Colors.red,
+                ),
+              );
+              setState(() {
+                _isLoading = false;
+              });
+              throw Exception('Error al crear vehículo');
+            }
+          },
+          (createdVehicle) {
+            vehicleId = createdVehicle.id!;
+            debugPrint('✅ Vehículo creado con UUID: $vehicleId');
+          },
+        );
+      }
+
+      // Validar que tenemos un UUID válido
+      if (vehicleId.isEmpty || int.tryParse(vehicleId) != null) {
+        debugPrint('❌ No se pudo obtener UUID válido del vehículo');
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
+        return;
+      }
+    }
+
     // TODO: Reemplazar por usuario actual de API REST PostgreSQL
     final currentUser = 'user_123456789';
 
-    final cost = double.tryParse(_costController.text) ?? 0.0;
+    final cost =
+        CurrencyInputFormatter.getNumericValue(_costController.text) ?? 0.0;
 
     // Calcular next_change_km y alert_date según las reglas
     // IMPORTANTE: next_change_km se guarda SIN umbral (km donde se debe hacer el cambio)
@@ -408,7 +475,7 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
 
     // Para "Otro", el serviceType debe ser "Otro" y el nombre personalizado va en customServiceName
     final maintenance = MaintenanceEntity(
-      vehicleId: _selectedVehicle!.id!,
+      vehicleId: vehicleId,
       serviceType:
           _selectedType!, // Siempre el tipo seleccionado (incluye "Otro")
       serviceDate: _serviceDate ?? DateTime.now(),
@@ -510,8 +577,22 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
                     '--- [DEBUG CRÍTICO] GPS Device ID desde objeto: ${vehicle.gpsDeviceId} ---',
                   );
 
-                  // Relectura del vehículo desde BD para asegurar datos completos
-                  if (vehicle.id != null) {
+                  // Verificar si el ID es un ID GPS (numérico) o un UUID de BD
+                  final isGpsId =
+                      vehicle.id != null && int.tryParse(vehicle.id!) != null;
+
+                  // Si es un ID GPS, usar el vehículo directamente sin buscar en BD
+                  if (isGpsId) {
+                    debugPrint(
+                      '--- [DEBUG CRÍTICO] ID GPS detectado, usando vehículo del GPS directamente ---',
+                    );
+                    setState(() {
+                      _selectedVehicle = vehicle;
+                      _currentMileage = null;
+                    });
+                    _loadGpsMileage();
+                  } else if (vehicle.id != null) {
+                    // Es un UUID válido, releer desde BD
                     final vehicleResult = await _vehicleRepository
                         .getVehicleById(vehicle.id!);
                     vehicleResult.fold(
@@ -601,7 +682,7 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
                               ),
                             ),
                             Text(
-                              '${_currentMileage!.toStringAsFixed(0)} km',
+                              '${_currentMileage!.toStringAsFixed(2)} km',
                               style: const TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
@@ -860,10 +941,14 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
               // Costo
               TextFormField(
                 controller: _costController,
-                keyboardType: TextInputType.number,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                inputFormatters: [CurrencyInputFormatter()],
                 decoration: InputDecoration(
                   labelText: 'Costo *',
                   prefixIcon: const Icon(Icons.attach_money),
+                  prefixText: '\$ ',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -872,7 +957,7 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
                   if (value == null || value.isEmpty) {
                     return 'Ingresa el costo';
                   }
-                  final cost = double.tryParse(value);
+                  final cost = CurrencyInputFormatter.getNumericValue(value);
                   if (cost == null || cost < 0) {
                     return 'Costo inválido';
                   }

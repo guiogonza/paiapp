@@ -17,19 +17,44 @@ class VehicleModel extends VehicleEntity {
 
   /// Crea un VehicleModel desde un Map (JSON de Supabase)
   factory VehicleModel.fromJson(Map<String, dynamic> json) {
+    // Helper para parsear números que pueden venir como String
+    double? parseDouble(dynamic value) {
+      if (value == null) return null;
+      if (value is num) return value.toDouble();
+      if (value is String) return double.tryParse(value);
+      return null;
+    }
+
+    int parseIntSafe(dynamic value, [int defaultValue = 0]) {
+      if (value == null) return defaultValue;
+      if (value is int) return value;
+      if (value is num) return value.toInt();
+      if (value is String) return int.tryParse(value) ?? defaultValue;
+      return defaultValue;
+    }
+
     return VehicleModel(
       id: json['id'] as String?,
-      placa: json['plate'] as String, // Mapeo: plate → placa
-      marca: json['brand'] as String, // Mapeo: brand → marca
-      modelo: json['model'] as String, // Mapeo: model → modelo
-      ano: json['year'] as int? ?? 0, // Mapeo: year → ano
-      conductor: json['driver_name'] as String?, // Mapeo: driver_name → conductor
-      gpsDeviceId: json['gps_device_id'] as String?, // Mapeo: gps_device_id → gpsDeviceId
+      placa:
+          (json['placa'] ?? json['plate']) as String, // Soporta ambos nombres
+      marca:
+          (json['marca'] ?? json['brand'] ?? 'N/A')
+              as String, // Soporta ambos nombres
+      modelo:
+          (json['modelo'] ?? json['model'] ?? 'N/A')
+              as String, // Soporta ambos nombres
+      ano: parseIntSafe(json['ano'] ?? json['year']), // Soporta ambos nombres
+      conductor:
+          json['driver_name'] as String?, // Mapeo: driver_name → conductor
+      gpsDeviceId:
+          json['gps_device_id']
+              as String?, // Mapeo: gps_device_id → gpsDeviceId
       ownerId: json['owner_id'] as String?, // Mapeo: owner_id → ownerId
-      currentMileage: json['current_mileage'] != null 
-          ? (json['current_mileage'] as num).toDouble() 
-          : null, // Mapeo: current_mileage → currentMileage
-      vehicleType: json['vehicle_type'] as String?, // Mapeo: vehicle_type → vehicleType
+      currentMileage: parseDouble(
+        json['current_mileage'],
+      ), // Soporta String y num
+      vehicleType:
+          json['vehicle_type'] as String?, // Mapeo: vehicle_type → vehicleType
     );
   }
 
@@ -37,15 +62,19 @@ class VehicleModel extends VehicleEntity {
   Map<String, dynamic> toJson() {
     return {
       if (id != null) 'id': id,
-      'plate': placa, // Mapeo: placa → plate
-      'brand': marca, // Mapeo: marca → brand
-      'model': modelo, // Mapeo: modelo → model
-      'year': ano, // Mapeo: ano → year
-      'driver_name': conductor,// Mapeo: conductor → driver_name
-      if (gpsDeviceId != null) 'gps_device_id': gpsDeviceId, // Mapeo: gpsDeviceId → gps_device_id
+      'placa': placa, // Mapeo para PostgreSQL local
+      'marca': marca, // Mapeo para PostgreSQL local
+      'modelo': modelo, // Mapeo para PostgreSQL local
+      'ano': ano, // Mapeo para PostgreSQL local
+      'driver_name': conductor, // Mapeo: conductor → driver_name
+      if (gpsDeviceId != null)
+        'gps_device_id': gpsDeviceId, // Mapeo: gpsDeviceId → gps_device_id
       if (ownerId != null) 'owner_id': ownerId, // Mapeo: ownerId → owner_id
-      if (currentMileage != null) 'current_mileage': currentMileage, // Mapeo: currentMileage → current_mileage
-      if (vehicleType != null) 'vehicle_type': vehicleType, // Mapeo: vehicleType → vehicle_type
+      if (currentMileage != null)
+        'current_mileage':
+            currentMileage, // Mapeo: currentMileage → current_mileage
+      if (vehicleType != null)
+        'vehicle_type': vehicleType, // Mapeo: vehicleType → vehicle_type
     };
   }
 

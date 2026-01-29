@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:pai_app/core/theme/app_colors.dart';
+import 'package:pai_app/core/utils/currency_input_formatter.dart';
 import 'package:pai_app/data/repositories/expense_repository_impl.dart';
 import 'package:pai_app/data/repositories/trip_repository_impl.dart';
 import 'package:pai_app/domain/entities/expense_entity.dart';
@@ -351,7 +352,9 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
     });
 
     try {
-      final amount = double.tryParse(_amountController.text.trim());
+      final amount = CurrencyInputFormatter.getNumericValue(
+        _amountController.text,
+      );
       if (amount == null || amount <= 0) {
         throw Exception('El monto debe ser un número válido mayor a 0');
       }
@@ -705,28 +708,28 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
               ),
               const SizedBox(height: 20),
 
-              // Monto (amount) - Obligatorio, Numérico
+              // Monto (amount) - Obligatorio, Numérico con formato de miles
               TextFormField(
                 controller: _amountController,
                 decoration: InputDecoration(
                   labelText: 'Monto *',
                   hintText: '0',
+                  prefixText: '\$ ',
                   prefixIcon: const Icon(Icons.attach_money),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
+                keyboardType: TextInputType.number,
                 inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+                  FilteringTextInputFormatter.digitsOnly,
+                  CurrencyInputFormatter(),
                 ],
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
                     return 'El monto es requerido';
                   }
-                  final amount = double.tryParse(value.trim());
+                  final amount = CurrencyInputFormatter.getNumericValue(value);
                   if (amount == null) {
                     return 'Ingresa un monto válido';
                   }

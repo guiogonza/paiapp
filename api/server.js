@@ -738,11 +738,24 @@ app.get('/rest/v1/vehicles', authenticateToken, async (req, res) => {
   }
 });
 
-// Crear vehículo
+// Crear vehículo (o devolver existente si la placa ya existe)
 app.post('/rest/v1/vehicles', authenticateToken, async (req, res) => {
   try {
     const { placa, marca, modelo, ano, color, tipo, gps_device_id } = req.body;
 
+    // Primero verificar si ya existe un vehículo con esa placa
+    const existing = await pool.query(
+      'SELECT * FROM vehicles WHERE UPPER(placa) = UPPER($1)',
+      [placa]
+    );
+
+    if (existing.rows.length > 0) {
+      // Ya existe, devolver el existente
+      console.log(`✅ Vehículo ya existe: ${placa} (ID: ${existing.rows[0].id})`);
+      return res.status(200).json(existing.rows[0]);
+    }
+
+    // No existe, crear nuevo
     const result = await pool.query(
       `INSERT INTO vehicles (placa, marca, modelo, ano, color, tipo, gps_device_id, owner_id)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -750,6 +763,7 @@ app.post('/rest/v1/vehicles', authenticateToken, async (req, res) => {
       [placa, marca, modelo, ano, color, tipo, gps_device_id, req.user.id]
     );
 
+    console.log(`✅ Vehículo creado: ${placa} (ID: ${result.rows[0].id})`);
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('❌ Error creando vehículo:', error);
@@ -810,7 +824,7 @@ app.get('/rest/v1/vehicle_history', authenticateToken, async (req, res) => {
 
 app.get('/rest/v1/documents', authenticateToken, async (req, res) => {
   try {
-    const { vehicle_id } = req.query;
+    const { vehicle_id, driver_id } = req.query;
     
     let query = 'SELECT * FROM documents WHERE is_archived = false';
     const params = [];
@@ -818,6 +832,11 @@ app.get('/rest/v1/documents', authenticateToken, async (req, res) => {
     if (vehicle_id) {
       params.push(vehicle_id.replace('eq.', ''));
       query += ` AND vehicle_id = $${params.length}`;
+    }
+
+    if (driver_id) {
+      params.push(driver_id.replace('eq.', ''));
+      query += ` AND driver_id = $${params.length}`;
     }
 
     query += ' ORDER BY expiry_date ASC';
@@ -832,19 +851,25 @@ app.get('/rest/v1/documents', authenticateToken, async (req, res) => {
 
 app.post('/rest/v1/documents', authenticateToken, async (req, res) => {
   try {
-    const { vehicle_id, document_type, document_number, issue_date, expiry_date, alert_date, document_url, notes } = req.body;
+    const { vehicle_id, driver_id, document_type, document_number, issue_date, expiry_date, alert_date, document_url, notes, is_archived } = req.body;
+
+    // Validar que al menos uno esté presente
+    if (!vehicle_id && !driver_id) {
+      return res.status(400).json({ error: 'Se requiere vehicle_id o driver_id' });
+    }
 
     const result = await pool.query(
-      `INSERT INTO documents (vehicle_id, document_type, document_number, issue_date, expiry_date, alert_date, document_url, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `INSERT INTO documents (vehicle_id, driver_id, document_type, document_number, issue_date, expiry_date, alert_date, document_url, notes, is_archived)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING *`,
-      [vehicle_id, document_type, document_number, issue_date, expiry_date, alert_date, document_url, notes]
+      [vehicle_id || null, driver_id || null, document_type, document_number, issue_date, expiry_date, alert_date, document_url, notes, is_archived || false]
     );
 
+    console.log('✅ Documento creado:', result.rows[0]);
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('❌ Error creando documento:', error);
-    res.status(500).json({ error: 'Error del servidor' });
+    res.status(500).json({ error: 'Error del servidor', details: error.message });
   }
 });
 
@@ -897,18 +922,19 @@ app.post('/rest/v1/trips', authenticateToken, async (req, res) => {
     const { 
       vehicle_id, start_latitude, start_longitude, start_address,
       end_latitude, end_longitude, end_address, start_location, end_location,
-      budget_amount, status 
+      budget_amount, status, driver_name, client_name, revenue_amount,
+      start_date, end_date
     } = req.body;
 
     const result = await pool.query(
       `INSERT INTO trips (vehicle_id, driver_id, start_time, start_latitude, start_longitude, 
         start_address, end_latitude, end_longitude, end_address, start_location, end_location,
-        budget_amount, status)
-       VALUES ($1, $2, CURRENT_TIMESTAMP, $3, $4, $5, $6, $7, $8, $9, $10, $11, COALESCE($12, 'in_progress'))
+        budget_amount, status, driver_name, client_name, revenue_amount, start_date, end_date)
+       VALUES ($1, $2, CURRENT_TIMESTAMP, $3, $4, $5, $6, $7, $8, $9, $10, $11, COALESCE($12, 'in_progress'), $13, $14, $15, $16, $17)
        RETURNING *`,
       [vehicle_id, req.user.id, start_latitude, start_longitude, start_address,
        end_latitude, end_longitude, end_address, start_location, end_location,
-       budget_amount, status]
+       budget_amount, status, driver_name, client_name, revenue_amount, start_date, end_date]
     );
 
     res.status(201).json(result.rows[0]);
@@ -1114,31 +1140,40 @@ app.post('/rest/v1/maintenance', authenticateToken, async (req, res) => {
   try {
     const { 
       vehicle_id, service_type, service_date, km_at_service, cost, 
-      next_change_km, alert_date, notes, tire_position, provider 
+      next_change_km, alert_date, custom_service_name, tire_position, provider_name,
+      created_by
     } = req.body;
 
+    console.log('📝 Creando mantenimiento:', { vehicle_id, service_type, km_at_service, cost });
+    
     const result = await pool.query(
-      `INSERT INTO maintenance (vehicle_id, created_by, service_type, service_date, km_at_service, 
-        cost, next_change_km, alert_date, notes, tire_position, provider)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      `INSERT INTO maintenance (
+        vehicle_id, service_type, maintenance_type, service_date, 
+        km_at_service, cost, next_change_km, alert_date,
+        custom_service_name, tire_position, created_by, status
+      )
+       VALUES ($1, $2, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'completed')
        RETURNING *`,
-      [vehicle_id, req.user.id, service_type, service_date, km_at_service, 
-       cost, next_change_km, alert_date, notes, tire_position, provider]
+      [
+        vehicle_id, 
+        service_type, 
+        service_date, 
+        km_at_service, 
+        cost, 
+        next_change_km || null,
+        alert_date || null,
+        custom_service_name || null,
+        tire_position || null,
+        created_by || req.user.id
+      ]
     );
 
-    // Actualizar kilometraje del vehículo si se proporcionó
-    if (km_at_service && vehicle_id) {
-      await pool.query(
-        'UPDATE vehicles SET current_mileage = $1 WHERE id = $2',
-        [km_at_service, vehicle_id]
-      );
-      console.log(`✅ Kilometraje actualizado: ${km_at_service} km para vehículo ${vehicle_id}`);
-    }
+    console.log(`✅ Mantenimiento registrado: ${result.rows[0].id}`);
 
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('❌ Error creando mantenimiento:', error);
-    res.status(500).json({ error: 'Error del servidor' });
+    res.status(500).json({ error: 'Error del servidor', details: error.message });
   }
 });
 
@@ -1302,10 +1337,15 @@ app.patch('/rest/v1/remisiones/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// Actualizar vehículo
+// Actualizar vehículo (soporta UUID o GPS device ID)
 app.patch('/rest/v1/vehicles/:id', authenticateToken, async (req, res) => {
   try {
     const { placa, marca, modelo, ano, color, tipo, gps_device_id, current_mileage, is_active } = req.body;
+    const vehicleId = req.params.id;
+    
+    // Verificar si es un UUID válido o un ID numérico (GPS)
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(vehicleId);
+    const whereClause = isUuid ? 'id = $10' : 'gps_device_id = $10';
 
     const result = await pool.query(
       `UPDATE vehicles SET 
@@ -1318,14 +1358,15 @@ app.patch('/rest/v1/vehicles/:id', authenticateToken, async (req, res) => {
         gps_device_id = COALESCE($7, gps_device_id),
         current_mileage = COALESCE($8, current_mileage),
         is_active = COALESCE($9, is_active)
-       WHERE id = $10
+       WHERE ${whereClause}
        RETURNING *`,
-      [placa, marca, modelo, ano, color, tipo, gps_device_id, current_mileage, is_active, req.params.id]
+      [placa, marca, modelo, ano, color, tipo, gps_device_id, current_mileage, is_active, vehicleId]
     );
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Vehículo no encontrado' });
     }
+    console.log(`✅ Vehículo actualizado: ${result.rows[0].placa} (ID: ${result.rows[0].id})`);
     res.json(result.rows[0]);
   } catch (error) {
     console.error('❌ Error actualizando vehículo:', error);
@@ -1333,10 +1374,22 @@ app.patch('/rest/v1/vehicles/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// Obtener vehículo por ID
+// Obtener vehículo por ID (soporta UUID o GPS device ID)
 app.get('/rest/v1/vehicles/:id', authenticateToken, async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM vehicles WHERE id = $1', [req.params.id]);
+    const vehicleId = req.params.id;
+    
+    // Verificar si es un UUID válido o un ID numérico (GPS)
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(vehicleId);
+    
+    let result;
+    if (isUuid) {
+      result = await pool.query('SELECT * FROM vehicles WHERE id = $1', [vehicleId]);
+    } else {
+      // Buscar por gps_device_id si no es UUID
+      result = await pool.query('SELECT * FROM vehicles WHERE gps_device_id = $1', [vehicleId]);
+    }
+    
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Vehículo no encontrado' });
     }

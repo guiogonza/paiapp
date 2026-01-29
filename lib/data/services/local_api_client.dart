@@ -21,8 +21,8 @@ class LocalApiClient {
 
     final origin = Uri.base.origin;
 
-    // Desarrollo local Flutter (localhost con puerto alto)
-    if (origin.contains('localhost:8') || origin.contains('127.0.0.1:8')) {
+    // Desarrollo local Flutter (localhost o 127.0.0.1 con cualquier puerto)
+    if (origin.contains('localhost') || origin.contains('127.0.0.1')) {
       return 'http://localhost:3000';
     }
 

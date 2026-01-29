@@ -63,12 +63,13 @@ class GPSVehicleProvider {
       // Convertir VehicleLocationEntity a VehicleEntity
       final vehicles = vehicleLocations.map((location) {
         return VehicleEntity(
-          id: location.id,
+          id: location
+              .id, // Usar el ID del GPS temporalmente hasta que se sincronice con BD
           placa: location.plate, // plate viene del name del GPS
           marca: 'GPS',
           modelo: 'Sincronizado',
           ano: DateTime.now().year,
-          gpsDeviceId: location.id,
+          gpsDeviceId: location.id, // El ID del GPS se guarda aquí también
         );
       }).toList();
 

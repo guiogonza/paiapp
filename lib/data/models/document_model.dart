@@ -20,8 +20,10 @@ class DocumentModel extends DocumentEntity {
       id: json['id'] as String?,
       vehicleId: json['vehicle_id'] as String?,
       driverId: json['driver_id'] as String?,
-      documentType: json['type'] as String,
-      expirationDate: DateTime.parse(json['expiration_date'] as String),
+      documentType: (json['document_type'] ?? json['type']) as String,
+      expirationDate: DateTime.parse(
+        (json['expiry_date'] ?? json['expiration_date']) as String,
+      ),
       documentUrl: json['document_url'] as String?,
       createdBy: json['created_by'] as String?,
       createdAt: json['created_at'] != null
@@ -39,8 +41,10 @@ class DocumentModel extends DocumentEntity {
       if (id != null) 'id': id,
       if (vehicleId != null) 'vehicle_id': vehicleId,
       if (driverId != null) 'driver_id': driverId,
-      'type': documentType,
-      'expiration_date': expirationDate.toIso8601String().split('T')[0], // YYYY-MM-DD
+      'document_type': documentType,
+      'expiry_date': expirationDate.toIso8601String().split(
+        'T',
+      )[0], // YYYY-MM-DD
       if (documentUrl != null) 'document_url': documentUrl,
       if (createdBy != null) 'created_by': createdBy,
       if (createdAt != null) 'created_at': createdAt!.toIso8601String(),
@@ -79,4 +83,3 @@ class DocumentModel extends DocumentEntity {
     );
   }
 }
-

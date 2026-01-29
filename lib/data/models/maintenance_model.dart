@@ -20,21 +20,42 @@ class MaintenanceModel extends MaintenanceEntity {
 
   /// Crea un MaintenanceModel desde un Map (JSON de Supabase)
   factory MaintenanceModel.fromJson(Map<String, dynamic> json) {
+    // Helper para parsear números que pueden venir como String
+    double parseDouble(dynamic value, [double defaultValue = 0.0]) {
+      if (value == null) return defaultValue;
+      if (value is num) return value.toDouble();
+      if (value is String) return double.tryParse(value) ?? defaultValue;
+      return defaultValue;
+    }
+
+    double? parseDoubleNullable(dynamic value) {
+      if (value == null) return null;
+      if (value is num) return value.toDouble();
+      if (value is String) return double.tryParse(value);
+      return null;
+    }
+
+    int? parseIntNullable(dynamic value) {
+      if (value == null) return null;
+      if (value is int) return value;
+      if (value is num) return value.toInt();
+      if (value is String) return int.tryParse(value);
+      return null;
+    }
+
     return MaintenanceModel(
       id: json['id'] as String?,
       vehicleId: json['vehicle_id'] as String,
       serviceType: json['service_type'] as String,
       serviceDate: DateTime.parse(json['service_date'] as String),
-      kmAtService: (json['km_at_service'] as num).toDouble(),
-      nextChangeKm: json['next_change_km'] != null 
-          ? (json['next_change_km'] as num).toDouble() 
-          : null,
+      kmAtService: parseDouble(json['km_at_service']),
+      nextChangeKm: parseDoubleNullable(json['next_change_km']),
       alertDate: json['alert_date'] != null
           ? DateTime.parse(json['alert_date'] as String)
           : null,
-      cost: (json['cost'] as num).toDouble(),
+      cost: parseDouble(json['cost']),
       customServiceName: json['custom_service_name'] as String?,
-      tirePosition: json['tire_position'] as int?,
+      tirePosition: parseIntNullable(json['tire_position']),
       providerName: json['provider_name'] as String?,
       receiptUrl: json['receipt_url'] as String?,
       createdBy: json['created_by'] as String,
@@ -47,15 +68,21 @@ class MaintenanceModel extends MaintenanceEntity {
       if (id != null) 'id': id,
       'vehicle_id': vehicleId,
       'service_type': serviceType,
-      'service_date': serviceDate.toIso8601String().split('T')[0], // Solo fecha (YYYY-MM-DD)
+      'service_date': serviceDate.toIso8601String().split(
+        'T',
+      )[0], // Solo fecha (YYYY-MM-DD)
       'km_at_service': kmAtService,
       if (nextChangeKm != null) 'next_change_km': nextChangeKm,
-      if (alertDate != null) 'alert_date': alertDate!.toIso8601String().split('T')[0],
+      if (alertDate != null)
+        'alert_date': alertDate!.toIso8601String().split('T')[0],
       'cost': cost,
-      if (customServiceName != null && customServiceName!.isNotEmpty) 'custom_service_name': customServiceName,
+      if (customServiceName != null && customServiceName!.isNotEmpty)
+        'custom_service_name': customServiceName,
       if (tirePosition != null) 'tire_position': tirePosition,
-      if (providerName != null && providerName!.isNotEmpty) 'provider_name': providerName,
-      if (receiptUrl != null && receiptUrl!.isNotEmpty) 'receipt_url': receiptUrl,
+      if (providerName != null && providerName!.isNotEmpty)
+        'provider_name': providerName,
+      if (receiptUrl != null && receiptUrl!.isNotEmpty)
+        'receipt_url': receiptUrl,
       'created_by': createdBy,
     };
   }
@@ -98,4 +125,3 @@ class MaintenanceModel extends MaintenanceEntity {
     );
   }
 }
-

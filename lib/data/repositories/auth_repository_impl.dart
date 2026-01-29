@@ -1,6 +1,8 @@
+import 'package:pai_app/data/providers/gps_vehicle_provider.dart';
+import 'package:pai_app/data/services/gps_auth_service.dart';
+import 'package:pai_app/data/services/local_api_client.dart';
 import 'package:pai_app/domain/entities/user_entity.dart';
 import 'package:pai_app/domain/repositories/auth_repository.dart';
-import 'package:pai_app/data/services/local_api_client.dart';
 
 class AuthRepositoryImpl implements AuthRepository {
   final LocalApiClient _apiClient = LocalApiClient();
@@ -46,10 +48,23 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<void> logout() async {
     try {
-      print('👋 Cerrando sesión en API local...');
-      // Limpiar el token almacenado en LocalApiClient
+      print('👋 Cerrando sesión...');
+
+      // 1. Limpiar cache de vehículos GPS
+      final gpsProvider = GPSVehicleProvider();
+      gpsProvider.clearCache();
+      print('✅ Cache de vehículos GPS limpiado');
+
+      // 2. Limpiar API key y credenciales GPS
+      final gpsAuthService = GPSAuthService();
+      await gpsAuthService.logout();
+      print('✅ Credenciales GPS limpiadas');
+
+      // 3. Limpiar token de API local
       await _apiClient.logout();
-      print('✅ Sesión cerrada');
+      print('✅ Sesión local cerrada');
+
+      print('✅ Logout completo - usuario puede cambiar');
     } catch (e) {
       print('❌ Error al cerrar sesión: $e');
       throw Exception('Error al cerrar sesión: ${e.toString()}');

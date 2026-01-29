@@ -138,11 +138,13 @@ class _LoginPageState extends State<LoginPage> {
       // Guardar credenciales GPS (las mismas que se usan para el login PAI)
       // Esto permite que los servicios de GPS puedan obtener ubicaciones de vehículos
       final gpsAuthService = GPSAuthService();
-      print('💾 Guardando credenciales GPS fijas (transmaq@rastrear.com.co)');
-      // USAR SIEMPRE credenciales GPS fijas para consistencia con el mapa
+      print(
+        '💾 Guardando credenciales GPS para: ${_usernameController.text.trim()}',
+      );
+      // Guardar las credenciales del usuario para GPS
       await gpsAuthService.saveGpsCredentialsLocally(
-        'transmaq@rastrear.com.co',
-        'RastrearUMCL2019',
+        _usernameController.text.trim(),
+        _passwordController.text,
       );
       print('✅ Credenciales GPS guardadas localmente');
 
@@ -311,11 +313,11 @@ class _LoginPageState extends State<LoginPage> {
           _passwordController.text,
         );
 
-        // Guardar credenciales GPS fijas (no las del usuario)
+        // Guardar credenciales GPS del usuario después del login exitoso
         final gpsAuthService = GPSAuthService();
         await gpsAuthService.saveGpsCredentialsLocally(
-          'transmaq@rastrear.com.co',
-          'RastrearUMCL2019',
+          _usernameController.text.trim(),
+          _passwordController.text,
         );
 
         if (mounted) {

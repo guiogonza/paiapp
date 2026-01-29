@@ -31,7 +31,7 @@ class _VehicleHistoryPageState extends State<VehicleHistoryPage> {
   DateTime? _toDate;
   MapController? _flutterMapController;
   gmaps.GoogleMapController? _mapController;
-  bool _loadingFromApi = false;
+  final bool _loadingFromApi = false;
   VehicleHistoryEntity? _selectedPoint;
   OverlayEntry? _overlayEntry;
 

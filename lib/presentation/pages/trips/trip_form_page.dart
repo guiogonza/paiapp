@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:pai_app/core/theme/app_colors.dart';
+import 'package:pai_app/core/utils/currency_input_formatter.dart';
 import 'package:pai_app/core/utils/validators.dart';
 import 'package:pai_app/core/services/municipalities_service.dart';
 import 'package:pai_app/data/repositories/trip_repository_impl.dart';
+import 'package:pai_app/data/repositories/vehicle_repository_impl.dart';
 import 'package:pai_app/data/providers/gps_vehicle_provider.dart';
 import 'package:pai_app/data/repositories/profile_repository_impl.dart';
 import 'package:pai_app/domain/entities/trip_entity.dart';
@@ -29,6 +31,7 @@ class _TripFormPageState extends State<TripFormPage> {
   final _revenueAmountController = TextEditingController();
   final _budgetAmountController = TextEditingController();
   final _tripRepository = TripRepositoryImpl();
+  final _vehicleRepository = VehicleRepositoryImpl();
   final _gpsVehicleProvider = GPSVehicleProvider();
   final _profileRepository = ProfileRepositoryImpl();
 
@@ -360,7 +363,66 @@ class _TripFormPageState extends State<TripFormPage> {
     });
 
     try {
-      final revenueAmount = double.tryParse(
+      // Si el vehículo tiene un ID numérico (del GPS), crearlo primero en la BD
+      String vehicleId = _selectedVehicleId!;
+      final isGpsId = int.tryParse(vehicleId) != null;
+
+      if (isGpsId) {
+        debugPrint(
+          '🔄 Vehículo con ID GPS ($vehicleId), buscando o creando en BD',
+        );
+        final vehicle = _vehicles.firstWhere((v) => v.id == vehicleId);
+
+        // Primero intentar obtener el vehículo por placa (puede que ya exista)
+        final vehiclesResult = await _vehicleRepository.getVehicles();
+        VehicleEntity? existingVehicle;
+
+        vehiclesResult.fold((failure) => null, (vehicles) {
+          try {
+            existingVehicle = vehicles.firstWhere(
+              (v) => v.placa.toUpperCase() == vehicle.placa.toUpperCase(),
+            );
+          } catch (e) {
+            existingVehicle = null;
+          }
+        });
+
+        if (existingVehicle != null) {
+          // El vehículo ya existe en la BD, usar su UUID
+          vehicleId = existingVehicle!.id!;
+          debugPrint(
+            '✅ Vehículo ya existe con UUID: $vehicleId (placa: ${existingVehicle!.placa})',
+          );
+        } else {
+          // Crear el vehículo
+          final createResult = await _vehicleRepository.createVehicle(vehicle);
+
+          await createResult.fold(
+            (failure) {
+              // Si falla por duplicado, recargar vehículos y buscar de nuevo
+              if (failure.toString().contains('already exists') ||
+                  failure.toString().contains('unique_placa')) {
+                debugPrint(
+                  '⚠️ Vehículo duplicado detectado, recargando lista...',
+                );
+                throw Exception(
+                  'El vehículo ${vehicle.placa} ya existe. Por favor, recarga la página e intenta nuevamente.',
+                );
+              } else {
+                throw Exception(
+                  'Error al crear vehículo: ${failure.toString()}',
+                );
+              }
+            },
+            (createdVehicle) {
+              vehicleId = createdVehicle.id!;
+              debugPrint('✅ Vehículo creado con UUID: $vehicleId');
+            },
+          );
+        }
+      }
+
+      final revenueAmount = CurrencyInputFormatter.getNumericValue(
         _revenueAmountController.text.trim(),
       );
       if (revenueAmount == null || revenueAmount <= 0) {
@@ -369,7 +431,9 @@ class _TripFormPageState extends State<TripFormPage> {
         );
       }
 
-      final budgetAmount = double.tryParse(_budgetAmountController.text.trim());
+      final budgetAmount = CurrencyInputFormatter.getNumericValue(
+        _budgetAmountController.text.trim(),
+      );
       if (budgetAmount == null || budgetAmount <= 0) {
         throw Exception(
           'El anticipo de viaje debe ser un número válido mayor a 0',
@@ -378,7 +442,7 @@ class _TripFormPageState extends State<TripFormPage> {
 
       final trip = TripEntity(
         id: widget.trip?.id,
-        vehicleId: _selectedVehicleId!,
+        vehicleId: vehicleId,
         driverName: _driverNameController.text.trim(),
         clientName: _clientNameController.text.trim(),
         origin: _originController.text.trim(),
@@ -597,7 +661,7 @@ class _TripFormPageState extends State<TripFormPage> {
               ),
               const SizedBox(height: 20),
 
-              // Origen - Obligatorio con Autocomplete OPTIMIZADO
+              // Origen - Obligatorio con Autocomplete
               Autocomplete<String>(
                 optionsBuilder: (TextEditingValue textEditingValue) async {
                   final query = textEditingValue.text.trim();
@@ -606,13 +670,8 @@ class _TripFormPageState extends State<TripFormPage> {
                     return const Iterable<String>.empty();
                   }
 
-                  // DEBOUNCE: Esperar 300ms para evitar búsquedas innecesarias
-                  await Future.delayed(const Duration(milliseconds: 300));
-
-                  // Verificar si el query cambió durante el debounce
-                  if (query != textEditingValue.text.trim()) {
-                    return const Iterable<String>.empty();
-                  }
+                  // Debounce ligero para mejorar rendimiento
+                  await Future.delayed(const Duration(milliseconds: 200));
 
                   try {
                     final suggestions = await _municipalitiesService
@@ -720,30 +779,19 @@ class _TripFormPageState extends State<TripFormPage> {
               Autocomplete<String>(
                 optionsBuilder: (TextEditingValue textEditingValue) async {
                   final query = textEditingValue.text.trim();
-                  print(
-                    '🔎 [Autocomplete Destino] Query recibido: "$query" (length: ${query.length})',
-                  );
 
                   if (query.isEmpty || query.length < 2) {
-                    print('   ⏭️ Query muy corto, no se busca');
-                    // No mostrar sugerencias hasta que haya al menos 2 caracteres
                     return const Iterable<String>.empty();
                   }
 
+                  // Debounce ligero para mejorar rendimiento
+                  await Future.delayed(const Duration(milliseconds: 200));
+
                   try {
-                    print('   🔍 Llamando a searchMunicipalities...');
                     final suggestions = await _municipalitiesService
                         .searchMunicipalities(query);
-                    print('   ✅ Sugerencias recibidas: ${suggestions.length}');
-                    if (suggestions.isNotEmpty && suggestions.length <= 5) {
-                      print(
-                        '   📍 Primeros resultados: ${suggestions.join(", ")}',
-                      );
-                    }
                     return suggestions;
-                  } catch (e, stackTrace) {
-                    print('❌ Error al buscar municipios en Destino: $e');
-                    print('   Stack: $stackTrace');
+                  } catch (e) {
                     return const Iterable<String>.empty();
                   }
                 },
@@ -850,6 +898,7 @@ class _TripFormPageState extends State<TripFormPage> {
                   labelText: 'Monto de Ingreso *',
                   hintText: '0',
                   prefixIcon: const Icon(Icons.attach_money),
+                  prefixText: '\$ ',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -857,14 +906,14 @@ class _TripFormPageState extends State<TripFormPage> {
                 keyboardType: const TextInputType.numberWithOptions(
                   decimal: true,
                 ),
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
-                ],
+                inputFormatters: [CurrencyInputFormatter()],
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
                     return 'El monto de ingreso es requerido';
                   }
-                  final amount = double.tryParse(value.trim());
+                  final amount = CurrencyInputFormatter.getNumericValue(
+                    value.trim(),
+                  );
                   if (amount == null) {
                     return 'Ingresa un monto válido';
                   }
@@ -884,6 +933,7 @@ class _TripFormPageState extends State<TripFormPage> {
                   labelText: 'Anticipo de viaje *',
                   hintText: '0',
                   prefixIcon: const Icon(Icons.account_balance_wallet),
+                  prefixText: '\$ ',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -891,14 +941,14 @@ class _TripFormPageState extends State<TripFormPage> {
                 keyboardType: const TextInputType.numberWithOptions(
                   decimal: true,
                 ),
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
-                ],
+                inputFormatters: [CurrencyInputFormatter()],
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
                     return 'El anticipo de viaje es requerido';
                   }
-                  final amount = double.tryParse(value.trim());
+                  final amount = CurrencyInputFormatter.getNumericValue(
+                    value.trim(),
+                  );
                   if (amount == null) {
                     return 'Ingresa un anticipo válido';
                   }

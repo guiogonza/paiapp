@@ -17,9 +17,9 @@ class VehicleLocationService {
       final apiKey = await _authService.getApiKey();
 
       if (apiKey == null || apiKey.isEmpty) {
-        // Si no hay API key, intentar hacer login con credenciales guardadas
+        // Si no hay API key, intentar hacer login con credenciales guardadas del usuario
         print(
-          '⚠️ No hay API key, intentando login con credenciales del usuario...',
+          '⚠️ No hay API key, intentando login con credenciales GPS del usuario...',
         );
         try {
           final credentials = await _authService.getGpsCredentialsLocally();

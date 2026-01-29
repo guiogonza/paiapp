@@ -20,15 +20,32 @@ class TripModel extends TripEntity {
   /// Crea un TripModel desde un Map (JSON de Supabase)
   /// Mapeo estricto: las claves deben coincidir con las columnas de la tabla 'routes'
   factory TripModel.fromJson(Map<String, dynamic> json) {
+    // Helper para parsear números que pueden venir como String
+    double parseDouble(dynamic value, [double defaultValue = 0.0]) {
+      if (value == null) return defaultValue;
+      if (value is num) return value.toDouble();
+      if (value is String) return double.tryParse(value) ?? defaultValue;
+      return defaultValue;
+    }
+
     return TripModel(
       id: json['id'] as String?,
       vehicleId: json['vehicle_id'] as String, // Mapeo estricto: vehicle_id
       driverName: json['driver_name'] as String, // Mapeo estricto: driver_name
-      clientName: (json['client_name'] as String?) ?? '', // Mapeo estricto: client_name
-      origin: (json['start_location'] ?? json['origin']) as String? ?? '', // Mapeo estricto: start_location o origin
-      destination: (json['end_location'] ?? json['destination']) as String? ?? '', // Mapeo estricto: end_location o destination
-      revenueAmount: (json['revenue_amount'] as num).toDouble(), // Mapeo estricto: revenue_amount
-      budgetAmount: (json['budget_amount'] as num?)?.toDouble() ?? 0.0, // Mapeo estricto: budget_amount (con fallback)
+      clientName:
+          (json['client_name'] as String?) ?? '', // Mapeo estricto: client_name
+      origin:
+          (json['start_location'] ?? json['origin']) as String? ??
+          '', // Mapeo estricto: start_location o origin
+      destination:
+          (json['end_location'] ?? json['destination']) as String? ??
+          '', // Mapeo estricto: end_location o destination
+      revenueAmount: parseDouble(
+        json['revenue_amount'],
+      ), // Mapeo estricto: revenue_amount
+      budgetAmount: parseDouble(
+        json['budget_amount'],
+      ), // Mapeo estricto: budget_amount
       startDate: json['start_date'] != null
           ? DateTime.parse(json['start_date'] as String)
           : null, // Mapeo estricto: start_date
@@ -50,8 +67,11 @@ class TripModel extends TripEntity {
       'end_location': destination, // Mapeo estricto: end_location
       'revenue_amount': revenueAmount, // Mapeo estricto: revenue_amount
       'budget_amount': budgetAmount, // Mapeo estricto: budget_amount
-      if (startDate != null) 'start_date': startDate!.toIso8601String(), // Mapeo estricto: start_date
-      if (endDate != null) 'end_date': endDate!.toIso8601String(), // Mapeo estricto: end_date
+      if (startDate != null)
+        'start_date': startDate!
+            .toIso8601String(), // Mapeo estricto: start_date
+      if (endDate != null)
+        'end_date': endDate!.toIso8601String(), // Mapeo estricto: end_date
     };
   }
 
@@ -87,4 +107,3 @@ class TripModel extends TripEntity {
     );
   }
 }
-

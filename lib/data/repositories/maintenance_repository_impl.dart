@@ -16,6 +16,14 @@ class MaintenanceRepositoryImpl implements MaintenanceRepository {
   static const String _devicesUrl =
       'https://plataforma.sistemagps.online/api/get_devices';
 
+  // Helper para parsear números que pueden venir como String
+  double _parseDouble(dynamic value, [double defaultValue = 0.0]) {
+    if (value == null) return defaultValue;
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? defaultValue;
+    return defaultValue;
+  }
+
   /// Extrae el kilometraje del XML sucio del GPS
   /// Algoritmo robusto que busca múltiples etiquetas en orden de prioridad
   double? extractMileage(String rawData) {
@@ -175,14 +183,14 @@ class MaintenanceRepositoryImpl implements MaintenanceRepository {
         '🔍 Obteniendo kilometraje GPS para dispositivo específico: $gpsDeviceId',
       );
 
-      // Autenticación
-      final email = 'luisr@rastrear.com.co';
-      final password = '2023';
-
-      final apiKey = await _gpsAuthService.login(email, password);
+      // USAR EL API KEY EXISTENTE (del mapa) en lugar de hacer login nuevamente
+      final apiKey = await _gpsAuthService.getApiKey();
       if (apiKey == null || apiKey.isEmpty) {
+        print('⚠️ No hay API key, el mapa debe cargarse primero');
         return const Left(
-          MaintenanceNetworkFailure('Error al autenticar con GPS'),
+          MaintenanceNetworkFailure(
+            'No hay sesión GPS activa. Carga el mapa primero.',
+          ),
         );
       }
 
@@ -249,93 +257,65 @@ class MaintenanceRepositoryImpl implements MaintenanceRepository {
                 print('🔍 Campos disponibles: ${device.keys.toList()}');
 
                 // Buscar odómetro en diferentes campos
-                if (device['odometer'] != null) {
-                  mileage =
-                      (device['odometer'] as num).toDouble() /
-                      1000; // Convertir a km
-                  print(
-                    '✅ Kilometraje encontrado en campo odometer: $mileage km',
-                  );
-                } else if (device['totalDistance'] != null) {
-                  mileage = (device['totalDistance'] as num).toDouble() / 1000;
-                  print(
-                    '✅ Kilometraje encontrado en campo totalDistance: $mileage km',
-                  );
-                } else if (device['total_distance'] != null) {
-                  mileage = (device['total_distance'] as num).toDouble() / 1000;
-                  print(
-                    '✅ Kilometraje encontrado en campo total_distance: $mileage km',
-                  );
-                } else if (device['other'] != null) {
+                // PRIORIDAD: odometer del campo other parseado
+                if (device['other'] != null) {
                   print(
                     '🔍 Campo other encontrado, tipo: ${device['other'].runtimeType}',
                   );
 
-                  // El campo 'other' puede venir como string XML o como objeto parseado
                   final otherValue = device['other'];
 
                   if (otherValue is String) {
-                    // Es un string XML, usar extractMileage
-                    print('🔍 other es String, llamando extractMileage...');
-                    final otherStr = otherValue;
-                    print(
-                      '🔍 Llamando extractMileage con: ${otherStr.length > 200 ? '${otherStr.substring(0, 200)}...' : otherStr}',
-                    );
-                    mileage = extractMileage(otherStr);
-                    if (mileage == null) {
-                      print('⚠️ extractMileage devolvió null');
-                    } else {
-                      print('✅ extractMileage devolvió: $mileage km');
+                    // Es un string XML, parsear para obtener odometer
+                    print('🔍 other es String, parseando XML...');
+                    final odometroMatch = RegExp(
+                      r'<odometer>(\d+)</odometer>',
+                    ).firstMatch(otherValue);
+                    if (odometroMatch != null) {
+                      final odometroStr = odometroMatch.group(1);
+                      if (odometroStr != null) {
+                        // El odómetro viene en metros, dividir entre 1000
+                        final meters = double.parse(odometroStr);
+                        mileage = meters / 1000.0;
+                        print(
+                          '✅ Odómetro encontrado en XML: $odometroStr m -> $mileage km',
+                        );
+                      }
                     }
-                  } else if (otherValue is Map) {
-                    // Es un objeto parseado, buscar totaldistance directamente
+                  } else if (otherValue is Map &&
+                      otherValue['odometer'] != null) {
+                    // Es un objeto parseado, obtener odometer directamente
+                    final meters = (otherValue['odometer'] as num).toDouble();
+                    mileage = meters / 1000.0;
                     print(
-                      '🔍 other es Map, buscando totaldistance en el objeto...',
+                      '✅ Odómetro encontrado en other.odometer: $meters m -> $mileage km',
                     );
-                    if (otherValue['totaldistance'] != null) {
-                      final meters = (otherValue['totaldistance'] as num)
-                          .toDouble();
-                      mileage = meters / 1000.0;
-                      print(
-                        '✅ Kilometraje encontrado en other.totaldistance: $meters m -> $mileage km',
-                      );
-                    } else if (otherValue['total_distance'] != null) {
-                      final meters = (otherValue['total_distance'] as num)
-                          .toDouble();
-                      mileage = meters / 1000.0;
-                      print(
-                        '✅ Kilometraje encontrado en other.total_distance: $meters m -> $mileage km',
-                      );
-                    } else if (otherValue['odometer'] != null) {
-                      final meters = (otherValue['odometer'] as num).toDouble();
-                      mileage = meters / 1000.0;
-                      print(
-                        '✅ Kilometraje encontrado en other.odometer: $meters m -> $mileage km',
-                      );
-                    } else {
-                      print(
-                        '⚠️ No se encontró totaldistance en el objeto other',
-                      );
-                      print(
-                        '🔍 Claves disponibles en other: ${otherValue.keys.toList()}',
-                      );
-                      // Intentar convertir a string y parsear como XML
-                      final otherStr = otherValue.toString();
-                      print(
-                        '🔍 Intentando parsear como XML: ${otherStr.length > 200 ? '${otherStr.substring(0, 200)}...' : otherStr}',
-                      );
-                      mileage = extractMileage(otherStr);
-                    }
-                  } else {
-                    // Otro tipo, intentar convertir a string
-                    print(
-                      '🔍 other es de tipo ${otherValue.runtimeType}, convirtiendo a string...',
-                    );
-                    final otherStr = otherValue.toString();
-                    mileage = extractMileage(otherStr);
                   }
-                } else {
-                  print('⚠️ No se encontró campo other en el dispositivo');
+                }
+
+                // Si no se encontró en other, buscar en campos directos
+                if (mileage == null) {
+                  if (device['odometer'] != null) {
+                    final meters = (device['odometer'] as num).toDouble();
+                    mileage = meters / 1000;
+                    print(
+                      '✅ Kilometraje encontrado en campo odometer: $meters m -> $mileage km',
+                    );
+                  } else if (device['totalDistance'] != null) {
+                    mileage =
+                        (device['totalDistance'] as num).toDouble() / 1000;
+                    print(
+                      '✅ Kilometraje encontrado en campo totalDistance: $mileage km',
+                    );
+                  } else if (device['total_distance'] != null) {
+                    mileage =
+                        (device['total_distance'] as num).toDouble() / 1000;
+                    print(
+                      '✅ Kilometraje encontrado en campo total_distance: $mileage km',
+                    );
+                  } else {
+                    print('⚠️ No se encontró ningún campo de kilometraje');
+                  }
                 }
 
                 // Si encontramos el dispositivo específico, salir de TODOS los loops
@@ -404,8 +384,9 @@ class MaintenanceRepositoryImpl implements MaintenanceRepository {
       final vehicleMileageMap = <String, double>{};
       for (var vehicle in vehiclesResponse) {
         if (vehicle['id'] != null && vehicle['current_mileage'] != null) {
-          vehicleMileageMap[vehicle['id'] as String] =
-              (vehicle['current_mileage'] as num).toDouble();
+          vehicleMileageMap[vehicle['id'] as String] = _parseDouble(
+            vehicle['current_mileage'],
+          );
         }
       }
 

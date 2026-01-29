@@ -20,6 +20,14 @@ class RemittanceRepositoryImpl implements RemittanceRepository {
   // IMPORTANTE: El bucket de storage en Supabase se llama 'signatures' (en plural)
   static const String _storageBucket = 'signatures';
 
+  // Helper para parsear números que pueden venir como String
+  double _parseDouble(dynamic value, [double defaultValue = 0.0]) {
+    if (value == null) return defaultValue;
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? defaultValue;
+    return defaultValue;
+  }
+
   @override
   Future<Either<RemittanceFailure, List<RemittanceEntity>>>
   getRemittances() async {
@@ -106,7 +114,7 @@ class RemittanceRepositoryImpl implements RemittanceRepository {
             driverName: routeData['driver_name'] as String?,
             clientName: routeData['client_name'] as String?,
             revenueAmount: routeData['revenue_amount'] != null
-                ? (routeData['revenue_amount'] as num).toDouble()
+                ? _parseDouble(routeData['revenue_amount'])
                 : null,
             createdAt: routeData['created_at'] != null
                 ? DateTime.parse(routeData['created_at'] as String)
@@ -176,7 +184,7 @@ class RemittanceRepositoryImpl implements RemittanceRepository {
               driverName: routeData['driver_name'] as String?,
               clientName: routeData['client_name'] as String?,
               revenueAmount: routeData['revenue_amount'] != null
-                  ? (routeData['revenue_amount'] as num).toDouble()
+                  ? _parseDouble(routeData['revenue_amount'])
                   : null,
               createdAt: routeData['created_at'] != null
                   ? DateTime.parse(routeData['created_at'] as String)
@@ -402,7 +410,7 @@ class RemittanceRepositoryImpl implements RemittanceRepository {
                 driverName: routeData['driver_name'] as String?,
                 clientName: routeData['client_name'] as String?,
                 revenueAmount: routeData['revenue_amount'] != null
-                    ? (routeData['revenue_amount'] as num).toDouble()
+                    ? _parseDouble(routeData['revenue_amount'])
                     : null,
                 createdAt: routeData['created_at'] != null
                     ? DateTime.parse(routeData['created_at'] as String)

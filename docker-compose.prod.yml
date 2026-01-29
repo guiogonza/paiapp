@@ -1,0 +1,103 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database con persistencia
+  postgres:
+    image: postgres:15-alpine
+    container_name: pai-postgres-prod
+    restart: always
+    environment:
+      POSTGRES_DB: paiapp
+      POSTGRES_USER: paiapp
+      POSTGRES_PASSWORD: PaiApp2026SecurePass!
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./backups:/backups
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U paiapp -d paiapp"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - pai-network
+
+  # API Node.js
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: pai-api-prod
+    restart: always
+    environment:
+      PORT: 3000
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: paiapp
+      DB_USER: paiapp
+      DB_PASSWORD: PaiApp2026SecurePass!
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - pai-network
+
+  # Flutter Web App con Nginx
+  web:
+    image: nginx:alpine
+    container_name: pai-web-prod
+    restart: always
+    volumes:
+      - ./web-build:/usr/share/nginx/html:ro
+      - ./nginx/nginx-prod.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - api
+    networks:
+      - pai-network
+
+  # Backup automático diario
+  backup:
+    image: postgres:15-alpine
+    container_name: pai-backup
+    restart: always
+    environment:
+      PGHOST: postgres
+      PGUSER: paiapp
+      PGPASSWORD: PaiApp2026SecurePass!
+      PGDATABASE: paiapp
+    volumes:
+      - ./backups:/backups
+    entrypoint: /bin/sh
+    command: >
+      -c 'while true; do
+        BACKUP_FILE="/backups/paiapp_$$(date +%Y%m%d_%H%M%S).sql";
+        echo "🔄 Iniciando backup: $$BACKUP_FILE";
+        pg_dump -h postgres -U paiapp paiapp > "$$BACKUP_FILE";
+        gzip "$$BACKUP_FILE";
+        echo "✅ Backup completado: $${BACKUP_FILE}.gz";
+        # Mantener solo los últimos 30 backups
+        ls -t /backups/*.gz 2>/dev/null | tail -n +31 | xargs -r rm;
+        echo "⏰ Próximo backup en 24 horas...";
+        sleep 86400;
+      done'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - pai-network
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  pai-network:
+    driver: bridge

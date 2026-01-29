@@ -866,7 +866,7 @@ class _DriversManagementPageState extends State<DriversManagementPage> {
                       key: ValueKey(
                         'dropdown_${loadedVehicles.length}_${DateTime.now().millisecondsSinceEpoch}',
                       ),
-                      value: _selectedVehicleIdForNewDriver,
+                      initialValue: _selectedVehicleIdForNewDriver,
                       decoration: InputDecoration(
                         labelText: 'Vehículo asignado (Opcional)',
                         hintText: loadedVehicles.isEmpty
